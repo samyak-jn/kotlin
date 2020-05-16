@@ -1,0 +1,10 @@
+org.jetbrains.kotlin * * * * *
+org.jetbrains.kotlinx * * * * *
+com.google.protobuf protobuf * s/2.*/2.x * *
+s/org.jetbrains.intellij.deps/org.ow2.asm asm-all
+s/org.jetbrains.intellij.deps.jflex/de.jflex jflex
+s/com.google.android/com.android android * s/2.3.1/23 * *
+junit junit * s/4.*/4.x * *
+net.rubygrapefruit s/native-platform-linux-amd64/native-platform
+org.apache.maven * * s/3.*/3.x * *
+s/io.javaslang/io.vavr s/javaslang/vavr * s/.*/0.x * *

@@ -1,0 +1,15 @@
+kotlin (1.3.30-1) unstable; urgency=medium
+
+  [Samyak Jain]
+  * Corrects d/control file (fixes all lintian warnings)
+  * Updated d/rules ln_to_ant_repo
+  * Updates d/rules for correct jar file (for picocontainer and lz4)
+  * Adds d/copyright file a/c to upstream license
+  * Adds homepage, VCS-* fields
+  * Bumps standard version to 4.5.0 and removes d/compat (No changes Required)
+  * Updates d/rules for correct ln_to_ant_repo
+
+  [Saif Abdul Casim]
+  * Initial release. (Closes: #939730)
+
+ -- Samyak Jain <samyak.jn11@gmail.com>  Sat, 16 May 2020 13:51:27 +0530

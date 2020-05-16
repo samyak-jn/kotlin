@@ -1,0 +1,52 @@
+<project name="Build Protobuf" default="get-protobuf-and-rename-packages" xmlns:if="ant:if" xmlns:unless="ant:unless">
+    
+    <target name="get-protobuf-and-rename-packages">
+        <sequential>
+            <macrodef name="rename-packages-in-binaries">
+                <attribute name="target.jar"/>
+                <attribute name="source.jar"/>
+                <attribute name="OrigName"/>
+                <attribute name="TargetName"/>
+
+                <sequential>
+                    <delete file="@{target.jar}" failonerror="false"/>
+                    <taskdef name="jarjar" classname="com.tonicsystems.jarjar.JarJarTask" classpath="/usr/share/java/jarjar.jar"/>
+                    <jarjar jarfile="@{target.jar}" filesonly="true">
+                        <zipfileset src="@{source.jar}">
+                            <exclude name="META-INF/maven/com.google.protobuf/protobuf-java/pom.properties"/>
+                        </zipfileset>
+                        <rule pattern="@{OrigName}.**" result="@{TargetName}.@1"/>
+                    </jarjar>
+                </sequential>
+            </macrodef>
+
+            <!-- rename packages-->
+            <rename-packages-in-binaries
+                source.jar="/usr/share/java/protobuf2-2.6.1.jar"
+                target.jar="./maven-repo-cache/org/jetbrains/kotlin/protobuf/protobuf/debian/protobuf-debian.jar"
+                OrigName="com.google.protobuf"
+                TargetName="org.jetbrains.kotlin.protobuf"
+            />
+			<rename-packages-in-binaries
+                source.jar="/usr/share/java/asm-all.jar"
+                target.jar="./maven-repo-cache/intellij-deps-asm/asm-all/debian/asm-all-debian.jar"
+                OrigName="org.objectweb.asm"
+                TargetName="org.jetbrains.org.objectweb.asm"
+            />
+            <rename-packages-in-binaries
+                source.jar="/usr/share/java/asm-all.jar"
+                target.jar="../buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellij-core/asm-all-7.0.jar"
+                OrigName="org.objectweb.asm"
+                TargetName="org.jetbrains.org.objectweb.asm"
+            />
+            
+            <rename-packages-in-binaries
+                source.jar="/usr/share/java/asm-all.jar"
+                target.jar="../buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/asm-all-7.0.jar"
+                OrigName="org.objectweb.asm"
+                TargetName="org.jetbrains.org.objectweb.asm"
+            />
+        </sequential>
+    </target>
+
+</project>

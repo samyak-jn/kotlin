@@ -1,0 +1,56 @@
+Source: kotlin
+Maintainer: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
+Uploaders: Saif Abdul Cassim <saif.15@cse.mrt.ac.lk>
+		   Samyak Jain <samyak.jn11@gmail.com>
+Section: java
+Priority: optional
+Build-Depends: debhelper-compat (=12),
+	gradle-debian-helper,
+	libjetbrains-annotations-java,
+	libproguard-java,
+	openjdk-8-jdk-headless,
+	openjdk-11-jdk-headless,
+	jflex,
+	libtrove-intellij-java,
+	libandroid-23-java,
+	libnative-platform-java,
+	libmaven3-core-java,
+	libjengelman-shadow-java,
+	libprotobuf2-java,
+	libjna-java,
+	libjna-platform-java,
+	liblog4j1.2-java,
+	liboro-java,
+	libpicocontainer1-java,
+	libintellij-java-compatibility-java,
+	libstreamex-java,
+	libguava-java,
+	liblz4-java,
+	ant,
+	libjdom2-java,
+	libjdom2-intellij-java,
+	libjline3-java,
+	libvavr0-java,
+	libasm-java,
+	libintellij-utils-java,
+	libintellij-jps-model-java,
+	libintellij-extensions-java,
+	libintellij-platform-api-java,
+	libintellij-platform-impl-java,
+	libintellij-core-java,
+	libkotlin-bootstrap-java
+Standards-Version: 4.5.0
+Homepage: https://github.com/jetbrains/kotlin
+Vcs-Browser: https://salsa.debian.org/java-team/kotlin
+Vcs-Git: https://salsa.debian.org/java-team/kotlin.git
+Rules-Requires-Root: no
+
+Package: kotlin
+Architecture: all
+Depends:
+	${misc:Depends}
+Description: Kotlin is a cross-platform , general-purpose programming language
+ Kotlin is a cross-platform, statically typed, general-purpose programming
+ language with type inference. Kotlin is designed to interoperate fully with
+ Java, and the JVM version of its standard library  depends on the Java Class
+ Library, but type inference allows its syntax to be more concise.

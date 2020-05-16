@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+#meant to be invoked from the project root directory; with root permission
+bootstrap:
+	git clone https://salsa.debian.org/m36-guest/kotlin-1.3.30-temp-requirements ../kotlin-1.3.30-temp-requirements
+	mkdir -p /usr/share/maven-repo/org/jetbrains
+	cp -r ../kotlin-1.3.30-temp-requirements/kotlin_bootstrapper/kotlin /usr/share/maven-repo/org/jetbrains
+	cp -r ../kotlin-1.3.30-temp-requirements/kotlin_bootstrapper/kotlinx /usr/share/maven-repo/org/jetbrains
+	cp -r ../kotlin-1.3.30-temp-requirements/kotlin_bootstrapper/gradle/*  /usr/share/gradle/lib/
+clean:
+	rm -rf /usr/share/maven-repo/org/jetbrains/kotlin /usr/share/maven-repo/org/jetbrains/kotlinx
+	find /usr/share/gradle/lib/ -type f | grep -v "\->" | grep "jar" | tr "\n" " " | xargs rm -rf

@@ -1,0 +1,100 @@
+# List of POM files for the package
+# Format of this file is:
+# <path to pom file> [option]*
+# where option can be:
+#   --ignore: ignore this POM and its artifact if any
+#   --ignore-pom: don't install the POM. To use on POM files that are created
+#     temporarily for certain artifacts such as Javadoc jars. [mh_install, mh_installpoms]
+#   --no-parent: remove the <parent> tag from the POM
+#   --package=<package>: an alternative package to use when installing this POM
+#      and its artifact
+#   --has-package-version: to indicate that the original version of the POM is the same as the upstream part
+#      of the version for the package.
+#   --keep-elements=<elem1,elem2>: a list of XML elements to keep in the POM
+#      during a clean operation with mh_cleanpom or mh_installpom
+#   --artifact=<path>: path to the build artifact associated with this POM,
+#      it will be installed when using the command mh_install. [mh_install]
+#   --java-lib: install the jar into /usr/share/java to comply with Debian
+#      packaging guidelines
+#   --usj-name=<name>: name to use when installing the library in /usr/share/java
+#   --usj-version=<version>: version to use when installing the library in /usr/share/java
+#   --no-usj-versionless: don't install the versionless link in /usr/share/java
+#   --dest-jar=<path>: the destination for the real jar.
+#     It will be installed with mh_install. [mh_install]
+#   --classifier=<classifier>: Optional, the classifier for the jar. Empty by default.
+#   --site-xml=<location>: Optional, the location for site.xml if it needs to be installed.
+#     Empty by default. [mh_install]
+#
+.m2/repository/org/jetbrains/kotlin/kotlin-allopen-compiler-plugin/1.3.30/kotlin-allopen-compiler-plugin-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-allopen-compiler-plugin/1.3.30/kotlin-allopen-compiler-plugin-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/plugin-api/1.3.30/plugin-api-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/plugin-api/1.3.30/plugin-api-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/cli-common/1.3.30/cli-common-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/cli-common/1.3.30/cli-common-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/util.runtime/1.3.30/util.runtime-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/util.runtime/1.3.30/util.runtime-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/frontend.script/1.3.30/frontend.script-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/frontend.script/1.3.30/frontend.script-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/js.ast/1.3.30/js.ast-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/js.ast/1.3.30/js.ast-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/metadata.jvm/1.3.30/metadata.jvm-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/metadata.jvm/1.3.30/metadata.jvm-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/backend.jvm/1.3.30/backend.jvm-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/backend.jvm/1.3.30/backend.jvm-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-script-runtime/1.3.30/kotlin-script-runtime-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-script-runtime/1.3.30/kotlin-script-runtime-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/jvm-abi-gen/1.3.30/jvm-abi-gen-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/jvm-abi-gen/1.3.30/jvm-abi-gen-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/daemon/1.3.30/daemon-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/daemon/1.3.30/daemon-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-annotation-processing-base/1.3.30/kotlin-annotation-processing-base-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-annotation-processing-base/1.3.30/kotlin-annotation-processing-base-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/android-extensions-compiler/1.3.30/android-extensions-compiler-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/android-extensions-compiler/1.3.30/android-extensions-compiler-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-android-extensions-runtime/1.3.30/kotlin-android-extensions-runtime-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-android-extensions-runtime/1.3.30/kotlin-android-extensions-runtime-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/frontend/1.3.30/frontend-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/frontend/1.3.30/frontend-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-scripting-common/1.3.30/kotlin-scripting-common-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-scripting-common/1.3.30/kotlin-scripting-common-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/backend-common/1.3.30/backend-common-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/backend-common/1.3.30/backend-common-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/js.serializer/1.3.30/js.serializer-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/js.serializer/1.3.30/js.serializer-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-source-sections-compiler-plugin/1.3.30/kotlin-source-sections-compiler-plugin-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-source-sections-compiler-plugin/1.3.30/kotlin-source-sections-compiler-plugin-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-scripting-compiler/1.3.30/kotlin-scripting-compiler-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-scripting-compiler/1.3.30/kotlin-scripting-compiler-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-annotation-processing/1.3.30/kotlin-annotation-processing-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-annotation-processing/1.3.30/kotlin-annotation-processing-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/psi/1.3.30/psi-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/psi/1.3.30/psi-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/descriptors/1.3.30/descriptors-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/descriptors/1.3.30/descriptors-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-scripting-impl/1.3.30/kotlin-scripting-impl-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-scripting-impl/1.3.30/kotlin-scripting-impl-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/ir.tree/1.3.30/ir.tree-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/ir.tree/1.3.30/ir.tree-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-annotation-processing-cli/1.3.30/kotlin-annotation-processing-cli-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-annotation-processing-cli/1.3.30/kotlin-annotation-processing-cli-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-annotation-processing-runtime/1.3.30/kotlin-annotation-processing-runtime-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-annotation-processing-runtime/1.3.30/kotlin-annotation-processing-runtime-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/backend.js/1.3.30/backend.js-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/backend.js/1.3.30/backend.js-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-reflect/1.3.30/kotlin-reflect-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-reflect/1.3.30/kotlin-reflect-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/deserialization/1.3.30/deserialization-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/deserialization/1.3.30/deserialization-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/serialization/1.3.30/serialization-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/serialization/1.3.30/serialization-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/resolution/1.3.30/resolution-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/resolution/1.3.30/resolution-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-build-common/1.3.30/kotlin-build-common-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-build-common/1.3.30/kotlin-build-common-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/ir.backend.common/1.3.30/ir.backend.common-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/ir.backend.common/1.3.30/ir.backend.common-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/js.parser/1.3.30/js.parser-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/js.parser/1.3.30/js.parser-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-annotations-android/1.3.30/kotlin-annotations-android-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-annotations-android/1.3.30/kotlin-annotations-android-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/container/1.3.30/container-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/container/1.3.30/container-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/frontend.common/1.3.30/frontend.common-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/frontend.common/1.3.30/frontend.common-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/backend/1.3.30/backend-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/backend/1.3.30/backend-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/daemon-common/1.3.30/daemon-common-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/daemon-common/1.3.30/daemon-common-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/mutability-annotations-compat/1.3.30/mutability-annotations-compat-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/mutability-annotations-compat/1.3.30/mutability-annotations-compat-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-reflect-api/1.3.30/kotlin-reflect-api-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-reflect-api/1.3.30/kotlin-reflect-api-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-main-kts/1.3.30/kotlin-main-kts-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-main-kts/1.3.30/kotlin-main-kts-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.3.30/kotlin-stdlib-jdk7-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.3.30/kotlin-stdlib-jdk7-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/js.translator/1.3.30/js.translator-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/js.translator/1.3.30/js.translator-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-sam-with-receiver-compiler-plugin/1.3.30/kotlin-sam-with-receiver-compiler-plugin-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-sam-with-receiver-compiler-plugin/1.3.30/kotlin-sam-with-receiver-compiler-plugin-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-noarg-compiler-plugin/1.3.30/kotlin-noarg-compiler-plugin-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-noarg-compiler-plugin/1.3.30/kotlin-noarg-compiler-plugin-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-script-util/1.3.30/kotlin-script-util-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-script-util/1.3.30/kotlin-script-util-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-test/1.3.30/kotlin-test-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-test/1.3.30/kotlin-test-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-preloader/1.3.30/kotlin-preloader-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-preloader/1.3.30/kotlin-preloader-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-annotations-jvm/1.3.30/kotlin-annotations-jvm-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-annotations-jvm/1.3.30/kotlin-annotations-jvm-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/js.dce/1.3.30/js.dce-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/js.dce/1.3.30/js.dce-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/js.frontend/1.3.30/js.frontend-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/js.frontend/1.3.30/js.frontend-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/cli/1.3.30/cli-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/cli/1.3.30/cli-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/light-classes/1.3.30/light-classes-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/light-classes/1.3.30/light-classes-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-stdlib/1.3.30/kotlin-stdlib-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-stdlib/1.3.30/kotlin-stdlib-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/util/1.3.30/util-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/util/1.3.30/util-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlinx-serialization-compiler-plugin/1.3.30/kotlinx-serialization-compiler-plugin-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlinx-serialization-compiler-plugin/1.3.30/kotlinx-serialization-compiler-plugin-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/descriptors.runtime/1.3.30/descriptors.runtime-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/descriptors.runtime/1.3.30/descriptors.runtime-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/jvm-minimal-for-test/1.3.30/jvm-minimal-for-test-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/jvm-minimal-for-test/1.3.30/jvm-minimal-for-test-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-ant/1.3.30/kotlin-ant-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-ant/1.3.30/kotlin-ant-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-runner/1.3.30/kotlin-runner-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-runner/1.3.30/kotlin-runner-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.3.30/kotlin-stdlib-jdk8-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.3.30/kotlin-stdlib-jdk8-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/descriptors.jvm/1.3.30/descriptors.jvm-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/descriptors.jvm/1.3.30/descriptors.jvm-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-compiler/1.3.30/kotlin-compiler-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-compiler/1.3.30/kotlin-compiler-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-scripting-jvm/1.3.30/kotlin-scripting-jvm-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-scripting-jvm/1.3.30/kotlin-scripting-jvm-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-imports-dumper-compiler-plugin/1.3.30/kotlin-imports-dumper-compiler-plugin-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-imports-dumper-compiler-plugin/1.3.30/kotlin-imports-dumper-compiler-plugin-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/frontend.java/1.3.30/frontend.java-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/frontend.java/1.3.30/frontend.java-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/ir.psi2ir/1.3.30/ir.psi2ir-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/ir.psi2ir/1.3.30/ir.psi2ir-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/incremental-compilation-impl/1.3.30/incremental-compilation-impl-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/incremental-compilation-impl/1.3.30/incremental-compilation-impl-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/metadata/1.3.30/metadata-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/metadata/1.3.30/metadata-1.3.30.jar --java-lib
+.m2/repository/org/jetbrains/kotlin/kotlin-daemon-client/1.3.30/kotlin-daemon-client-1.3.30.pom --artifact=.m2/repository/org/jetbrains/kotlin/kotlin-daemon-client/1.3.30/kotlin-daemon-client-1.3.30.jar --java-lib
+

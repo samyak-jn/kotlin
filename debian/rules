@@ -1,0 +1,46 @@
+#!/usr/bin/make -f
+
+export KOTLIN_VERSION="1.3.0"
+
+%:
+	dh $@ --buildsystem=gradle --with-maven-repo-helper
+
+ln_to_ant_repo:
+	mkdir --parents buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib
+	mkdir --parents buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellij-core
+	mkdir --parents buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/jps-standalone
+	cp -u /usr/share/java/guava.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/guava-25.1-jre.jar
+	cp -u /usr/share/java/jdom2-intellij.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/jdom.jar
+	cp -u /usr/share/java/jna.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/jna.jar
+	cp -u /usr/share/java/jna-platform.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/jna-platform.jar
+	cp -u /usr/share/java/log4j-1.2.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/log4j.jar
+	cp -u /usr/share/java/oro.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/oro-2.0.8.jar
+	cp -u /usr/share/java/picocontainer-1.3.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/picocontainer-1.2.jar
+	cp -u /usr/share/java/libtrove-intellij.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/trove4j.jar
+	cp -u /usr/share/java/intellij-java-compatibility.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellij-core/java-compatibility-1.0.1.jar
+	cp -u /usr/share/java/streamex.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/streamex-0.6.7.jar
+	cp -u /usr/share/java/lz4-java-1.5.1.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/lz4-1.3.0.jar
+	cp -u /usr/share/java/guava.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/guava-25.1-jre.jar
+	cp -u /usr/share/java/intellij-util-all.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/util.jar
+	cp -u /usr/share/java/intellij-jps-model-all.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/jps-standalone/jps-model.jar
+	cp -u /usr/share/java/intellij-extensions.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/extensions.jar
+	cp -u /usr/share/java/intellij-platform-api.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/platform-api.jar
+	cp -u /usr/share/java/intellij-platform-impl.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/platform-impl.jar
+	cp -u /usr/share/java/intellij-core.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellij-core/intellij-core.jar
+
+override_dh_auto_build: ln_to_ant_repo
+	export JDK_16="/usr/lib/jvm/java-8-openjdk-amd64"
+	export JDK_17="/usr/lib/jvm/java-8-openjdk-amd64"
+	export JDK_18="/usr/lib/jvm/java-8-openjdk-amd64"
+	export JDK_9="/usr/lib/jvm/java-11-openjdk-amd64"
+	ant -f ./debian/buildprotobufkotlin.xml
+	cp ./debian/protobuf-debian.pom ./debian/maven-repo-cache/org/jetbrains/kotlin/protobuf/protobuf/debian/protobuf-debian.pom
+	dh_auto_build -- --no-parallel -PbuildSrc.kotlin.version=1.3.30-eap-28 -Pteamcity=true dist install
+	mv dist/kotlinc/lib/annotations-debian.jar dist/kotlinc/lib/annotations-13.0.jar
+override_dh_clean:
+	dh_clean
+	dh_auto_build -- --no-parallel -PbuildSrc.kotlin.version=1.3.30-eap-28 -Pteamcity=true clean
+	rm -rf ./debian/maven-repo-cache ./buildSrc/prepare-deps/intellij-sdk/build buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate/lib/*.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellij-core/*.jar buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/jps-standalone/*.jar
+override_dh_install:
+	mh_install
+	dh_install
