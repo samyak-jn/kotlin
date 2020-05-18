@@ -1,0 +1,36 @@
+Description: Covert build.gradle.kts to build.gradle
+ This patch converts the build.gradle.kts to build.gradle.
+Bug-Debian: https://bugs.debian.org/939730
+
+---
+
+--- a/build.gradle
++++ b/build.gradle
+@@ -22,13 +22,13 @@
+     // a workaround for kotlin compiler classpath in kotlin project: sometimes gradle substitutes
+     // kotlin-stdlib external dependency with local project :kotlin-stdlib in kotlinCompilerClasspath configuration.
+     // see also configureCompilerClasspath@
+-    val bootstrapCompilerClasspath by configurations.creating
++	configurations.create("bootstrapCompilerClasspath")
+ 
+     dependencies {
+-        bootstrapCompilerClasspath(kotlin("compiler-embeddable", bootstrapKotlinVersion))
++		bootstrapCompilerClasspath DependenciesKt.kotlinDep("compiler-embeddable", bootstrapKotlinVersion)
+ 
+         classpath("com.gradle.publish:plugin-publish-plugin:0.9.7")
+-        classpath(kotlin("gradle-plugin", bootstrapKotlinVersion))
++        classpath(DependenciesKt.kotlinDep("gradle-plugin", bootstrapKotlinVersion))
+         classpath("net.sf.proguard:proguard-gradle:6.0.3")
+         classpath("org.jetbrains.dokka:dokka-gradle-plugin:0.9.17")
+ 
+--- a/buildSrc/src/main/kotlin/dependencies.kt
++++ b/buildSrc/src/main/kotlin/dependencies.kt
+@@ -68,7 +68,7 @@
+     else files()
+ }
+ 
+-fun Project.kotlinDep(artifactBaseName: String, version: String): String = "org.jetbrains.kotlin:kotlin-$artifactBaseName:$version"
++fun kotlinDep(artifactBaseName: String, version: String): String = "org.jetbrains.kotlin:kotlin-$artifactBaseName:$version"
+ 
+ val Project.useBootstrapStdlib: Boolean get() =
+     findProperty("jpsBuild")?.toString() == "true"
