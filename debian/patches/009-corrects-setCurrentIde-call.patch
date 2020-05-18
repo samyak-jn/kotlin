@@ -1,0 +1,73 @@
+Description: fixes setCurrentIde() call in build.gradle 
+ This patch fix the setCurrentIde() method call in build.gradle.
+
+---
+--- a/build.gradle
++++ b/build.gradle
+@@ -66,6 +66,8 @@
+                 logger.info("Using ${it.majorVersion} home: ${it.homeDir}")
+ }
+ 
++ext.configuredJdks =configuredJdks
++
+ val defaultSnapshotVersion: String by extra
+ val buildNumber by extra(findProperty("build.number")?.toString() ?: defaultSnapshotVersion)
+ val kotlinVersion by extra(findProperty("deployVersion")?.toString() ?: buildNumber)
+@@ -79,18 +81,16 @@
+ 
+ extra["kotlin_root"] = rootDir
+ 
+-val jpsBootstrap by configurations.creating
++configurations.create("jpsBootstrap")
+ 
+-val commonBuildDir = File(rootDir, "build")
+-val distDir by extra("$rootDir/dist")
+-val distKotlinHomeDir by extra("$distDir/kotlinc")
+-val distLibDir = "$distKotlinHomeDir/lib"
+-val commonLocalDataDir = "$rootDir/local"
+-val ideaSandboxDir = "$commonLocalDataDir/ideaSandbox"
+-val ideaUltimateSandboxDir = "$commonLocalDataDir/ideaUltimateSandbox"
+-val artifactsDir = "$distDir/artifacts"
+-val ideaPluginDir = "$artifactsDir/ideaPlugin/Kotlin"
+-val ideaUltimatePluginDir = "$artifactsDir/ideaUltimatePlugin/Kotlin"
++def commonBuildDir =new File(rootDir, "build")
++def distLibDir = "$distKotlinHomeDir/lib"
++def commonLocalDataDir = "$rootDir/local"
++def ideaSandboxDir = "$commonLocalDataDir/ideaSandbox"
++def ideaUltimateSandboxDir = "$commonLocalDataDir/ideaUltimateSandbox"
++def artifactsDir = "$distDir/artifacts"
++def ideaPluginDir = "$artifactsDir/ideaPlugin/Kotlin"
++def ideaUltimatePluginDir = "$artifactsDir/ideaUltimatePlugin/Kotlin"
+ 
+ // TODO: use "by extra()" syntax where possible
+ extra["distLibDir"] = project.file(distLibDir)
+@@ -103,7 +103,8 @@
+ extra["isSonatypeRelease"] = false
+ 
+ // Work-around necessary to avoid setting null javaHome. Will be removed after support of lazy task configuration
+-val jdkNotFoundConst = "JDK NOT FOUND"
++def jdkNotFoundConst = "JDK NOT FOUND"
++ext.jdkNotFoundConst =jdkNotFoundConst
+ 
+ extra["JDK_16"] = jdkPath("1.6")
+ extra["JDK_17"] = jdkPath("1.7")
+@@ -135,7 +136,7 @@
+     from(rootProject.file("gradle/jps.gradle.kts"))
+ }
+ 
+-IdeVersionConfigurator.setCurrentIde(this)
++IdeCompatibilityDslKt.setCurrentIde(project)
+ 
+ extra["versions.protobuf"] = "2.6.1"
+ extra["versions.javax.inject"] = "1"
+@@ -684,8 +685,8 @@
+ }
+ 
+ def String jdkPath(String version) {
+-    val jdkName = "JDK_${version.replace(".", "")}"
+-    val jdkMajorVersion = JdkMajorVersion.valueOf(jdkName)
++    def jdkName = "JDK_${version.replace(".", "")}"
++    def jdkMajorVersion = JdkMajorVersion.valueOf(jdkName)
+     return configuredJdks.find { it.majorVersion == jdkMajorVersion }?.homeDir?.canonicalPath?:jdkNotFoundConst
+ }
+ 

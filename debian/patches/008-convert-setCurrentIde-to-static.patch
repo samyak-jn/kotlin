@@ -1,0 +1,29 @@
+Description: Covert build.gradle.kts to build.gradle
+ This patch converts made setCurrentIde a static method of
+ IdeCompatibilityDslKt since groovy cannot understand "object" keyword and
+ hence cant use functions defined in object IdeVersionConfigurator.
+
+---
+
+--- a/buildSrc/src/main/kotlin/IdeCompatibilityDsl.kt
++++ b/buildSrc/src/main/kotlin/IdeCompatibilityDsl.kt
+@@ -85,13 +85,12 @@
+ object IdeVersionConfigurator {
+     lateinit var currentIde: Ide
+ 
+-    fun setCurrentIde(project: Project) {
+-        val platformVersion = project.rootProject.extensions.extraProperties["versions.platform"].toString()
+-        val ideName = if (platformVersion.startsWith("AS")) platformVersion else "IJ$platformVersion"
+-        currentIde = Ide.valueOf(ideName)
+-    }
++fun setCurrentIde(project: Project) {
++    val platformVersion = project.rootProject.extensions.extraProperties["versions.platform"].toString()
++    val ideName = if (platformVersion.startsWith("AS")) platformVersion else "IJ$platformVersion"
++    IdeVersionConfigurator.currentIde = Ide.valueOf(ideName)
+ }
+ 
+ private class IdeKindPredicate(val kind: Ide.Kind) : CompatibilityPredicate {
+     override fun matches(ide: Ide) = ide.kind == kind
+-}
+\ No newline at end of file
++}
