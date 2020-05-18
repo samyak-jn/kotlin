@@ -7,3 +7,5 @@
 007-translates-JdksFinderKt.patch
 008-convert-setCurrentIde-to-static.patch
 009-corrects-setCurrentIde-call.patch
+010-creates-getBooleanPropertyFromProject.patch
+011-create-getAsmVersion-method.patch

@@ -1,0 +1,19 @@
+Description: Creates new method getBooleanPropertyFromProject
+ This patch creates new method getBooleanPropertyFromProjectwhich inturn calls
+ getBooleanProperty so that build.gradle may use it.
+
+---
+
+--- a/buildSrc/src/main/kotlin/CommonUtil.kt
++++ b/buildSrc/src/main/kotlin/CommonUtil.kt
+@@ -64,6 +64,10 @@
+     else v.toBoolean()
+ }
+ 
++fun getBooleanPropertyFromProject(project:Project,name: String): Boolean? {
++	return project.getBooleanProperty(name)
++}
++
+ inline fun CopySourceSpec.from(crossinline filesProvider: () -> Any?): CopySourceSpec = from(Callable { filesProvider() })
+ 
+ fun Project.javaPluginConvention(): JavaPluginConvention = the()

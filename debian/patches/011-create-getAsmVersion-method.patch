@@ -1,0 +1,23 @@
+Description: Creates new method getBooleanPropertyFromProject
+ This patch creates new method getAsmVersion to act as a buffer between 
+ Platform.orHigher and build.gradle.
+
+---
+
+--- a/buildSrc/src/main/kotlin/IdeCompatibilityDsl.kt
++++ b/buildSrc/src/main/kotlin/IdeCompatibilityDsl.kt
+@@ -74,6 +74,14 @@
+     override fun matches(ide: Ide) = ide.platform.version <= version
+ }
+ 
++fun getAsmVersion(number: Int): String {
++	if (Platform[number].orHigher()){
++		return "asm-all-7.0"
++	} else {
++		return "asm-all"
++	}
++}
++
+ val Ide.orHigher get() = object : CompatibilityPredicate {
+     override fun matches(ide: Ide) = ide.kind == kind && ide.version >= version
+ }
