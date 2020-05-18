@@ -1,0 +1,55 @@
+Description: Translates pill configuration 
+ This patch translates pill configuration to work in build.gradle.
+Bug-Debian: https://bugs.debian.org/939730
+
+---
+
+--- a/build.gradle
++++ b/build.gradle
+@@ -47,7 +47,7 @@
+ }
+ 
+ pill {
+-    excludedDirs(
++    excludedDirs(project,
+         "out",
+         "buildSrc/build",
+         "buildSrc/prepare-deps/android-dx/build",
+@@ -118,7 +118,7 @@
+     checkJDK()
+ }
+ 
+-var jdkChecked: Boolean = false
++Boolean jdkChecked  = false
+ def checkJDK() {
+     if (jdkChecked) {
+         return
+@@ -375,7 +375,7 @@
+         }
+ 
+         ext.printClassPath = {String role, FileCollection f  ->
+-                println("${project.path} $role classpath:\n  ${f.collect({it -> toProjectRootRelativePathOrSelf(it)}).join("\n  ")}")
++	                println("${project.path} $role classpath:\n  ${f.collect({fi -> toProjectRootRelativePathOrSelf(fi)}).join("\n  ")}")
+         }
+ 
+         try { 
+--- a/buildSrc/src/main/kotlin/pill/extension.kt
++++ b/buildSrc/src/main/kotlin/pill/extension.kt
+@@ -27,8 +27,8 @@
+ 
+     open var excludedDirs: List<File> = emptyList()
+ 
+-    fun Project.excludedDirs(vararg dirs: String) {
+-        excludedDirs = excludedDirs + dirs.map { File(projectDir, it) }
++    fun excludedDirs(project:Project,vararg dirs: String) {
++        excludedDirs = excludedDirs + dirs.map { File(project.getProjectDir(), it) }
+     }
+ 
+     open var libraryPath: File? = null
+@@ -36,4 +36,4 @@
+             importAsLibrary = true
+             field = v
+         }
+-}
+\ No newline at end of file
++}

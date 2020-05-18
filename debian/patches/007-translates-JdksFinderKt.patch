@@ -1,0 +1,31 @@
+Description: Translates JdksFinderKt
+ This patch updates JdksFinderKt present in build.gradle.
+
+---
+
+--- a/build.gradle
++++ b/build.gradle
+@@ -55,18 +55,16 @@
+     )
+ }
+ 
+-buildScan {
++/*buildScan {
+     setTermsOfServiceUrl("https://gradle.com/terms-of-service")
+     setTermsOfServiceAgree("yes")
+-}
++}*/
+ 
+ //val configuredJdks: List<JdkId> =
+-List<JdkId> configuredJdks =
+-       getConfiguredJdks().also {
+-            it.forEach {
++List<JdkId> configuredJdks = JdksFinderKt.getConfiguredJdks(project)
++configuredJdks.forEach {
+                 logger.info("Using ${it.majorVersion} home: ${it.homeDir}")
+-            }
+-        }
++}
+ 
+ val defaultSnapshotVersion: String by extra
+ val buildNumber by extra(findProperty("build.number")?.toString() ?: defaultSnapshotVersion)

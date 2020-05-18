@@ -2,3 +2,6 @@
 002-translate-buildsrc-to-groovy-remove-kotlin-dsl.patch
 003-transport-JbCacheRedirectorKt.repositories-for-build.gradle.patch
 004-transport-translated-project_kotlinDep.patch
+005-translated-pill-configuration.patch
+006-translated-getConfiguredJdks.patch
+007-translates-JdksFinderKt.patch

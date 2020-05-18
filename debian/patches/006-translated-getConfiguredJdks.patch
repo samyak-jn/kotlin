@@ -1,0 +1,29 @@
+Description: Translates getConfiguredJdks
+ This patch translates getConfiguredJdks to work with groovy.
+
+---
+
+--- a/buildSrc/src/main/kotlin/jdksFinder.kt
++++ b/buildSrc/src/main/kotlin/jdksFinder.kt
+@@ -18,10 +18,10 @@
+ 
+ data class JdkId(val explicit: Boolean, val majorVersion: JdkMajorVersion, var version: String, var homeDir: File)
+ 
+-fun Project.getConfiguredJdks(): List<JdkId> {
++fun getConfiguredJdks(project:Project): List<JdkId> {
+     val res = arrayListOf<JdkId>()
+     for (jdkMajorVersion in JdkMajorVersion.values()) {
+-        val explicitJdkEnvVal = findProperty(jdkMajorVersion.name)?.toString()
++        val explicitJdkEnvVal = project.findProperty(jdkMajorVersion.name)?.toString()
+                 ?: System.getenv(jdkMajorVersion.name)
+                 ?: jdkAlternativeVarNames[jdkMajorVersion]?.mapNotNull { System.getenv(it) }?.firstOrNull()
+                 ?: continue
+@@ -32,7 +32,7 @@
+         res.add(JdkId(true, jdkMajorVersion, "X", explicitJdk))
+     }
+     if (res.size < JdkMajorVersion.values().size) {
+-        res.discoverJdks(this)
++        res.discoverJdks(project)
+     }
+     return res
+ }
