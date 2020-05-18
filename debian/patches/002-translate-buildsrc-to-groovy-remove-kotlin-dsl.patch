@@ -1,0 +1,1172 @@
+Description: Make buildSrc files compatible to build
+ This patch does the following things:
+ It translated the buildSrc buildfiles to groovy and removes the kotlin-dsl
+ comaptibility. It replaces org.gradle.api.plugins.extenssions.configure(Block)
+ in kotlin dsl with ..configure(type,block). Converts buildSrc/build.gradle.kts to
+ buildSrc/build.gradle.
+Author: Samyak Jain <samyak.jn11@gmail.com>
+Bug-Debian: https://bugs.debian.org/939730
+
+---
+
+--- a/build.gradle.kts
++++ /dev/null
+@@ -1,726 +0,0 @@
+-
+-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+-import org.gradle.plugins.ide.idea.model.IdeaModel
+-import org.gradle.api.file.FileCollection
+-import org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompile
+-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+-import proguard.gradle.ProGuardTask
+-import org.gradle.kotlin.dsl.*
+-
+-buildscript {
+-    extra["defaultSnapshotVersion"] = "1.3-SNAPSHOT"
+-
+-    kotlinBootstrapFrom(BootstrapOption.TeamCity("1.3.30-eap-28", projectExtId = "Kotlin_1330_Compiler", onlySuccessBootstrap = false))
+-
+-    repositories.withRedirector(project) {
+-        bootstrapKotlinRepo?.let(::maven)
+-        maven("https://plugins.gradle.org/m2")
+-    }
+-
+-    // a workaround for kotlin compiler classpath in kotlin project: sometimes gradle substitutes
+-    // kotlin-stdlib external dependency with local project :kotlin-stdlib in kotlinCompilerClasspath configuration.
+-    // see also configureCompilerClasspath@
+-    val bootstrapCompilerClasspath by configurations.creating
+-
+-    dependencies {
+-        bootstrapCompilerClasspath(kotlin("compiler-embeddable", bootstrapKotlinVersion))
+-
+-        classpath("com.gradle.publish:plugin-publish-plugin:0.9.7")
+-        classpath(kotlin("gradle-plugin", bootstrapKotlinVersion))
+-        classpath("net.sf.proguard:proguard-gradle:6.0.3")
+-        classpath("org.jetbrains.dokka:dokka-gradle-plugin:0.9.17")
+-
+-        // a workaround to add another one buildSrc with Cidr-specific tools to Gradle classpath
+-        if (findProperty("cidrPluginsEnabled")?.toString()?.toBoolean() == true) {
+-            classpath("org.jetbrains.kotlin.ultimate:buildSrc:1.0")
+-        }
+-    }
+-}
+-
+-plugins {
+-    `build-scan`
+-    idea
+-    id("jps-compatible")
+-    id("org.jetbrains.gradle.plugin.idea-ext")
+-}
+-
+-pill {
+-    excludedDirs(
+-        "out",
+-        "buildSrc/build",
+-        "buildSrc/prepare-deps/android-dx/build",
+-        "buildSrc/prepare-deps/intellij-sdk/build"
+-    )
+-}
+-
+-buildScan {
+-    setTermsOfServiceUrl("https://gradle.com/terms-of-service")
+-    setTermsOfServiceAgree("yes")
+-}
+-
+-val configuredJdks: List<JdkId> =
+-        getConfiguredJdks().also {
+-            it.forEach {
+-                logger.info("Using ${it.majorVersion} home: ${it.homeDir}")
+-            }
+-        }
+-
+-val defaultSnapshotVersion: String by extra
+-val buildNumber by extra(findProperty("build.number")?.toString() ?: defaultSnapshotVersion)
+-val kotlinVersion by extra(findProperty("deployVersion")?.toString() ?: buildNumber)
+-
+-val kotlinLanguageVersion by extra("1.3")
+-
+-allprojects {
+-    group = "org.jetbrains.kotlin"
+-    version = kotlinVersion
+-}
+-
+-extra["kotlin_root"] = rootDir
+-
+-val jpsBootstrap by configurations.creating
+-
+-val commonBuildDir = File(rootDir, "build")
+-val distDir by extra("$rootDir/dist")
+-val distKotlinHomeDir by extra("$distDir/kotlinc")
+-val distLibDir = "$distKotlinHomeDir/lib"
+-val commonLocalDataDir = "$rootDir/local"
+-val ideaSandboxDir = "$commonLocalDataDir/ideaSandbox"
+-val ideaUltimateSandboxDir = "$commonLocalDataDir/ideaUltimateSandbox"
+-val artifactsDir = "$distDir/artifacts"
+-val ideaPluginDir = "$artifactsDir/ideaPlugin/Kotlin"
+-val ideaUltimatePluginDir = "$artifactsDir/ideaUltimatePlugin/Kotlin"
+-
+-// TODO: use "by extra()" syntax where possible
+-extra["distLibDir"] = project.file(distLibDir)
+-extra["libsDir"] = project.file(distLibDir)
+-extra["commonLocalDataDir"] = project.file(commonLocalDataDir)
+-extra["ideaSandboxDir"] = project.file(ideaSandboxDir)
+-extra["ideaUltimateSandboxDir"] = project.file(ideaUltimateSandboxDir)
+-extra["ideaPluginDir"] = project.file(ideaPluginDir)
+-extra["ideaUltimatePluginDir"] = project.file(ideaUltimatePluginDir)
+-extra["isSonatypeRelease"] = false
+-
+-// Work-around necessary to avoid setting null javaHome. Will be removed after support of lazy task configuration
+-val jdkNotFoundConst = "JDK NOT FOUND"
+-
+-extra["JDK_16"] = jdkPath("1.6")
+-extra["JDK_17"] = jdkPath("1.7")
+-extra["JDK_18"] = jdkPath("1.8")
+-extra["JDK_9"] = jdkPath("9")
+-extra["JDK_10"] = jdkPath("10")
+-extra["JDK_11"] = jdkPath("11")
+-
+-gradle.taskGraph.beforeTask() {
+-    checkJDK()
+-}
+-
+-var jdkChecked: Boolean = false
+-fun checkJDK() {
+-    if (jdkChecked) {
+-        return
+-    }
+-    var unpresentJdks = JdkMajorVersion.values().filter { it.isMandatory() }.map { it -> it.name }.filter { it == null || extra[it] == jdkNotFoundConst }.toList()
+-    if (!unpresentJdks.isEmpty()) {
+-        throw GradleException("Please set environment variable${if (unpresentJdks.size > 1) "s" else ""}: ${unpresentJdks.joinToString()} to point to corresponding JDK installation.")
+-    }
+-    jdkChecked = true
+-}
+-
+-rootProject.apply {
+-    from(rootProject.file("gradle/versions.gradle.kts"))
+-    from(rootProject.file("gradle/report.gradle.kts"))
+-    from(rootProject.file("gradle/javaInstrumentation.gradle.kts"))
+-    from(rootProject.file("gradle/jps.gradle.kts"))
+-}
+-
+-IdeVersionConfigurator.setCurrentIde(this)
+-
+-extra["versions.protobuf"] = "2.6.1"
+-extra["versions.javax.inject"] = "1"
+-extra["versions.jsr305"] = "1.3.9"
+-extra["versions.jansi"] = "1.16"
+-extra["versions.jline"] = "3.3.1"
+-extra["versions.junit"] = "4.12"
+-extra["versions.javaslang"] = "2.0.6"
+-extra["versions.ant"] = "1.8.2"
+-extra["versions.android"] = "2.3.1"
+-extra["versions.kotlinx-coroutines-core"] = "1.0.1"
+-extra["versions.kotlinx-coroutines-jdk8"] = "1.0.1"
+-extra["versions.json"] = "20160807"
+-extra["versions.native-platform"] = "0.14"
+-extra["versions.ant-launcher"] = "1.8.0"
+-extra["versions.robolectric"] = "3.1"
+-extra["versions.org.springframework"] = "4.2.0.RELEASE"
+-extra["versions.jflex"] = "1.7.0"
+-extra["versions.markdown"] = "0.1.25"
+-extra["versions.trove4j"] = "1.0.20181211"
+-
+-val isTeamcityBuild = project.hasProperty("teamcity") || System.getenv("TEAMCITY_VERSION") != null
+-val intellijUltimateEnabled = project.getBooleanProperty("intellijUltimateEnabled") ?: isTeamcityBuild
+-val effectSystemEnabled by extra(project.getBooleanProperty("kotlin.compiler.effectSystemEnabled") ?: false)
+-val newInferenceEnabled by extra(project.getBooleanProperty("kotlin.compiler.newInferenceEnabled") ?: false)
+-
+-val intellijSeparateSdks = project.getBooleanProperty("intellijSeparateSdks") ?: false
+-
+-extra["intellijUltimateEnabled"] = intellijUltimateEnabled
+-extra["intellijSeparateSdks"] = intellijSeparateSdks
+-
+-extra["IntellijCoreDependencies"] =
+-        listOf(if (Platform[191].orHigher()) "asm-all-7.0" else "asm-all",
+-               "guava",
+-               "jdom",
+-               "jna",
+-               "log4j",
+-               "picocontainer",
+-               "snappy-in-java",
+-               "streamex",
+-               "trove4j")
+-
+-
+-extra["compilerModules"] = arrayOf(
+-        ":compiler:util",
+-        ":compiler:container",
+-        ":compiler:resolution",
+-        ":compiler:serialization",
+-        ":compiler:psi",
+-        *if (project.findProperty("fir.enabled") == "true") {
+-            arrayOf(
+-                ":compiler:fir:cones",
+-                ":compiler:fir:resolve",
+-                ":compiler:fir:tree",
+-                ":compiler:fir:psi2fir"
+-            )
+-        } else {
+-            emptyArray()
+-        },
+-        ":compiler:frontend",
+-        ":compiler:frontend.common",
+-        ":compiler:frontend.java",
+-        ":compiler:frontend.script",
+-        ":compiler:cli-common",
+-        ":compiler:daemon-common",
+-        ":compiler:daemon",
+-        ":compiler:ir.tree",
+-        ":compiler:ir.psi2ir",
+-        ":compiler:ir.backend.common",
+-        ":compiler:backend.jvm",
+-        ":compiler:backend.js",
+-        ":compiler:backend-common",
+-        ":compiler:backend",
+-        ":compiler:plugin-api",
+-        ":compiler:light-classes",
+-        ":compiler:cli",
+-        ":compiler:incremental-compilation-impl",
+-        ":js:js.ast",
+-        ":js:js.serializer",
+-        ":js:js.parser",
+-        ":js:js.frontend",
+-        ":js:js.translator",
+-        ":js:js.dce",
+-        ":compiler",
+-        ":kotlin-build-common",
+-        ":core:metadata",
+-        ":core:metadata.jvm",
+-        ":core:descriptors",
+-        ":core:descriptors.jvm",
+-        ":core:deserialization",
+-        ":core:util.runtime"
+-)
+-
+-val coreLibProjects = listOf(
+-        ":kotlin-stdlib",
+-        ":kotlin-stdlib-common",
+-        ":kotlin-stdlib-js",
+-        ":kotlin-stdlib-jdk7",
+-        ":kotlin-stdlib-jdk8",
+-        ":kotlin-test:kotlin-test-common",
+-        ":kotlin-test:kotlin-test-jvm",
+-        ":kotlin-test:kotlin-test-junit",
+-        ":kotlin-test:kotlin-test-junit5",
+-        ":kotlin-test:kotlin-test-testng",
+-        ":kotlin-test:kotlin-test-js",
+-        ":kotlin-reflect"
+-)
+-
+-val gradlePluginProjects = listOf(
+-        ":kotlin-gradle-plugin",
+-        ":kotlin-gradle-plugin:plugin-marker",
+-        ":kotlin-gradle-plugin-api",
+-//        ":kotlin-gradle-plugin-integration-tests",  // TODO: build fails
+-        ":kotlin-allopen",
+-        ":kotlin-allopen:plugin-marker",
+-        ":kotlin-annotation-processing-gradle",
+-        ":kotlin-noarg",
+-        ":kotlin-noarg:plugin-marker",
+-        ":kotlin-sam-with-receiver"
+-)
+-
+-apply {
+-    from("libraries/commonConfiguration.gradle")
+-    from("libraries/configureGradleTools.gradle")
+-}
+-
+-apply {
+-    if (extra["isSonatypeRelease"] as? Boolean == true) {
+-        logger.info("Applying configuration for sonatype release")
+-        from("libraries/prepareSonatypeStaging.gradle")
+-    }
+-}
+-
+-fun Task.listConfigurationContents(configName: String) {
+-    doFirst {
+-        project.configurations.findByName(configName)?.let {
+-            println("$configName configuration files:\n${it.allArtifacts.files.files.joinToString("\n  ", "  ")}")
+-        }
+-    }
+-}
+-
+-val defaultJvmTarget = "1.8"
+-val defaultJavaHome = jdkPath(defaultJvmTarget)
+-val ignoreTestFailures by extra(project.findProperty("ignoreTestFailures")?.toString()?.toBoolean() ?: project.hasProperty("teamcity"))
+-
+-allprojects {
+-
+-    jvmTarget = defaultJvmTarget
+-    if (defaultJavaHome != null) {
+-        javaHome = defaultJavaHome
+-    } else {
+-        logger.error("Could not find default java home. Please set environment variable JDK_${defaultJavaHome} to point to JDK ${defaultJavaHome} installation.")
+-    }
+-
+-
+-    // There are problems with common build dir:
+-    //  - some tests (in particular js and binary-compatibility-validator depend on the fixed (default) location
+-    //  - idea seems unable to exclude common builddir from indexing
+-    // therefore it is disabled by default
+-    // buildDir = File(commonBuildDir, project.name)
+-
+-    val mirrorRepo: String? = findProperty("maven.repository.mirror")?.toString()
+-
+-    repositories {
+-        intellijSdkRepo(project)
+-        androidDxJarRepo(project)
+-        mirrorRepo?.let(::maven)
+-        bootstrapKotlinRepo?.let(::maven)
+-        jcenter()
+-        maven(protobufRepo)
+-    }
+-
+-    configureJvmProject(javaHome!!, jvmTarget!!)
+-
+-    val commonCompilerArgs = listOfNotNull(
+-        "-Xallow-kotlin-package",
+-        "-Xread-deserialized-contracts",
+-        "-Xjvm-default=compatibility",
+-        "-Xprogressive".takeIf { hasProperty("test.progressive.mode") } // TODO: change to "-progressive" after bootstrap
+-    )
+-
+-    tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>> {
+-        kotlinOptions {
+-            languageVersion = kotlinLanguageVersion
+-            apiVersion = kotlinLanguageVersion
+-            freeCompilerArgs = commonCompilerArgs
+-        }
+-    }
+-
+-    tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile> {
+-        kotlinOptions {
+-            freeCompilerArgs = commonCompilerArgs + listOf("-Xnormalize-constructor-calls=enable")
+-        }
+-    }
+-
+-    tasks.withType(VerificationTask::class.java as Class<Task>) {
+-        (this as VerificationTask).ignoreFailures = ignoreTestFailures
+-    }
+-
+-    tasks.withType<Javadoc> {
+-        enabled = false
+-    }
+-
+-    tasks.withType<Jar> {
+-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+-    }
+-
+-    task("listArchives") { listConfigurationContents("archives") }
+-
+-    task("listRuntimeJar") { listConfigurationContents("runtimeJar") }
+-
+-    task("listDistJar") { listConfigurationContents("distJar") }
+-
+-    afterEvaluate {
+-        if (javaHome != defaultJavaHome || jvmTarget != defaultJvmTarget) {
+-            logger.info("configuring project $name to compile to the target jvm version $jvmTarget using jdk: $javaHome")
+-            configureJvmProject(javaHome!!, jvmTarget!!)
+-        } // else we will actually fail during the first task execution. We could not fail before configuration is done due to impact on import in IDE
+-
+-        fun File.toProjectRootRelativePathOrSelf() = (relativeToOrNull(rootDir)?.takeUnless { it.startsWith("..") } ?: this).path
+-
+-        fun FileCollection.printClassPath(role: String) =
+-                println("${project.path} $role classpath:\n  ${joinToString("\n  ") { it.toProjectRootRelativePathOrSelf() } }")
+-
+-        try { javaPluginConvention() } catch (_: UnknownDomainObjectException) { null }?.let { javaConvention ->
+-            task("printCompileClasspath") { doFirst { javaConvention.sourceSets["main"].compileClasspath.printClassPath("compile") } }
+-            task("printRuntimeClasspath") { doFirst { javaConvention.sourceSets["main"].runtimeClasspath.printClassPath("runtime") } }
+-            task("printTestCompileClasspath") { doFirst { javaConvention.sourceSets["test"].compileClasspath.printClassPath("test compile") } }
+-            task("printTestRuntimeClasspath") { doFirst { javaConvention.sourceSets["test"].runtimeClasspath.printClassPath("test runtime") } }
+-        }
+-
+-        run configureCompilerClasspath@ {
+-            val bootstrapCompilerClasspath by rootProject.buildscript.configurations
+-            configurations.findByName("kotlinCompilerClasspath")?.let {
+-                dependencies.add(it.name, files(bootstrapCompilerClasspath))
+-            }
+-        }
+-    }
+-}
+-
+-gradle.taskGraph.whenReady {
+-    if (isTeamcityBuild) {
+-        logger.warn("CI build profile is active (IC is off, proguard is on). Use -Pteamcity=false to reproduce local build")
+-        for (task in allTasks) {
+-            when (task) {
+-                is AbstractKotlinCompile<*> -> task.incremental = false
+-                is JavaCompile -> task.options.isIncremental = false
+-            }
+-        }
+-    } else {
+-        logger.warn("Local build profile is active (IC is on, proguard is off). Use -Pteamcity=true to reproduce TC build")
+-        for (task in allTasks) {
+-            when (task) {
+-                // todo: remove when Gradle 4.10+ is used (Java IC on by default)
+-                is JavaCompile -> task.options.isIncremental = true
+-                is org.gradle.jvm.tasks.Jar -> task.entryCompression = ZipEntryCompression.STORED
+-            }
+-        }
+-    }
+-}
+-
+-val dist by task<Copy> {
+-    val childDistTasks = getTasksByName("dist", true) - this@task
+-    dependsOn(childDistTasks)
+-
+-    into(distDir)
+-    from(files("compiler/cli/bin")) { into("kotlinc/bin") }
+-    from(files("license")) { into("kotlinc/license") }
+-}
+-
+-val copyCompilerToIdeaPlugin by task<Copy> {
+-    dependsOn(dist)
+-    into(ideaPluginDir)
+-    from(distDir) { include("kotlinc/**") }
+-}
+-
+-val ideaPlugin by task<Task> {
+-    dependsOn(copyCompilerToIdeaPlugin)
+-    val childIdeaPluginTasks = getTasksByName("ideaPlugin", true) - this@task
+-    dependsOn(childIdeaPluginTasks)
+-}
+-
+-tasks {
+-    create("clean") {
+-        doLast {
+-            delete("$buildDir/repo")
+-            delete(distDir)
+-        }
+-    }
+-
+-    create("cleanupArtifacts") {
+-        doLast {
+-            delete(artifactsDir)
+-        }
+-    }
+-
+-    listOf("clean", "assemble", "install", "dist").forEach { taskName ->
+-        create("coreLibs${taskName.capitalize()}") {
+-            coreLibProjects.forEach { projectName -> dependsOn("$projectName:$taskName") }
+-        }
+-    }
+-
+-    create("coreLibsTest") {
+-        (coreLibProjects + listOf(
+-                ":kotlin-stdlib:samples",
+-                ":kotlin-test:kotlin-test-js:kotlin-test-js-it",
+-                ":kotlinx-metadata-jvm",
+-                ":tools:binary-compatibility-validator"
+-        )).forEach {
+-            dependsOn(it + ":check")
+-        }
+-    }
+-
+-    create("gradlePluginTest") {
+-        gradlePluginProjects.forEach {
+-            dependsOn(it + ":check")
+-        }
+-    }
+-
+-    create("gradlePluginIntegrationTest") {
+-        dependsOn(":kotlin-gradle-plugin-integration-tests:check")
+-    }
+-
+-    create("jvmCompilerTest") {
+-        dependsOn("dist")
+-        dependsOn(":compiler:test",
+-                  ":compiler:container:test",
+-                  ":compiler:tests-java8:test",
+-                  ":compiler:tests-spec:remoteRunTests")
+-        dependsOn(":plugins:jvm-abi-gen:test")
+-    }
+-
+-    create("jsCompilerTest") {
+-        dependsOn(":js:js.tests:test")
+-        dependsOn(":js:js.tests:runMocha")
+-    }
+-
+-    create("scriptingTest") {
+-        dependsOn("dist")
+-        dependsOn(":kotlin-script-util:test")
+-        dependsOn(":kotlin-scripting-jvm-host:test")
+-    }
+-
+-    create("compilerTest") {
+-        dependsOn("jvmCompilerTest")
+-        dependsOn("jsCompilerTest")
+-
+-        dependsOn("scriptingTest")
+-        dependsOn(":kotlin-build-common:test")
+-        dependsOn(":compiler:incremental-compilation-impl:test")
+-        dependsOn(":core:descriptors.runtime:test")
+-    }
+-
+-    create("toolsTest") {
+-        dependsOn(":tools:kotlinp:test")
+-    }
+-
+-    create("examplesTest") {
+-        dependsOn("dist")
+-        (project(":examples").subprojects + project(":kotlin-gradle-subplugin-example")).forEach { p ->
+-            dependsOn("${p.path}:check")
+-        }
+-    }
+-
+-    create("distTest") {
+-        dependsOn("compilerTest")
+-        dependsOn("toolsTest")
+-        dependsOn("gradlePluginTest")
+-        dependsOn("examplesTest")
+-    }
+-
+-    create("specTest") {
+-        dependsOn("dist")
+-        dependsOn(":compiler:tests-spec:test")
+-    }
+-
+-    create("androidCodegenTest") {
+-        dependsOn(":compiler:android-tests:test")
+-    }
+-
+-    create("jps-tests") {
+-        dependsOn("dist")
+-        dependsOn(":jps-plugin:test")
+-    }
+-
+-    create("idea-plugin-main-tests") {
+-        dependsOn("dist")
+-        dependsOn(":idea:test")
+-    }
+-
+-    create("idea-plugin-additional-tests") {
+-        dependsOn("dist")
+-        dependsOn(":idea:idea-gradle:test",
+-                  ":idea:idea-gradle-native:test",
+-                  ":idea:idea-maven:test",
+-                  ":j2k:test",
+-                  ":idea:eval4j:test")
+-    }
+-
+-    create("idea-plugin-tests") {
+-        dependsOn("dist")
+-        dependsOn("idea-plugin-main-tests",
+-                  "idea-plugin-additional-tests")
+-    }
+-
+-    create("android-ide-tests") {
+-        dependsOn("dist")
+-        dependsOn(":plugins:android-extensions-ide:test",
+-                  ":idea:idea-android:test",
+-                  ":kotlin-annotation-processing:test")
+-    }
+-
+-    create("plugins-tests") {
+-        dependsOn("dist")
+-        dependsOn(":kotlin-annotation-processing:test",
+-                  ":kotlin-source-sections-compiler-plugin:test",
+-                  ":kotlin-allopen-compiler-plugin:test",
+-                  ":kotlin-noarg-compiler-plugin:test",
+-                  ":kotlin-sam-with-receiver-compiler-plugin:test",
+-                  ":plugins:uast-kotlin:test",
+-                  ":kotlin-annotation-processing-gradle:test",
+-                  ":kotlinx-serialization-ide-plugin:test")
+-    }
+-
+-
+-    create("ideaPluginTest") {
+-        dependsOn(
+-                "idea-plugin-tests",
+-                "jps-tests",
+-                "plugins-tests",
+-                "android-ide-tests",
+-                ":generators:test"
+-        )
+-    }
+-
+-
+-    create("test") {
+-        doLast {
+-            throw GradleException("Don't use directly, use aggregate tasks *-check instead")
+-        }
+-    }
+-
+-    create("check") {
+-        dependsOn("test")
+-    }
+-}
+-
+-fun CopySpec.setExecutablePermissions() {
+-    filesMatching("**/bin/*") { mode = 0b111101101 }
+-    filesMatching("**/bin/*.bat") { mode = 0b110100100 }
+-}
+-
+-val zipCompiler by task<Zip> {
+-    dependsOn(dist)
+-    destinationDir = file(distDir)
+-    archiveName = "kotlin-compiler-$kotlinVersion.zip"
+-
+-    from(distKotlinHomeDir)
+-    into("kotlinc")
+-    setExecutablePermissions()
+-
+-    doLast {
+-        logger.lifecycle("Compiler artifacts packed to $archivePath")
+-    }
+-}
+-
+-val zipTestData by task<Zip> {
+-    destinationDir = file(distDir)
+-    archiveName = "kotlin-test-data.zip"
+-    from("compiler/testData") { into("compiler") }
+-    from("idea/testData") { into("ide") }
+-    from("idea/idea-completion/testData") { into("ide/completion") }
+-    from("libraries/stdlib/common/test") { into("stdlib/common") }
+-    from("libraries/stdlib/test") { into("stdlib/test") }
+-    doLast {
+-        logger.lifecycle("Test data packed to $archivePath")
+-    }
+-}
+-
+-val zipPlugin by task<Zip> {
+-    val src = when (project.findProperty("pluginArtifactDir") as String?) {
+-        "Kotlin" -> ideaPluginDir
+-        "KotlinUltimate" -> ideaUltimatePluginDir
+-        null -> if (project.hasProperty("ultimate")) ideaUltimatePluginDir else ideaPluginDir
+-        else -> error("Unsupported plugin artifact dir")
+-    }
+-    val destPath = project.findProperty("pluginZipPath") as String?
+-    val dest = File(destPath ?: "$buildDir/kotlin-plugin.zip")
+-    destinationDir = dest.parentFile
+-    archiveName = dest.name
+-    doFirst {
+-        if (destPath == null) throw GradleException("Specify target zip path with 'pluginZipPath' property")
+-    }
+-
+-    from(src)
+-    into("Kotlin")
+-    setExecutablePermissions()
+-
+-    doLast {
+-        logger.lifecycle("Plugin artifacts packed to $archivePath")
+-    }
+-}
+-
+-configure<IdeaModel> {
+-    module {
+-        excludeDirs = files(
+-                project.buildDir,
+-                commonLocalDataDir,
+-                ".gradle",
+-                "dependencies",
+-                "dist"
+-        ).toSet()
+-    }
+-}
+-
+-fun jdkPath(version: String): String {
+-    val jdkName = "JDK_${version.replace(".", "")}"
+-    val jdkMajorVersion = JdkMajorVersion.valueOf(jdkName)
+-    return configuredJdks.find { it.majorVersion == jdkMajorVersion }?.homeDir?.canonicalPath?:jdkNotFoundConst
+-}
+-
+-
+-fun Project.configureJvmProject(javaHome: String, javaVersion: String) {
+-    tasks.withType<JavaCompile> {
+-        if (name != "compileJava9Java") {
+-            options.isFork = true
+-            options.forkOptions.javaHome = file(javaHome)
+-            options.compilerArgs.add("-proc:none")
+-            options.encoding = "UTF-8"
+-        }
+-    }
+-
+-    tasks.withType<KotlinCompile> {
+-        kotlinOptions.jdkHome = javaHome
+-        kotlinOptions.jvmTarget = javaVersion
+-        kotlinOptions.freeCompilerArgs += "-Xjvm-default=compatibility"
+-    }
+-
+-    tasks.withType<Test> {
+-        executable = File(javaHome, "bin/java").canonicalPath
+-    }
+-}
+-
+-tasks.create("findShadowJarsInClasspath").doLast {
+-    fun Collection<File>.printSorted(indent: String = "    ") {
+-        sortedBy { it.path }.forEach { println(indent + it.relativeTo(rootProject.projectDir)) }
+-    }
+-
+-    val shadowJars = hashSetOf<File>()
+-    for (project in rootProject.allprojects) {
+-        for (task in project.tasks) {
+-            when (task) {
+-                is ShadowJar -> {
+-                    shadowJars.add(fileFrom(task.archivePath))
+-                }
+-                is ProGuardTask -> {
+-                    shadowJars.addAll(task.outputs.files.toList())
+-                }
+-            }
+-        }
+-    }
+-
+-    println("Shadow jars:")
+-    shadowJars.printSorted()
+-
+-    fun Project.checkConfig(configName: String) {
+-        val config = configurations.findByName(configName) ?: return
+-        val shadowJarsInConfig = config.resolvedConfiguration.files.filter { it in shadowJars }
+-        if (shadowJarsInConfig.isNotEmpty()) {
+-            println()
+-            println("Project $project contains shadow jars in configuration '$configName':")
+-            shadowJarsInConfig.printSorted()
+-        }
+-    }
+-
+-    for (project in rootProject.allprojects) {
+-        project.checkConfig("compileClasspath")
+-        project.checkConfig("testCompileClasspath")
+-    }
+-}
+-
+-allprojects {
+-    afterEvaluate {
+-        if (cacheRedirectorEnabled()) {
+-            logger.info("Redirecting repositories for $displayName")
+-            repositories.redirect()
+-        }
+-    }
+-}
+\ No newline at end of file
+--- /dev/null
++++ b/buildSrc/build.gradle
+@@ -0,0 +1,116 @@
++
++buildscript {
++	println("wew")
++    ext.cacheRedirectorEnabled = findProperty("cacheRedirectorEnabled")?.toString()?.toBoolean() == true
++	ext.embeddedKotlinVersion = "1.3.11"
++    ext.buildSrcKotlinVersion = findProperty("buildSrc.kotlin.version")?.toString() ?: embeddedKotlinVersion
++    println("cheat")
++    println(buildSrcKotlinVersion)
++    ext.buildSrcKotlinRepo = findProperty("buildSrc.kotlin.repo") as String
++    println("WEEEHAAA")
++    println(buildSrcKotlinRepo)
++    ext["versions.shadow"] = "4.0.3"
++    ext["versions.native-platform"] = "0.14"
++
++    repositories {
++        if (cacheRedirectorEnabled) {
++            maven({url("https://cache-redirector.jetbrains.com/jcenter.bintray.com")})
++        }
++
++		if(buildSrcKotlinRepo){
++			maven({url("buildSrcKotlinRepo")})
++		}
++    }
++
++    dependencies {
++        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$buildSrcKotlinVersion")
++        classpath("org.jetbrains.kotlin:kotlin-sam-with-receiver:$buildSrcKotlinVersion")
++    }
++}
++
++plugins {
++    id("java-gradle-plugin")
++}
++
++ext.cacheRedirectorEnabled = findProperty("cacheRedirectorEnabled")?.toString()?.toBoolean() == true
++
++logger.info("buildSrcKotlinVersion: " + ext["buildSrcKotlinVersion"])
++logger.info("buildSrc kotlin compiler version: " + org.jetbrains.kotlin.config.KotlinCompilerVersion.VERSION)
++logger.info("buildSrc stdlib version: " + buildSrcKotlinVersion)
++
++apply {
++    plugin("kotlin")
++    plugin("kotlin-sam-with-receiver")
++}
++
++gradlePlugin {
++    plugins {
++        register("pill-configurable") {
++            id = "pill-configurable"
++            implementationClass = "org.jetbrains.kotlin.pill.PillConfigurablePlugin"
++        }
++        register("jps-compatible") {
++            id = "jps-compatible"
++            implementationClass = "org.jetbrains.kotlin.pill.JpsCompatiblePlugin"
++        }
++    }
++}
++
++ext.getBooleanProperty = {Project project, String name ->
++	if(project.findProperty(name)){
++		val v = project.findProperty(name).toString()
++		v.toBoolean()
++		return v
++	}else if(project.findProperty(name)!=null){
++		return true
++	}else{return null}
++}
++
++rootProject.apply {
++    from(rootProject.file("../gradle/versions.gradle.kts"))
++}
++
++ext.isTeamcityBuild = project.hasProperty("teamcity") || System.getenv("TEAMCITY_VERSION") != null
++ext.intellijUltimateEnabled = getBooleanProperty(project,"intellijUltimateEnabled") ?: isTeamcityBuild
++ext.intellijSeparateSdks = getBooleanProperty(project,"intellijSeparateSdks") ?: false
++
++if (ext["versions.intellijSdk"]?.toString()?.endsWith("SNAPSHOT") == true)
++    ext["intellijReleaseType"] ="snapshots"
++else
++	ext["intellijReleaseType"] ="releases"
++
++ext["versions.androidDxSources"] = "5.0.0_r2"
++
++ext["customDepsOrg"] = "kotlin.build.custom.deps"
++
++repositories {
++    if (cacheRedirectorEnabled) {
++        maven({url("https://cache-redirector.jetbrains.com/jcenter.bintray.com")})
++        maven({url("https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-third-party-dependencies/")})
++    }
++
++	if(project.ext["buildSrcKotlinRepo"]) {
++		maven({url("${ext["buildSrcKotlinRepo"]}".toString())})    }
++
++    jcenter()
++    maven({url("https://jetbrains.bintray.com/intellij-third-party-dependencies/")})
++    maven({url("https://plugins.gradle.org/m2/")})
++}
++
++dependencies {
++    compile("net.rubygrapefruit:native-platform:${property("versions.native-platform")}")
++    compile("net.rubygrapefruit:native-platform-windows-amd64:${property("versions.native-platform")}")
++    compile("net.rubygrapefruit:native-platform-windows-i386:${property("versions.native-platform")}")
++    compile("com.jakewharton.dex:dex-method-list:3.0.0")
++
++    compile("com.github.jengelman.gradle.plugins:shadow:${property("versions.shadow")}")
++    compile("org.jetbrains.intellij.deps:asm-all:7.0")
++
++    compile("gradle.plugin.org.jetbrains.gradle.plugin.idea-ext:gradle-idea-ext:0.4.2")
++}
++
++extensions.configure("samWithReceiver"){
++    it.annotation("org.gradle.api.HasImplicitReceiver")
++}
++
++tasks["build"].dependsOn(":prepare-deps:android-dx:build", ":prepare-deps:intellij-sdk:build")
+--- a/buildSrc/build.gradle.kts
++++ /dev/null
+@@ -1,112 +0,0 @@
+-
+-buildscript {
+-    val cacheRedirectorEnabled = findProperty("cacheRedirectorEnabled")?.toString()?.toBoolean() == true
+-
+-    val buildSrcKotlinVersion: String by extra(findProperty("buildSrc.kotlin.version")?.toString() ?: embeddedKotlinVersion)
+-    val buildSrcKotlinRepo: String? by extra(findProperty("buildSrc.kotlin.repo") as String?)
+-    extra["versions.shadow"] = "4.0.3"
+-    extra["versions.native-platform"] = "0.14"
+-
+-    repositories {
+-        if (cacheRedirectorEnabled) {
+-            maven("https://cache-redirector.jetbrains.com/jcenter.bintray.com")
+-        }
+-
+-        buildSrcKotlinRepo?.let {
+-            maven(url = it)
+-        }
+-    }
+-
+-    dependencies {
+-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$buildSrcKotlinVersion")
+-        classpath("org.jetbrains.kotlin:kotlin-sam-with-receiver:$buildSrcKotlinVersion")
+-    }
+-}
+-
+-val cacheRedirectorEnabled = findProperty("cacheRedirectorEnabled")?.toString()?.toBoolean() == true
+-
+-logger.info("buildSrcKotlinVersion: " + extra["buildSrcKotlinVersion"])
+-logger.info("buildSrc kotlin compiler version: " + org.jetbrains.kotlin.config.KotlinCompilerVersion.VERSION)
+-logger.info("buildSrc stdlib version: " + KotlinVersion.CURRENT)
+-
+-apply {
+-    plugin("kotlin")
+-    plugin("kotlin-sam-with-receiver")
+-}
+-
+-plugins {
+-    `kotlin-dsl`
+-    `java-gradle-plugin`
+-}
+-
+-gradlePlugin {
+-    plugins {
+-        register("pill-configurable") {
+-            id = "pill-configurable"
+-            implementationClass = "org.jetbrains.kotlin.pill.PillConfigurablePlugin"
+-        }
+-        register("jps-compatible") {
+-            id = "jps-compatible"
+-            implementationClass = "org.jetbrains.kotlin.pill.JpsCompatiblePlugin"
+-        }
+-    }
+-}
+-
+-fun Project.getBooleanProperty(name: String): Boolean? = this.findProperty(name)?.let {
+-    val v = it.toString()
+-    if (v.isBlank()) true
+-    else v.toBoolean()
+-}
+-
+-rootProject.apply {
+-    from(rootProject.file("../gradle/versions.gradle.kts"))
+-}
+-
+-val isTeamcityBuild = project.hasProperty("teamcity") || System.getenv("TEAMCITY_VERSION") != null
+-val intellijUltimateEnabled by extra(project.getBooleanProperty("intellijUltimateEnabled") ?: isTeamcityBuild)
+-val intellijSeparateSdks by extra(project.getBooleanProperty("intellijSeparateSdks") ?: false)
+-
+-extra["intellijReleaseType"] = if (extra["versions.intellijSdk"]?.toString()?.endsWith("SNAPSHOT") == true)
+-    "snapshots"
+-else
+-    "releases"
+-
+-extra["versions.androidDxSources"] = "5.0.0_r2"
+-
+-extra["customDepsOrg"] = "kotlin.build.custom.deps"
+-
+-repositories {
+-    if (cacheRedirectorEnabled) {
+-        maven("https://cache-redirector.jetbrains.com/jcenter.bintray.com")
+-        maven("https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-third-party-dependencies/")
+-    }
+-
+-    extra["buildSrcKotlinRepo"]?.let {
+-        maven(url = it)
+-    }
+-
+-    jcenter()
+-    maven("https://jetbrains.bintray.com/intellij-third-party-dependencies/")
+-    maven("https://plugins.gradle.org/m2/")
+-}
+-
+-dependencies {
+-    compile("net.rubygrapefruit:native-platform:${property("versions.native-platform")}")
+-    compile("net.rubygrapefruit:native-platform-windows-amd64:${property("versions.native-platform")}")
+-    compile("net.rubygrapefruit:native-platform-windows-i386:${property("versions.native-platform")}")
+-    compile("com.jakewharton.dex:dex-method-list:3.0.0")
+-
+-    compile("com.github.jengelman.gradle.plugins:shadow:${property("versions.shadow")}")
+-    compile("org.jetbrains.intellij.deps:asm-all:7.0")
+-
+-    compile("gradle.plugin.org.jetbrains.gradle.plugin.idea-ext:gradle-idea-ext:0.4.2")
+-}
+-
+-samWithReceiver {
+-    annotation("org.gradle.api.HasImplicitReceiver")
+-}
+-
+-fun Project.`samWithReceiver`(configure: org.jetbrains.kotlin.samWithReceiver.gradle.SamWithReceiverExtension.() -> Unit): Unit =
+-        extensions.configure("samWithReceiver", configure)
+-
+-tasks["build"].dependsOn(":prepare-deps:android-dx:build", ":prepare-deps:intellij-sdk:build")
+--- a/buildSrc/src/main/kotlin/AndroidSdkDependencies.kt
++++ b/buildSrc/src/main/kotlin/AndroidSdkDependencies.kt
+@@ -3,13 +3,17 @@
+ import org.gradle.api.Project
+ import org.gradle.api.artifacts.dsl.RepositoryHandler
+ import org.gradle.api.artifacts.repositories.IvyArtifactRepository
+-import org.gradle.kotlin.dsl.extra
+ import java.io.File
+ 
+-fun RepositoryHandler.androidDxJarRepo(project: Project): IvyArtifactRepository = ivy {
++fun androidDxJarRepo(repositoryHandler: RepositoryHandler,project: Project): IvyArtifactRepository = repositoryHandler.ivy {
+     val baseDir = File("${project.rootDir}/buildSrc/prepare-deps/android-dx/build/repo")
+     ivyPattern("${baseDir.canonicalPath}/[organisation]/[module]/[revision]/[module].ivy.xml")
+     artifactPattern("${baseDir.canonicalPath}/[organisation]/[module]/[revision]/[artifact](-[classifier]).jar")
+ }
+ 
+-fun Project.androidDxJar() = "kotlin.build.custom.deps:android-dx:${rootProject.extra["versions.androidBuildTools"]}"
++//val rootProject:Project = null;
++fun Project.androidDxJar():String {
++	val consta:String = rootProject.extensions.getExtraProperties().get("versions.androidBuildTools").toString()
++	return "kotlin.build.custom.deps:android-dx".toString()
++}
++fun customAndroidDxJar(project:Project) =project.androidDxJar()
+--- a/buildSrc/src/main/kotlin/Bootstrap.kt
++++ b/buildSrc/src/main/kotlin/Bootstrap.kt
+@@ -1,17 +1,16 @@
+ @file:Suppress("unused") // usages in build scripts are not tracked properly
+ 
+ import org.gradle.api.Project
+-import org.gradle.kotlin.dsl.*
+ 
++fun bootstrapKotlinVersion(project: Project,bootstrapKotlinVersion: String){
++	project.getExtensions().getExtraProperties().set("bootstrapKotlinVersion", bootstrapKotlinVersion)
++}
+ 
+-var Project.bootstrapKotlinVersion: String
+-    get() = this.property("bootstrapKotlinVersion") as String
+-    private set(value) { this.extra["bootstrapKotlinVersion"] = value }
+-var Project.bootstrapKotlinRepo: String?
+-    get() = this.property("bootstrapKotlinRepo") as String?
+-    private set(value) { this.extra["bootstrapKotlinRepo"] = value }
++fun bootstrapKotlinRepo(project: Project,bootstrapKotlinRepo: String?){
++	project.getExtensions().getExtraProperties().set("bootstrapKotlinRepo", bootstrapKotlinRepo)
++}
+ 
+-fun Project.kotlinBootstrapFrom(defaultSource: BootstrapOption) {
++fun kotlinBootstrapFrom(project: Project, defaultSource: BootstrapOption) {
+     val customVersion = project.findProperty("bootstrap.kotlin.version") as String?
+     val customRepo = project.findProperty("bootstrap.kotlin.repo") as String?
+     val teamCityVersion = project.findProperty("bootstrap.teamcity.kotlin.version") as String?
+@@ -20,16 +19,16 @@
+ 
+     val bootstrapSource = when {
+         project.hasProperty("bootstrap.local") -> BootstrapOption.Local(project.findProperty("bootstrap.local.version") as String?, project.findProperty("bootstrap.local.path") as String?)
+-        teamCityVersion != null -> BootstrapOption.TeamCity(teamCityVersion, teamCityBuild, projectExtId = teamCityProject, onlySuccessBootstrap = false)
++        teamCityVersion != null -> TeamCity(teamCityVersion, teamCityBuild, projectExtId = teamCityProject, onlySuccessBootstrap = false)
+         customVersion != null -> BootstrapOption.Custom(kotlinVersion = customVersion, repo = customRepo)
+         else -> defaultSource
+     }
+ 
+     bootstrapSource.applyToProject(project)
+-    project.logger.lifecycle("Using kotlin bootstrap version $bootstrapKotlinVersion from repo $bootstrapKotlinRepo")
++    project.logger.lifecycle("Using kotlin bootstrap version ${project.findProperty("bootstrapKotlinVersion")} from repo ${project.findProperty("bootstrapKotlinRepo")}")
+ }
+ 
+-sealed class BootstrapOption {
++public sealed class BootstrapOption {
+     abstract fun applyToProject(project: Project)
+ 
+     /** Manual repository and version specification.
+@@ -38,8 +37,8 @@
+      */
+     open class Custom(val kotlinVersion: String, val repo: String?) : BootstrapOption() {
+         override fun applyToProject(project: Project) {
+-            project.bootstrapKotlinVersion = kotlinVersion
+-            project.bootstrapKotlinRepo = repo
++			bootstrapKotlinVersion(project,kotlinVersion)
++			bootstrapKotlinRepo(project,repo)
+         }
+     }
+ 
+@@ -53,13 +52,6 @@
+      * [projectExtId] extId of a teamcity build configuration, by default "Kotlin_dev_Compiler",
+      * [onlySuccessBootstrap] allow artifacts only from success builds of the default branch tagged with 'bootstrap' tag
+      */
+-    class TeamCity(val kotlinVersion: String, val buildNumber: String? = null, val projectExtId: String? = null, val onlySuccessBootstrap: Boolean = true) : BootstrapOption() {
+-        override fun applyToProject(project: Project) {
+-            val query = if (onlySuccessBootstrap) "status:SUCCESS,tag:bootstrap,pinned:true" else "branch:default:any"
+-            project.bootstrapKotlinRepo = "https://teamcity.jetbrains.com/guestAuth/app/rest/builds/buildType:(id:${projectExtId ?: "Kotlin_dev_Compiler"}),number:${buildNumber ?: kotlinVersion},$query/artifacts/content/maven/"
+-            project.bootstrapKotlinVersion = kotlinVersion
+-        }
+-    }
+ 
+     /**
+      * Use previously published local artifacts from the build/repo maven repository
+@@ -74,8 +66,15 @@
+             else
+                 project.buildDir.resolve("repo")
+ 
+-            project.bootstrapKotlinRepo = repoPath.toURI().toString()
+-            project.bootstrapKotlinVersion = kotlinVersion ?: project.property("defaultSnapshotVersion") as String
++            bootstrapKotlinRepo(project,repoPath.toURI().toString())
++            bootstrapKotlinVersion(project,kotlinVersion ?: project.property("defaultSnapshotVersion") as String)
++	        }
+         }
+     }
+-}
+\ No newline at end of file
++public class TeamCity(val kotlinVersion: String, val buildNumber: String? = null, val projectExtId: String? = null, val onlySuccessBootstrap: Boolean = true) : BootstrapOption() {
++        override fun applyToProject(project: Project) {
++            val query = if (onlySuccessBootstrap) "status:SUCCESS,tag:bootstrap,pinned:true" else "branch:default:any"
++            bootstrapKotlinRepo(project,"https://teamcity.jetbrains.com/guestAuth/app/rest/builds/buildType:(id:${projectExtId ?: "Kotlin_dev_Compiler"}),number:${buildNumber ?: kotlinVersion},$query/artifacts/content/maven/")
++            bootstrapKotlinVersion(project,kotlinVersion)
++		}
++}
+--- a/buildSrc/src/main/kotlin/dependencies.kt
++++ b/buildSrc/src/main/kotlin/dependencies.kt
+@@ -75,7 +75,7 @@
+ 
+ fun Project.kotlinStdlib(suffix: String? = null): Any {
+     return if (useBootstrapStdlib)
+-        kotlinDep(listOfNotNull("stdlib", suffix).joinToString("-"), bootstrapKotlinVersion)
++        kotlinDep(listOfNotNull("stdlib", suffix).joinToString("-"), project.findProperty("bootstrapKotlinVersion") as String)
+     else
+         dependencies.project(listOfNotNull(":kotlin-stdlib", suffix).joinToString("-"))
+ }
+--- a/buildSrc/src/main/kotlin/embeddable.kt
++++ b/buildSrc/src/main/kotlin/embeddable.kt
+@@ -4,8 +4,6 @@
+ import org.gradle.api.Project
+ import org.gradle.api.file.DuplicatesStrategy
+ import org.gradle.jvm.tasks.Jar
+-import org.gradle.kotlin.dsl.task
+-import org.gradle.kotlin.dsl.*
+ import java.io.File
+ 
+ val kotlinEmbeddableRootPackage = "org.jetbrains.kotlin"
+@@ -60,9 +58,9 @@
+ private fun Project.compilerShadowJar(taskName: String, body: ShadowJar.() -> Unit): Jar {
+ 
+     val compilerJar = configurations.getOrCreate("compilerJar")
+-    dependencies.add(compilerJar.name, dependencies.project(":kotlin-compiler", configuration = "runtimeJar"))
++    dependencies.add(compilerJar.name, dependencies.project(mapOf<String,String>("path" to ":kotlin-compiler", "configuration" to "runtimeJar")))
+ 
+-    return task<ShadowJar>(taskName) {
++    return getTasks().create(taskName,ShadowJar::class.java) {
+         destinationDir = File(buildDir, "libs")
+         setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+         from(compilerJar)
+@@ -91,10 +89,9 @@
+ 
+ fun Project.embeddableCompilerDummyForDependenciesRewriting(taskName: String = "embeddable", body: Jar.() -> Unit = {}): Jar {
+     val compilerDummyJar = configurations.getOrCreate("compilerDummyJar")
+-    dependencies.add(compilerDummyJar.name,
+-                     dependencies.project(":kotlin-compiler-embeddable", configuration = COMPILER_DUMMY_JAR_CONFIGURATION_NAME))
++                     dependencies.project(mapOf<String,String>("path" to ":kotlin-compiler-embeddable", "configuration" to COMPILER_DUMMY_JAR_CONFIGURATION_NAME)))
+ 
+-    return task<ShadowJar>(taskName) {
++    return getTasks().create(taskName,ShadowJar::class.java) {
+         destinationDir = File(buildDir, "libs")
+         setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+         from(compilerDummyJar)
+--- a/buildSrc/src/main/kotlin/ideaExtKotlinDsl.kt
++++ b/buildSrc/src/main/kotlin/ideaExtKotlinDsl.kt
+@@ -3,7 +3,6 @@
+ 
+ import org.gradle.api.NamedDomainObjectContainer
+ import org.gradle.api.plugins.ExtensionAware
+-import org.gradle.kotlin.dsl.configure
+ import org.gradle.plugins.ide.idea.model.IdeaProject
+ import org.jetbrains.gradle.ext.*
+ 
+@@ -13,19 +12,19 @@
+  */
+ 
+ fun org.gradle.api.Project.idea(configure: org.gradle.plugins.ide.idea.model.IdeaModel.() -> Unit): Unit =
+-    (this as org.gradle.api.plugins.ExtensionAware).extensions.configure("idea", configure)
++    (this as org.gradle.api.plugins.ExtensionAware).getExtensions().configure("idea", configure)
+ 
+ fun IdeaProject.settings(block: ProjectSettings.() -> Unit) =
+-    (this@settings as ExtensionAware).extensions.configure(block)
++    (this@settings as ExtensionAware).getExtensions().configure(ProjectSettings::class.java,block) // beacuse this is a kotlin dsl function that configures teh extension of type T in parameter T.() -> unit with the given block
+ 
+ fun ProjectSettings.compiler(block: IdeaCompilerConfiguration.() -> Unit) =
+-    (this@compiler as ExtensionAware).extensions.configure(block)
++    (this@compiler as ExtensionAware).getExtensions().configure(IdeaCompilerConfiguration::class.java,block)
+ 
+ fun ProjectSettings.delegateActions(block: ActionDelegationConfig.() -> Unit) =
+-    (this@delegateActions as ExtensionAware).extensions.configure(block)
++    (this@delegateActions as ExtensionAware).getExtensions().configure(ActionDelegationConfig::class.java,block)
+ 
+ fun ProjectSettings.runConfigurations(block: DefaultRunConfigurationContainer.() -> Unit) =
+-    (this@runConfigurations as ExtensionAware).extensions.configure("runConfigurations", block)
++    (this@runConfigurations as ExtensionAware).getExtensions().configure("runConfigurations", block)
+ 
+ inline fun <reified T: RunConfiguration> DefaultRunConfigurationContainer.defaults(noinline block: T.() -> Unit) =
+     defaults(T::class.java, block)
