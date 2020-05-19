@@ -1,0 +1,152 @@
+Description: kotlindsl to groovy dsl 
+ This patch translates methods and variables from kotlindsl to groovy dsl.
+
+---
+
+--- a/build.gradle
++++ b/build.gradle
+@@ -162,20 +162,20 @@
+ ext["versions.markdown"] = "0.1.25"
+ ext["versions.trove4j"] = "1.0.20181211"
+ 
+-val isTeamcityBuild = project.hasProperty("teamcity") || System.getenv("TEAMCITY_VERSION") != null
+-val intellijUltimateEnabled = project.getBooleanProperty("intellijUltimateEnabled") ?: isTeamcityBuild
++def isTeamcityBuild = project.hasProperty("teamcity") || System.getenv("TEAMCITY_VERSION") != null
++def intellijUltimateEnabled = CommonUtilKt.getBooleanPropertyFromProject(project,"intellijUltimateEnabled") ?: isTeamcityBuild
+ ext {
+-	effectSystemEnabled = project.getBooleanProperty("kotlin.compiler.effectSystemEnabled") ?: false
+-	newInferenceEnabled = project.getBooleanProperty("kotlin.compiler.newInferenceEnabled") ?: false
++	effectSystemEnabled = CommonUtilKt.getBooleanPropertyFromProject(project,"kotlin.compiler.effectSystemEnabled") ?: false
++	newInferenceEnabled = CommonUtilKt.getBooleanPropertyFromProject(project,"kotlin.compiler.newInferenceEnabled") ?: false
+ }
+ 
+-val intellijSeparateSdks = project.getBooleanProperty("intellijSeparateSdks") ?: false
++def intellijSeparateSdks = CommonUtilKt.getBooleanPropertyFromProject(project,"intellijSeparateSdks") ?: false
+ 
+ ext.intellijUltimateEnabled = intellijUltimateEnabled
+ ext.intellijSeparateSdks = intellijSeparateSdks
+ 
+ ext.IntellijCoreDependencies =
+-        [{if (Platform[191].orHigher()) return "asm-all-7.0" else return "asm-all"}.call(),
++        [{return IdeCompatibilityDslKt.getAsmVersion(191)}.call(),
+                "guava",
+                "jdom",
+                "jna",
+@@ -186,21 +186,21 @@
+                "trove4j"]
+ 
+ 
+-ext.compilerModules = arrayOf(
++ext.compilerModules = [
+         ":compiler:util",
+         ":compiler:container",
+         ":compiler:resolution",
+         ":compiler:serialization",
+         ":compiler:psi",
+ 		*{if (project.findProperty("fir.enabled") == "true") {
+-            arrayOf(
++			return [
+                 ":compiler:fir:cones",
+                 ":compiler:fir:resolve",
+                 ":compiler:fir:tree",
+                 ":compiler:fir:psi2fir"
+-            )
++            ]
+         } else {
+-            emptyArray()
++            return []
+         }}.call(),
+         ":compiler:frontend",
+         ":compiler:frontend.common",
+@@ -234,9 +234,9 @@
+         ":core:descriptors.jvm",
+         ":core:deserialization",
+         ":core:util.runtime"
+-)
++] as String[]
+ 
+-val coreLibProjects = listOf(
++ext.coreLibProjects = [
+         ":kotlin-stdlib",
+         ":kotlin-stdlib-common",
+         ":kotlin-stdlib-js",
+@@ -249,9 +249,9 @@
+         ":kotlin-test:kotlin-test-testng",
+         ":kotlin-test:kotlin-test-js",
+         ":kotlin-reflect"
+-)
++]
+ 
+-val gradlePluginProjects = listOf(
++ext.gradlePluginProjects = [
+         ":kotlin-gradle-plugin",
+         ":kotlin-gradle-plugin:plugin-marker",
+         ":kotlin-gradle-plugin-api",
+@@ -262,7 +262,7 @@
+         ":kotlin-noarg",
+         ":kotlin-noarg:plugin-marker",
+         ":kotlin-sam-with-receiver"
+-)
++]
+ 
+ apply {
+     from("libraries/commonConfiguration.gradle")
+@@ -276,7 +276,7 @@
+     }
+ }
+ 
+-ext.listConfigurationContents(configName: String) {
++ext.listConfigurationContents = {String configName->
+     doFirst {
+         if(project.configurations.findByName(configName)) {
+             println("$configName configuration files:\n${project.configurations.findByName(configName).allArtifacts.files.files.join("\n  ")}")
+@@ -284,8 +284,8 @@
+     }
+ }
+ 
+-val defaultJvmTarget = "1.8"
+-val defaultJavaHome = jdkPath(defaultJvmTarget)
++def defaultJvmTarget = "1.8"
++def defaultJavaHome = jdkPath(defaultJvmTarget)
+ ext {
+ 	ignoreTestFailures = project.findProperty("ignoreTestFailures")?.toString()?.toBoolean() ?: project.hasProperty("teamcity")
+ }
+@@ -293,9 +293,9 @@
+ 
+ allprojects {
+ 
+-    jvmTarget = defaultJvmTarget
++	def jvmTarget = defaultJvmTarget
+     if (defaultJavaHome != null) {
+-        javaHome = defaultJavaHome
++		def javaHome = defaultJavaHome
+     } else {
+         logger.error("Could not find default java home. Please set environment variable JDK_${defaultJavaHome} to point to JDK ${defaultJavaHome} installation.")
+     }
+@@ -307,15 +307,20 @@
+     // therefore it is disabled by default
+     // buildDir = File(commonBuildDir, project.name)
+ 
+-	val mirrorRepo = findProperty("maven.repository.mirror").toString()
++	def mirrorRepo = findProperty("maven.repository.mirror")?.toString()
+ 
+     repositories {
+-        intellijSdkRepo(project)
+-        androidDxJarRepo(project)
+-        maven(mirrorRepo.toString())
+-        maven(bootstrapKotlinRepo.toString())
++	IntellijDependenciesKt.intellijSdkRepo(repositories,project)
++	AndroidSdkDependenciesKt.androidDxJarRepo(repositories,project)
++	if(mirrorRepo!=null){
++	        maven({url(mirrorRepo.toString())})
++        }
++        if(bootstrapKotlinRepo!=null){
++       		maven({url(bootstrapKotlinRepo.toString())})
++        }
+         jcenter()
+-        maven(protobufRepo)
++        println(DependenciesKt.getProtobufRepoFun(project))
++        maven({url(DependenciesKt.getProtobufRepoFun(project))})
+     }
+ 	
+ 	if(javaHome && jvmTarget){
