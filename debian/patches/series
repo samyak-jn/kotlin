@@ -10,3 +10,4 @@
 010-creates-getBooleanPropertyFromProject.patch
 011-create-getAsmVersion-method.patch
 012-made-intellijSdkRepo-not-extensive-function.patch
+013-adds-method-to-get-protobufrepo.patch

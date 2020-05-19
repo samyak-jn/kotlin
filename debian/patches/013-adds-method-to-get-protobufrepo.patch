@@ -1,0 +1,18 @@
+Description: adds an intermediatory method to get protobufrepo
+ This patch adds an intermediatory method to get protobufrepo.
+
+---
+
+--- a/buildSrc/src/main/kotlin/dependencies.kt
++++ b/buildSrc/src/main/kotlin/dependencies.kt
+@@ -90,6 +90,10 @@
+     get() =
+         "https://teamcity.jetbrains.com/guestAuth/app/rest/builds/buildType:(id:Kotlin_Protobuf),status:SUCCESS,pinned:true,tag:$protobufVersion/artifacts/content/internal/repo/"
+ 
++fun getProtobufRepoFun(project: Project): String {
++	return project.protobufRepo
++}
++
+ fun Project.protobufLite(): String = "org.jetbrains.kotlin:protobuf-lite:$protobufVersion"
+ fun Project.protobufFull(): String = "org.jetbrains.kotlin:protobuf-relocated:$protobufVersion"
+ 
