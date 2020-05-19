@@ -1,0 +1,509 @@
+Description: Added/Updated methods in buil.gradle kotlinjvmcompile, tasks.create
+ This patch translates allproject{afterEvaluate} and 
+ task.withtype(kotlinjvmcompile), converts foreach and listof keywords to each
+ and [] respectively.
+ This patch updates the name of configureJvmProject to configureJvmProjectRoot
+ in root project as it was conflicted, also changes distDir to String to avoid
+ GStringImpl cannot be cast to java.lang.String error in subprojects, and
+ changes task declaration from tasks{create(){}} to tasks.create.
+
+---
+--- a/build.gradle
++++ b/build.gradle
+@@ -39,7 +39,6 @@
+ 
+ plugins {
+ 	//`build-scan` // not needed
+-    id("groovy")
+     id("idea")
+     id("jps-compatible")
+     id("org.jetbrains.gradle.plugin.idea-ext")
+@@ -61,7 +60,7 @@
+ 
+ //val configuredJdks: List<JdkId> =
+ List<JdkId> configuredJdks = JdksFinderKt.getConfiguredJdks(project)
+-configuredJdks.forEach {
++configuredJdks.each {
+                 logger.info("Using ${it.majorVersion} home: ${it.homeDir}")
+ }
+ 
+@@ -85,8 +84,8 @@
+ 
+ def commonBuildDir =new File(rootDir, "build")
+ ext {
+-	distDir = "$rootDir/dist"
+-	distKotlinHomeDir = "$distDir/kotlinc"
++	distDir = "$rootDir/dist".toString()
++	distKotlinHomeDir = "$distDir/kotlinc".toString()
+ }
+ def distLibDir = "$distKotlinHomeDir/lib"
+ def commonLocalDataDir = "$rootDir/local"
+@@ -276,8 +275,8 @@
+     }
+ }
+ 
+-ext.listConfigurationContents = {String configName->
+-    doFirst {
++ext.listConfigurationContents = {Task task,String configName->
++    task.doFirst {
+         if(project.configurations.findByName(configName)) {
+             println("$configName configuration files:\n${project.configurations.findByName(configName).allArtifacts.files.files.join("\n  ")}")
+         }
+@@ -290,10 +289,9 @@
+ 	ignoreTestFailures = project.findProperty("ignoreTestFailures")?.toString()?.toBoolean() ?: project.hasProperty("teamcity")
+ }
+ 
+-ext.configureJvmProject = { String javaHome, String javaVersion ->
++ext.configureJvmProjectRoot = { String javaHome, String javaVersion ->
+     tasks.withType(JavaCompile) {
+         if (name != "compileJava9Java") {
+-        	println(it.name)
+             options.fork = true
+             options.forkOptions.javaHome = file(javaHome)
+             options.compilerArgs.add("-proc:none")
+@@ -344,17 +342,18 @@
+     }
+ 	
+ 	if(javaHome && jvmTarget){
+-		configureJvmProject(javaHome, jvmTarget)
++		configureJvmProjectRoot(javaHome, jvmTarget)
+ 		 }else{
+ 		throw new GradleScriptException('javaHome, jvmTarget might be null')
+ 	     }
+     
+-	val commonCompilerArgs = listOfNotNull(
++	def commonCompilerArgs = [
+         "-Xallow-kotlin-package",
+         "-Xread-deserialized-contracts",
+         "-Xjvm-default=compatibility",
+-        "-Xprogressive".takeIf { hasProperty("test.progressive.mode") } // TODO: change to "-progressive" after bootstrap
+-    )
++        {if(project.hasProperty("test.progressive.mode")){return "-Xprogressive"}}.call()
++    ]
++    commonCompilerArgs.removeAll([null])
+ 
+ 	tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinCompile) {
+         kotlinOptions {
+@@ -366,13 +365,13 @@
+ 
+ 	tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile) {
+         kotlinOptions {
+-            freeCompilerArgs = commonCompilerArgs + listOf("-Xnormalize-constructor-calls=enable")
++		freeCompilerArgs = commonCompilerArgs + ["-Xnormalize-constructor-calls=enable"]
+         }
+     }
+ 
+ 	//tasks.withType(VerificationTask::class.java as Class<Task>) { //could be wrong
+-    tasks.withType(VerificationTask.metaClass as Class<Task>) {
+-        (this as VerificationTask).ignoreFailures = ignoreTestFailures
++	    tasks.withType(VerificationTask) {
++        ignoreFailures = ignoreTestFailures
+     }
+ 
+     tasks.withType(Javadoc) {
+@@ -383,17 +382,15 @@
+         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+     }
+ 
+-	task("listArchives") { ext.listConfigurationContents("archives") }
+-
+-    task("listRuntimeJar") { ext.listConfigurationContents("runtimeJar") }
+-
+-    task("listDistJar") { ext.listConfigurationContents("distJar") }
++	task("listArchives") { listConfigurationContents(it,"archives") }
++	task("listRuntimeJar") { listConfigurationContents(it,"runtimeJar") }
++	task("listDistJar") { listConfigurationContents(it,"distJar") }
+ 
+     afterEvaluate {
+         if (javaHome != defaultJavaHome || jvmTarget != defaultJvmTarget) {
+             logger.info("configuring project $name to compile to the target jvm version $jvmTarget using jdk: $javaHome")
+             if(javaHome && jvmTarget){
+-				configureJvmProject(javaHome, jvmTarget)
++				configureJvmProjectRoot(javaHome, jvmTarget)
+ 			}else{
+ 				throw new GradleScriptException('javaHome, jvmTarget might be null')
+ 			}
+@@ -412,18 +409,20 @@
+         }
+ 
+         try { 
+-        	val javaConvention = javaPluginConvention()
++			def javaConvention = (JavaPluginConvention) project.getConvention().getPlugins().get("java")
+         	task("printCompileClasspath") { doFirst { ext.printClassPath("compile",javaConvention.sourceSets["main"].compileClasspath) } }
+             task("printRuntimeClasspath") { doFirst { ext.printClassPath("runtime",javaConvention.sourceSets["main"].runtimeClasspath) } }
+             task("printTestCompileClasspath") { doFirst { ext.printClassPath("test compile",javaConvention.sourceSets["test"].compileClasspath) } }
+             task("printTestRuntimeClasspath") { doFirst { ext.printClassPath("test runtime",javaConvention.sourceSets["test"].runtimeClasspath) } } 
+-        } catch (UnknownDomainObjectException e) { null }
+-
+-        run configureCompilerClasspath: {
+-            val bootstrapCompilerClasspath by rootProject.buildscript.configurations
+-            configurations.findByName("kotlinCompilerClasspath")?.let {
+-                dependencies.add(it.name, files(bootstrapCompilerClasspath))
+-            }
++        } catch (UnknownDomainObjectException e) {
++				null
++        } finally {
++        }
++        //configureCompilerClasspath:
++        def bootstrapCompilerClasspath = rootProject.buildscript.configurations.bootstrapCompilerClasspath
++        def confIt =configurations.findByName("kotlinCompilerClasspath")
++        if(confIt) {
++            dependencies.add(confIt.name, files(bootstrapCompilerClasspath))
+         }
+     }
+ }
+@@ -449,7 +448,7 @@
+ }
+ 
+ task('dist', type: Copy) {
+-	val childDistTasks = getTasksByName("dist", true)
++	def childDistTasks = getTasksByName("dist", true)
+     dependsOn(childDistTasks)
+ 
+     into(distDir)
+@@ -465,175 +464,168 @@
+ 
+ task('ideaPlugin', type: Task) {
+     dependsOn(copyCompilerToIdeaPlugin)
+-	val childIdeaPluginTasks = getTasksByName("ideaPlugin", true)
++	def childIdeaPluginTasks = getTasksByName("ideaPlugin", true)
+     dependsOn(childIdeaPluginTasks)
+ }
+ 
+-tasks {
+-    create("clean") {
+-        doLast {
+-            delete("$buildDir/repo")
+-            delete(distDir)
+-        }
+-    }
+-
+-    create("cleanupArtifacts") {
+-        doLast {
+-            delete(artifactsDir)
+-        }
+-    }
+-
+-    listOf("clean", "assemble", "install", "dist").forEach { taskName ->
+-        create("coreLibs${taskName.capitalize()}") {
+-            coreLibProjects.forEach { projectName -> dependsOn("$projectName:$taskName") }
+-        }
+-    }
+-
+-    create("coreLibsTest") {
+-        (coreLibProjects + listOf(
+-                ":kotlin-stdlib:samples",
+-                ":kotlin-test:kotlin-test-js:kotlin-test-js-it",
+-                ":kotlinx-metadata-jvm",
+-                ":tools:binary-compatibility-validator"
+-        )).forEach {
+-            dependsOn(it + ":check")
+-        }
+-    }
+-
+-    create("gradlePluginTest") {
+-        gradlePluginProjects.forEach {
+-            dependsOn(it + ":check")
+-        }
+-    }
++	tasks.create("clean") {
++	    doLast {
++	        delete("$buildDir/repo")
++	        delete(distDir)
++	}
++}
+ 
+-    create("gradlePluginIntegrationTest") {
+-        dependsOn(":kotlin-gradle-plugin-integration-tests:check")
++tasks.create("cleanupArtifacts") {
++    doLast {
++        delete(artifactsDir)
+     }
++}
+ 
+-    create("jvmCompilerTest") {
+-        dependsOn("dist")
+-        dependsOn(":compiler:test",
+-                  ":compiler:container:test",
+-                  ":compiler:tests-java8:test",
+-                  ":compiler:tests-spec:remoteRunTests")
+-        dependsOn(":plugins:jvm-abi-gen:test")
+-    }
++["clean", "assemble", "install", "dist"].each { taskName ->
++    tasks.create("coreLibs${taskName.capitalize()}") {
++        coreLibProjects.each { projectName -> dependsOn("$projectName:$taskName") }
++	}
++}
+ 
+-    create("jsCompilerTest") {
+-        dependsOn(":js:js.tests:test")
+-        dependsOn(":js:js.tests:runMocha")
++tasks.create("coreLibsTest") {
++    (coreLibProjects + [
++            ":kotlin-stdlib:samples",
++            ":kotlin-test:kotlin-test-js:kotlin-test-js-it",
++            ":kotlinx-metadata-jvm",
++            ":tools:binary-compatibility-validator"
++    ]).each {
++        dependsOn(it + ":check")
+     }
++}
+ 
+-    create("scriptingTest") {
+-        dependsOn("dist")
+-        dependsOn(":kotlin-script-util:test")
+-        dependsOn(":kotlin-scripting-jvm-host:test")
+-    }
++tasks.create("gradlePluginTest") {
++    gradlePluginProjects.each {
++        dependsOn(it + ":check")
++	}
++}
+ 
+-    create("compilerTest") {
+-        dependsOn("jvmCompilerTest")
+-        dependsOn("jsCompilerTest")
++tasks.create("gradlePluginIntegrationTest") {
++    dependsOn(":kotlin-gradle-plugin-integration-tests:check")
++}
+ 
+-        dependsOn("scriptingTest")
+-        dependsOn(":kotlin-build-common:test")
+-        dependsOn(":compiler:incremental-compilation-impl:test")
+-        dependsOn(":core:descriptors.runtime:test")
+-    }
++tasks.create("jvmCompilerTest") {
++    dependsOn("dist")
++    dependsOn(":compiler:test",
++              ":compiler:container:test",
++              ":compiler:tests-java8:test",
++              ":compiler:tests-spec:remoteRunTests")
++    dependsOn(":plugins:jvm-abi-gen:test")
++}
+ 
+-    create("toolsTest") {
+-        dependsOn(":tools:kotlinp:test")
+-    }
++tasks.create("jsCompilerTest") {
++    dependsOn(":js:js.tests:test")
++    dependsOn(":js:js.tests:runMocha")
++}
+ 
+-    create("examplesTest") {
+-        dependsOn("dist")
+-        (project(":examples").subprojects + project(":kotlin-gradle-subplugin-example")).forEach { p ->
+-            dependsOn("${p.path}:check")
+-        }
+-    }
++tasks.create("scriptingTest") {
++    dependsOn("dist")
++    dependsOn(":kotlin-script-util:test")
++    dependsOn(":kotlin-scripting-jvm-host:test")
++}
+ 
+-    create("distTest") {
+-        dependsOn("compilerTest")
+-        dependsOn("toolsTest")
+-        dependsOn("gradlePluginTest")
+-        dependsOn("examplesTest")
+-    }
++tasks.create("compilerTest") {
++    dependsOn("jvmCompilerTest")
++    dependsOn("jsCompilerTest")
++    dependsOn("scriptingTest")
++    dependsOn(":kotlin-build-common:test")
++    dependsOn(":compiler:incremental-compilation-impl:test")
++    dependsOn(":core:descriptors.runtime:test")
++}
+ 
+-    create("specTest") {
+-        dependsOn("dist")
+-        dependsOn(":compiler:tests-spec:test")
+-    }
++tasks.create("toolsTest") {
++    dependsOn(":tools:kotlinp:test")
++}
+ 
+-    create("androidCodegenTest") {
+-        dependsOn(":compiler:android-tests:test")
+-    }
++tasks.create("examplesTest") {
++    dependsOn("dist")
++    (project(":examples").subprojects + project(":kotlin-gradle-subplugin-example")).each { p ->
++        dependsOn("${p.path}:check")
++}
+ 
+-    create("jps-tests") {
+-        dependsOn("dist")
+-        dependsOn(":jps-plugin:test")
+-    }
++tasks.create("distTest") {
++    dependsOn("compilerTest")
++    dependsOn("toolsTest")
++    dependsOn("gradlePluginTest")
++    dependsOn("examplesTest")
++}
+ 
+-    create("idea-plugin-main-tests") {
+-        dependsOn("dist")
+-        dependsOn(":idea:test")
+-    }
++tasks.create("specTest") {
++    dependsOn("dist")
++    dependsOn(":compiler:tests-spec:test")
++}
+ 
+-    create("idea-plugin-additional-tests") {
+-        dependsOn("dist")
+-        dependsOn(":idea:idea-gradle:test",
+-                  ":idea:idea-gradle-native:test",
+-                  ":idea:idea-maven:test",
+-                  ":j2k:test",
+-                  ":idea:eval4j:test")
+-    }
++tasks.create("androidCodegenTest") {
++    dependsOn(":compiler:android-tests:test")
++}
+ 
+-    create("idea-plugin-tests") {
+-        dependsOn("dist")
+-        dependsOn("idea-plugin-main-tests",
+-                  "idea-plugin-additional-tests")
+-    }
++tasks.create("jps-tests") {
++    dependsOn("dist")
++    dependsOn(":jps-plugin:test")
++}
+ 
+-    create("android-ide-tests") {
+-        dependsOn("dist")
+-        dependsOn(":plugins:android-extensions-ide:test",
+-                  ":idea:idea-android:test",
+-                  ":kotlin-annotation-processing:test")
+-    }
++tasks.create("idea-plugin-main-tests") {
++    dependsOn("dist")
++    dependsOn(":idea:test")
++}
+ 
+-    create("plugins-tests") {
+-        dependsOn("dist")
+-        dependsOn(":kotlin-annotation-processing:test",
+-                  ":kotlin-source-sections-compiler-plugin:test",
+-                  ":kotlin-allopen-compiler-plugin:test",
+-                  ":kotlin-noarg-compiler-plugin:test",
+-                  ":kotlin-sam-with-receiver-compiler-plugin:test",
+-                  ":plugins:uast-kotlin:test",
+-                  ":kotlin-annotation-processing-gradle:test",
+-                  ":kotlinx-serialization-ide-plugin:test")
+-    }
++tasks.create("idea-plugin-additional-tests") {
++    dependsOn("dist")
++    dependsOn(":idea:idea-gradle:test",
++              ":idea:idea-gradle-native:test",
++              ":idea:idea-maven:test",
++              ":j2k:test",
++              ":idea:eval4j:test")
++}
+ 
++tasks.create("idea-plugin-tests") {
++    dependsOn("dist")
++    dependsOn("idea-plugin-main-tests",
++              "idea-plugin-additional-tests")
++}
+ 
+-    create("ideaPluginTest") {
+-        dependsOn(
+-                "idea-plugin-tests",
+-                "jps-tests",
+-                "plugins-tests",
+-                "android-ide-tests",
+-                ":generators:test"
+-        )
+-    }
++tasks.create("android-ide-tests") {
++    dependsOn("dist")
++    dependsOn(":plugins:android-extensions-ide:test",
++              ":idea:idea-android:test",
++              ":kotlin-annotation-processing:test")
++}
+ 
++tasks.create("plugins-tests") {
++    dependsOn("dist")
++    dependsOn(":kotlin-annotation-processing:test",
++              ":kotlin-source-sections-compiler-plugin:test",
++              ":kotlin-allopen-compiler-plugin:test",
++              ":kotlin-noarg-compiler-plugin:test",
++              ":kotlin-sam-with-receiver-compiler-plugin:test",
++              ":plugins:uast-kotlin:test",
++              ":kotlin-annotation-processing-gradle:test",
++              ":kotlinx-serialization-ide-plugin:test")
++}
+ 
+-    create("test") {
+-        doLast {
+-            throw GradleException("Don't use directly, use aggregate tasks *-check instead")
+-        }
+-    }
++tasks.create("ideaPluginTest") {
++    dependsOn(
++            "idea-plugin-tests",
++            "jps-tests",
++            "plugins-tests",
++            "android-ide-tests",
++            ":generators:test"
++    )
++}
+ 
+-    create("check") {
+-        dependsOn("test")
++tasks.create("test") {
++    doLast {
++        throw GradleException("Don't use directly, use aggregate tasks *-check instead")
+     }
+ }
+ 
++tasks.create("check") {
++    dependsOn("test")
++}
+ 
+ ext.setExecutablePermissions() {
+ 	CopySpec.filesMatching("**/bin/*") { mode = 0b111101101 }
+@@ -689,8 +681,8 @@
+ 		}
+ 
+     }else{}
+-    val destPath = project.findProperty("pluginZipPath") as String
+-    val dest = File(destPath ?: "$buildDir/kotlin-plugin.zip")
++    def destPath = project.findProperty("pluginZipPath") as String
++    def dest = File(destPath ?: "$buildDir/kotlin-plugin.zip")
+     destinationDir = dest.parentFile
+     archiveName = dest.name
+     doFirst {
+@@ -721,13 +713,13 @@
+ def String jdkPath(String version) {
+     def jdkName = "JDK_${version.replace(".", "")}"
+     def jdkMajorVersion = JdkMajorVersion.valueOf(jdkName)
+-    return configuredJdks.find { it.majorVersion == jdkMajorVersion }?.homeDir?.canonicalPath?:jdkNotFoundConst
++	return ((configuredJdks.find { it.majorVersion == jdkMajorVersion }?.homeDir?.canonicalPath?:jdkNotFoundConst).toString())
+ }
+ 
+ 
+ tasks.create("findShadowJarsInClasspath").doLast {
+     ext.printSorted={Collection<File> shadowJars,String indent = "    " ->
+-        sortedBy { shadowJars.path }.forEach { println(indent + shadowJars.relativeTo(rootProject.projectDir)) }
++        sortedBy { shadowJars.path }.each { println(indent + shadowJars.relativeTo(rootProject.projectDir)) }
+     }
+ 
+ 	def shadowJars = new HashSet<File>()
+@@ -745,8 +737,8 @@
+         if(configurations.findByName(configName) == null){
+ 		return
+         }else{
+-		    val config = configurations.findByName(configName)
+-		    val shadowJarsInConfig = config.resolvedConfiguration.files.filter { it in shadowJars }
++		    def config = configurations.findByName(configName)
++		    def shadowJarsInConfig = config.resolvedConfiguration.files.filter { it in shadowJars }
+ 		    if (shadowJarsInConfig.isNotEmpty()) {
+ 		        println()
+ 		        println("Project $project contains shadow jars in configuration '$configName':")
