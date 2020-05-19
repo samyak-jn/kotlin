@@ -1,0 +1,31 @@
+Description: updates cacheRedirectorEnabled and redirect method
+ This patch updates cacheRedirectorEnabled and redirect method signatures so
+ that they work with build.gradle.
+---
+
+
+--- a/buildSrc/src/main/kotlin/jbCacheRedirector.kt
++++ b/buildSrc/src/main/kotlin/jbCacheRedirector.kt
+@@ -46,18 +46,17 @@
+ 
+ fun URI.toCacheRedirectorUri() = URI("https://cache-redirector.jetbrains.com/$host/$path")
+ 
+-fun RepositoryHandler.redirect() = filterIsInstance<MavenArtifactRepository>().forEach { repository ->
++fun redirect(repositories:RepositoryHandler) = repositories.filterIsInstance<MavenArtifactRepository>().forEach { repository ->
+     val uri = repository.url
+     if (uri.toString().trimEnd('/') in mirroredUrls) {
+         repository.url = uri.toCacheRedirectorUri()
+     }
+ }
+ 
+-fun Project.cacheRedirectorEnabled(): Boolean = findProperty("cacheRedirectorEnabled")?.toString()?.toBoolean() == true
+-
++fun cacheRedirectorEnabled(project:Project): Boolean = project.findProperty("cacheRedirectorEnabled")?.toString()?.toBoolean() == true
+ fun repositoriesWithRedirector(repositories: RepositoryHandler, project: Project) {
+     configuration()
+-    if (project.cacheRedirectorEnabled()) {
+-        repositories.redirect()
++    if (cacheRedirectorEnabled(project)) {
++        redirect(repositories)
+     }
+ }

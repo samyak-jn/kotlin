@@ -16,3 +16,4 @@
 016-update-configureJvmProject.patch
 017-Corrects-build.gradle-translations.patch
 018-access-properties-rootProject.patch
+019-change-cacheRedirectorEnabled-redirect-signature.patch
