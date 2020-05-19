@@ -1,0 +1,226 @@
+Description: Update build.gradle
+
+---
+
+--- a/build.gradle
++++ b/build.gradle
+@@ -7,11 +7,9 @@
+ import proguard.gradle.ProGuardTask
+ 
+ buildscript {
+-    extra["defaultSnapshotVersion"] = "1.3-SNAPSHOT"
+-
+-    kotlinBootstrapFrom(BootstrapOption.TeamCity("1.3.30-eap-28", projectExtId = "Kotlin_1330_Compiler", onlySuccessBootstrap = false))
+-
+-	extra["bootstrapKotlinRepo"] = bootstrapKotlinRepo
++    ext.defaultSnapshotVersion = "1.3-SNAPSHOT"
++    BootstrapKt.kotlinBootstrapFrom(project,new TeamCity("1.3.30-eap-28","1.3.30-eap-28", "Kotlin_1330_Compiler", false)) // method defined in ./buildSrc/src/main/kotlin/Bootstrap.kt
++	ext.bootstrapKotlinRepo = bootstrapKotlinRepo
+ 
+ 	repositories {
+ 	        maven({url(bootstrapKotlinRepo.toString())})
+@@ -41,7 +39,8 @@
+ 
+ plugins {
+ 	//`build-scan` // not needed
+-    idea
++    id("groovy")
++    id("idea")
+     id("jps-compatible")
+     id("org.jetbrains.gradle.plugin.idea-ext")
+ }
+@@ -68,22 +67,27 @@
+ 
+ ext.configuredJdks =configuredJdks
+ 
+-val defaultSnapshotVersion: String by extra
+-val buildNumber by extra(findProperty("build.number")?.toString() ?: defaultSnapshotVersion)
+-val kotlinVersion by extra(findProperty("deployVersion")?.toString() ?: buildNumber)
+-
+-val kotlinLanguageVersion by extra("1.3")
++ext {
++	defaultSnapshotVersion = project.defaultSnapshotVersion
++	buildNumber = findProperty("build.number")?.toString() ?: defaultSnapshotVersion
++	kotlinVersion = findProperty("deployVersion")?.toString() ?: buildNumber
++	kotlinLanguageVersion = "1.3"
++}
+ 
+ allprojects {
+     group = "org.jetbrains.kotlin"
+     version = kotlinVersion
+ }
+ 
+-extra["kotlin_root"] = rootDir
++ext.kotlin_root = rootDir
+ 
+ configurations.create("jpsBootstrap")
+ 
+ def commonBuildDir =new File(rootDir, "build")
++ext {
++	distDir = "$rootDir/dist"
++	distKotlinHomeDir = "$distDir/kotlinc"
++}
+ def distLibDir = "$distKotlinHomeDir/lib"
+ def commonLocalDataDir = "$rootDir/local"
+ def ideaSandboxDir = "$commonLocalDataDir/ideaSandbox"
+@@ -93,25 +97,25 @@
+ def ideaUltimatePluginDir = "$artifactsDir/ideaUltimatePlugin/Kotlin"
+ 
+ // TODO: use "by extra()" syntax where possible
+-extra["distLibDir"] = project.file(distLibDir)
+-extra["libsDir"] = project.file(distLibDir)
+-extra["commonLocalDataDir"] = project.file(commonLocalDataDir)
+-extra["ideaSandboxDir"] = project.file(ideaSandboxDir)
+-extra["ideaUltimateSandboxDir"] = project.file(ideaUltimateSandboxDir)
+-extra["ideaPluginDir"] = project.file(ideaPluginDir)
+-extra["ideaUltimatePluginDir"] = project.file(ideaUltimatePluginDir)
+-extra["isSonatypeRelease"] = false
++ext.distLibDir = project.file(distLibDir)
++ext.libsDir = project.file(distLibDir)
++ext.commonLocalDataDir = project.file(commonLocalDataDir)
++ext.ideaSandboxDir = project.file(ideaSandboxDir)
++ext.ideaUltimateSandboxDir = project.file(ideaUltimateSandboxDir)
++ext.ideaPluginDir = project.file(ideaPluginDir)
++ext.ideaUltimatePluginDir = project.file(ideaUltimatePluginDir)
++ext.isSonatypeRelease = false
+ 
+ // Work-around necessary to avoid setting null javaHome. Will be removed after support of lazy task configuration
+ def jdkNotFoundConst = "JDK NOT FOUND"
+ ext.jdkNotFoundConst =jdkNotFoundConst
+ 
+-extra["JDK_16"] = jdkPath("1.6")
+-extra["JDK_17"] = jdkPath("1.7")
+-extra["JDK_18"] = jdkPath("1.8")
+-extra["JDK_9"] = jdkPath("9")
+-extra["JDK_10"] = jdkPath("10")
+-extra["JDK_11"] = jdkPath("11")
++ext.JDK_16 = jdkPath("1.6")
++ext.JDK_17 = jdkPath("1.7")
++ext.JDK_18 = jdkPath("1.8")
++ext.JDK_9 = jdkPath("9")
++ext.JDK_10 = jdkPath("10")
++ext.JDK_11 = jdkPath("11")
+ 
+ gradle.taskGraph.beforeTask() {
+     checkJDK()
+@@ -122,7 +126,7 @@
+     if (jdkChecked) {
+         return
+     }
+-    var unpresentJdks = JdkMajorVersion.values().filter { it.isMandatory() }.map { it -> it.name }.filter { it == null || extra[it] == jdkNotFoundConst }.toList()
++    var unpresentJdks = JdkMajorVersion.values().filter { it.isMandatory() }.map { it -> it.name }.filter { it == null || ext[it] == jdkNotFoundConst }.toList()
+     if (!unpresentJdks.isEmpty()) {
+         throw GradleException("Please set environment variable${if (unpresentJdks.size > 1) "s" else ""}: ${unpresentJdks.joinToString()} to point to corresponding JDK installation.")
+     }
+@@ -138,38 +142,40 @@
+ 
+ IdeCompatibilityDslKt.setCurrentIde(project)
+ 
+-extra["versions.protobuf"] = "2.6.1"
+-extra["versions.javax.inject"] = "1"
+-extra["versions.jsr305"] = "1.3.9"
+-extra["versions.jansi"] = "1.16"
+-extra["versions.jline"] = "3.3.1"
+-extra["versions.junit"] = "4.12"
+-extra["versions.javaslang"] = "2.0.6"
+-extra["versions.ant"] = "1.8.2"
+-extra["versions.android"] = "2.3.1"
+-extra["versions.kotlinx-coroutines-core"] = "1.0.1"
+-extra["versions.kotlinx-coroutines-jdk8"] = "1.0.1"
+-extra["versions.json"] = "20160807"
+-extra["versions.native-platform"] = "0.14"
+-extra["versions.ant-launcher"] = "1.8.0"
+-extra["versions.robolectric"] = "3.1"
+-extra["versions.org.springframework"] = "4.2.0.RELEASE"
+-extra["versions.jflex"] = "1.7.0"
+-extra["versions.markdown"] = "0.1.25"
+-extra["versions.trove4j"] = "1.0.20181211"
++ext["versions.protobuf"] = "2.6.1"
++ext["versions.javax.inject"] = "1"
++ext["versions.jsr305"] = "1.3.9"
++ext["versions.jansi"] = "1.16"
++ext["versions.jline"] = "3.3.1"
++ext["versions.junit"] = "4.12"
++ext["versions.javaslang"] = "2.0.6"
++ext["versions.ant"] = "1.8.2"
++ext["versions.android"] = "2.3.1"
++ext["versions.kotlinx-coroutines-core"] = "1.0.1"
++ext["versions.kotlinx-coroutines-jdk8"] = "1.0.1"
++ext["versions.json"] = "20160807"
++ext["versions.native-platform"] = "0.14"
++ext["versions.ant-launcher"] = "1.8.0"
++ext["versions.robolectric"] = "3.1"
++ext["versions.org.springframework"] = "4.2.0.RELEASE"
++ext["versions.jflex"] = "1.7.0"
++ext["versions.markdown"] = "0.1.25"
++ext["versions.trove4j"] = "1.0.20181211"
+ 
+ val isTeamcityBuild = project.hasProperty("teamcity") || System.getenv("TEAMCITY_VERSION") != null
+ val intellijUltimateEnabled = project.getBooleanProperty("intellijUltimateEnabled") ?: isTeamcityBuild
+-val effectSystemEnabled by extra(project.getBooleanProperty("kotlin.compiler.effectSystemEnabled") ?: false)
+-val newInferenceEnabled by extra(project.getBooleanProperty("kotlin.compiler.newInferenceEnabled") ?: false)
++ext {
++	effectSystemEnabled = project.getBooleanProperty("kotlin.compiler.effectSystemEnabled") ?: false
++	newInferenceEnabled = project.getBooleanProperty("kotlin.compiler.newInferenceEnabled") ?: false
++}
+ 
+ val intellijSeparateSdks = project.getBooleanProperty("intellijSeparateSdks") ?: false
+ 
+-extra["intellijUltimateEnabled"] = intellijUltimateEnabled
+-extra["intellijSeparateSdks"] = intellijSeparateSdks
++ext.intellijUltimateEnabled = intellijUltimateEnabled
++ext.intellijSeparateSdks = intellijSeparateSdks
+ 
+-extra["IntellijCoreDependencies"] =
+-	[{if (Platform[191].orHigher()) return "asm-all-7.0" else return "asm-all"}.call(),
++ext.IntellijCoreDependencies =
++        [{if (Platform[191].orHigher()) return "asm-all-7.0" else return "asm-all"}.call(),
+                "guava",
+                "jdom",
+                "jna",
+@@ -180,13 +186,13 @@
+                "trove4j"]
+ 
+ 
+-extra["compilerModules"] = arrayOf(
++ext.compilerModules = arrayOf(
+         ":compiler:util",
+         ":compiler:container",
+         ":compiler:resolution",
+         ":compiler:serialization",
+         ":compiler:psi",
+-        *{if (project.findProperty("fir.enabled") == "true") {
++		*{if (project.findProperty("fir.enabled") == "true") {
+             arrayOf(
+                 ":compiler:fir:cones",
+                 ":compiler:fir:resolve",
+@@ -264,7 +270,7 @@
+ }
+ 
+ apply {
+-    if (extra["isSonatypeRelease"].toBoolean() == true) {
++	if (ext.isSonatypeRelease.toBoolean() == true) {
+         logger.info("Applying configuration for sonatype release")
+         from("libraries/prepareSonatypeStaging.gradle")
+     }
+@@ -280,7 +286,10 @@
+ 
+ val defaultJvmTarget = "1.8"
+ val defaultJavaHome = jdkPath(defaultJvmTarget)
+-val ignoreTestFailures by extra(project.findProperty("ignoreTestFailures")?.toString()?.toBoolean() ?: project.hasProperty("teamcity"))
++ext {
++	ignoreTestFailures = project.findProperty("ignoreTestFailures")?.toString()?.toBoolean() ?: project.hasProperty("teamcity")
++}
++
+ 
+ allprojects {
+ 
+@@ -633,7 +642,7 @@
+     }
+ }
+ 
+-+task('zipPlugin', type: Zip) {
++task('zipPlugin', type: Zip) {
+     def src
+     if(project.findProperty("pluginArtifactDir")){
+ 		if(project.findProperty("pluginArtifactDir") == null){
