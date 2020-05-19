@@ -15,3 +15,4 @@
 015-translation-from-kotlindsl-to-groovy-dsl.patch
 016-update-configureJvmProject.patch
 017-Corrects-build.gradle-translations.patch
+018-access-properties-rootProject.patch

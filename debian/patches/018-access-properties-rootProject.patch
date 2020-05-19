@@ -1,0 +1,16 @@
+Description:  access of extra properties of rootProject
+ This patch is use to get access of extra properties of rootProject.
+
+---
+
+--- a/generators/build.gradle.kts
++++ b/generators/build.gradle.kts
+@@ -28,7 +28,7 @@
+     compile(projectTests(":kotlin-noarg-compiler-plugin"))
+     compile(projectTests(":kotlin-sam-with-receiver-compiler-plugin"))
+     compile(projectTests(":generators:test-generator"))
+-    builtinsCompile("org.jetbrains.kotlin:kotlin-stdlib:$bootstrapKotlinVersion")
++	builtinsCompile("org.jetbrains.kotlin:kotlin-stdlib:${rootProject.extra["bootstrapKotlinVersion"]}")
+     testCompileOnly(project(":kotlin-reflect-api"))
+     testCompile(builtinsSourceSet.output)
+     testRuntime(intellijDep()) { includeJars("idea_rt") }
