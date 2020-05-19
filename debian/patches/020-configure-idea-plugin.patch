@@ -1,0 +1,112 @@
+Description: Updates Configuring idea plugin
+ This patch changes configuring idea plugin by configure(IdeaModel){} to idea{}
+ It also added a few fixes like referencing methods properly with
+ project.method instead of using them as ext.method.
+
+---
+--- a/build.gradle
++++ b/build.gradle
+@@ -627,19 +627,22 @@
+     dependsOn("test")
+ }
+ 
+-ext.setExecutablePermissions() {
+-	CopySpec.filesMatching("**/bin/*") { mode = 0b111101101 }
+-	CopySpec.filesMatching("**/bin/*.bat") { mode = 0b110100100 }
++ext.setExecutablePermissions = {CopySpec copySpec ->
++    copySpec.filesMatching("**/bin/*") { mode = 0b111101101 }
++    copySpec.filesMatching("**/bin/*.bat") { mode = 0b110100100 }
+ }
+ 
+ task('zipCompiler', type: Zip) {
+     dependsOn(dist)
+     destinationDir = file(distDir)
+-    archiveName = "kotlin-compiler-$kotlinVersion.zip"
++    archiveName = "kotlin-compiler-${kotlinVersion}.zip"
++	println("hiho")
++	println(archiveName)
++	println("endho")
+ 
+     from(distKotlinHomeDir)
+     into("kotlinc")
+-    ext.setExecutablePermissions()
++	setExecutablePermissions(it)
+ 
+     doLast {
+         logger.lifecycle("Compiler artifacts packed to $archivePath")
+@@ -662,14 +665,7 @@
+ task('zipPlugin', type: Zip) {
+     def src
+     if(project.findProperty("pluginArtifactDir")){
+-		if(project.findProperty("pluginArtifactDir") == null){
+-		if (project.hasProperty("ultimate")){
+-			ideaUltimatePluginDir
+-		} else {
+-			ideaPluginDir
+-		}
+-	}else{
+-			String pluginArtifactDir_String = project.findProperty("pluginArtifactDir").toString()
++		String pluginArtifactDir_String = project.findProperty("pluginArtifactDir").toString()
+ 		switch(pluginArtifactDir_String){
+ 			case "Kotlin":
+ 				src = ideaPluginDir
+@@ -677,29 +673,36 @@
+ 				src = ideaUltimatePluginDir
+ 			default:
+ 				throw new GradleScriptException("Unsupported plugin artifact dir")
+-			}
++		}
++    }else{
++		if (project.hasProperty("ultimate")){
++			src=ideaUltimatePluginDir
++		} else {
++			src=ideaPluginDir
+ 		}
+ 
+     }else{}
+     def destPath = project.findProperty("pluginZipPath") as String
+-    def dest = File(destPath ?: "$buildDir/kotlin-plugin.zip")
++    def dest = new File(destPath ?: "$buildDir/kotlin-plugin.zip")
+     destinationDir = dest.parentFile
+     archiveName = dest.name
+     doFirst {
+         if (destPath == null) throw GradleException("Specify target zip path with 'pluginZipPath' property")
+     }
+ 
++	println(src)
++    println("hee")
+     from(src)
+     into("Kotlin")
+-    ext.setExecutablePermissions()
++    setExecutablePermissions()
+ 
+     doLast {
+         logger.lifecycle("Plugin artifacts packed to $archivePath")
+     }
+ }
+ 
+-configure(IdeaModel) {
+-    module {
++idea {
++    module{
+         excludeDirs = files(
+                 project.buildDir,
+                 commonLocalDataDir,
+@@ -731,7 +734,7 @@
+     }
+ 
+     println("Shadow jars:")
+-    ext.printSorted(shadowJars)
++    project.printSorted(shadowJars)
+ 
+     ext.checkConfig={ String configName ->
+         if(configurations.findByName(configName) == null){
+@@ -742,7 +745,7 @@
+ 		    if (shadowJarsInConfig.isNotEmpty()) {
+ 		        println()
+ 		        println("Project $project contains shadow jars in configuration '$configName':")
+-		        ext.printSorted(shadowJarsInConfig)
++		        project.printSorted(shadowJarsInConfig)
+ 		    }
+         }
+     }
