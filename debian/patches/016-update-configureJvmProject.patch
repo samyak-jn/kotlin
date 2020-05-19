@@ -1,0 +1,78 @@
+Description: Update configureJvmProject to works with build.gradle 
+
+---
+
+--- a/build.gradle
++++ b/build.gradle
+@@ -290,12 +290,33 @@
+ 	ignoreTestFailures = project.findProperty("ignoreTestFailures")?.toString()?.toBoolean() ?: project.hasProperty("teamcity")
+ }
+ 
++ext.configureJvmProject = { String javaHome, String javaVersion ->
++    tasks.withType(JavaCompile) {
++        if (name != "compileJava9Java") {
++        	println(it.name)
++            options.fork = true
++            options.forkOptions.javaHome = file(javaHome)
++            options.compilerArgs.add("-proc:none")
++            options.encoding = "UTF-8"
++        }
++    }
++
++    tasks.withType(KotlinCompile) {
++        kotlinOptions.jdkHome = javaHome
++        kotlinOptions.jvmTarget = javaVersion
++        kotlinOptions.freeCompilerArgs += "-Xjvm-default=compatibility"
++    }
++
++    tasks.withType(Test) {
++        executable = new File(javaHome, "bin/java").canonicalPath
++    }
++}
+ 
+ allprojects {
+ 
+-	def jvmTarget = defaultJvmTarget
++	ext.jvmTarget = defaultJvmTarget
+     if (defaultJavaHome != null) {
+-		def javaHome = defaultJavaHome
++		ext.javaHome = defaultJavaHome
+     } else {
+         logger.error("Could not find default java home. Please set environment variable JDK_${defaultJavaHome} to point to JDK ${defaultJavaHome} installation.")
+     }
+@@ -319,7 +340,6 @@
+        		maven({url(bootstrapKotlinRepo.toString())})
+         }
+         jcenter()
+-        println(DependenciesKt.getProtobufRepoFun(project))
+         maven({url(DependenciesKt.getProtobufRepoFun(project))})
+     }
+ 	
+@@ -705,27 +725,6 @@
+ }
+ 
+ 
+-ext.configureJvmProject = { String javaHome, String javaVersion ->
+-    tasks.withType(JavaCompile) {
+-        if (name != "compileJava9Java") {
+-            options.isFork = true
+-            options.forkOptions.javaHome = file(javaHome)
+-            options.compilerArgs.add("-proc:none")
+-            options.encoding = "UTF-8"
+-        }
+-    }
+-
+-    tasks.withType(KotlinCompile) {
+-        kotlinOptions.jdkHome = javaHome
+-        kotlinOptions.jvmTarget = javaVersion
+-        kotlinOptions.freeCompilerArgs += "-Xjvm-default=compatibility"
+-    }
+-
+-    tasks.withType(Test) {
+-        executable = File(javaHome, "bin/java").canonicalPath
+-    }
+-}
+-
+ tasks.create("findShadowJarsInClasspath").doLast {
+     ext.printSorted={Collection<File> shadowJars,String indent = "    " ->
+         sortedBy { shadowJars.path }.forEach { println(indent + shadowJars.relativeTo(rootProject.projectDir)) }

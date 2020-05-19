@@ -13,3 +13,4 @@
 013-adds-method-to-get-protobufrepo.patch
 014-update-build.gradle.patch
 015-translation-from-kotlindsl-to-groovy-dsl.patch
+016-update-configureJvmProject.patch
