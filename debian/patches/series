@@ -9,3 +9,4 @@
 009-corrects-setCurrentIde-call.patch
 010-creates-getBooleanPropertyFromProject.patch
 011-create-getAsmVersion-method.patch
+012-made-intellijSdkRepo-not-extensive-function.patch

@@ -1,0 +1,17 @@
+Description: intellijSdkRepo not an extenson function
+ This patch makes intellijSdkRepo not an extenson function so that it works with
+ groovy build.gradle.
+
+---
+
+--- a/buildSrc/src/main/kotlin/intellijDependencies.kt
++++ b/buildSrc/src/main/kotlin/intellijDependencies.kt
+@@ -28,7 +28,7 @@
+ 
+ private fun Project.intellijRepoDir() = File("${project.rootDir.absoluteFile}/buildSrc/prepare-deps/intellij-sdk/build/repo")
+ 
+-fun RepositoryHandler.intellijSdkRepo(project: Project): IvyArtifactRepository = ivy {
++fun intellijSdkRepo(repositoryHandler:RepositoryHandler,project: Project): IvyArtifactRepository = repositoryHandler.ivy {
+     val baseDir = project.intellijRepoDir()
+     val intellijEnforceCommunitySdk = project.getBooleanProperty("intellijEnforceCommunitySdk") == true
+ 

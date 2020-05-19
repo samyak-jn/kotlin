@@ -4,6 +4,7 @@ Description: Translates JbCacheRedirectorKt.repositories
 Bug-Debian: https://bugs.debian.org/939730
 
 ---
+
 --- a/build.gradle
 +++ b/build.gradle
 @@ -12,13 +12,12 @@
