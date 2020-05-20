@@ -1,0 +1,84 @@
+Description: Removes cyclic dependencies and corrects configureJvmProjectRoot
+ This patch updates cylic dependencies caused by children task list, and
+ corrects the translation of configureJvmProjectRoot.
+
+---
+
+
+--- a/build.gradle
++++ b/build.gradle
+@@ -427,20 +427,20 @@
+     }
+ }
+ 
+-gradle.taskGraph.whenReady {
++gradle.taskGraph.whenReady { taskGraph ->
+     if (isTeamcityBuild) {
+         logger.warn("CI build profile is active (IC is off, proguard is on). Use -Pteamcity=false to reproduce local build")
+-        for (task in allTasks) {
++        for (task in taskGraph.allTasks) {
+             if (task) {
+                 if(task instanceof AbstractKotlinCompile){ task.incremental = false}
+-                if(task instanceof JavaCompile){ task.options.isIncremental = false}
++                if(task instanceof JavaCompile){ task.options.setIncremental(false)}
+             }
+         }
+     } else {
+         logger.warn("Local build profile is active (IC is on, proguard is off). Use -Pteamcity=true to reproduce TC build")
+-        for (task in allTasks) {
++        for (task in taskGraph.allTasks) {
+ 		if (task) {
+-                if(task instanceof JavaCompile){ task.options.isIncremental = true}
++                if(task instanceof JavaCompile){ task.options.setIncremental(true)}
+                 if(task instanceof org.gradle.jvm.tasks.Jar){ task.entryCompression = ZipEntryCompression.STORED}
+             }
+         }
+@@ -448,7 +448,7 @@
+ }
+ 
+ task('dist', type: Copy) {
+-	def childDistTasks = getTasksByName("dist", true)
++	def childDistTasks = getTasksByName("dist", true) - it
+     dependsOn(childDistTasks)
+ 
+     into(distDir)
+@@ -464,7 +464,7 @@
+ 
+ task('ideaPlugin', type: Task) {
+     dependsOn(copyCompilerToIdeaPlugin)
+-	def childIdeaPluginTasks = getTasksByName("ideaPlugin", true)
++    def childIdeaPluginTasks = getTasksByName("ideaPlugin", true) - it
+     dependsOn(childIdeaPluginTasks)
+ }
+ 
+@@ -636,9 +636,6 @@
+     dependsOn(dist)
+     destinationDir = file(distDir)
+     archiveName = "kotlin-compiler-${kotlinVersion}.zip"
+-	println("hiho")
+-	println(archiveName)
+-	println("endho")
+ 
+     from(distKotlinHomeDir)
+     into("kotlinc")
+@@ -690,8 +687,6 @@
+         if (destPath == null) throw GradleException("Specify target zip path with 'pluginZipPath' property")
+     }
+ 
+-	println(src)
+-    println("hee")
+     from(src)
+     into("Kotlin")
+     setExecutablePermissions()
+@@ -758,9 +753,9 @@
+ 
+ allprojects {
+     afterEvaluate {
+-        if (cacheRedirectorEnabled()) {
++        if (JbCacheRedirectorKt.cacheRedirectorEnabled(project)) {
+             logger.info("Redirecting repositories for $displayName")
+-            repositories.redirect()
++            JbCacheRedirectorKt.redirect(repositories)
+         }
+     }
+ }

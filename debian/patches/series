@@ -18,3 +18,4 @@
 018-access-properties-rootProject.patch
 019-change-cacheRedirectorEnabled-redirect-signature.patch
 020-configure-idea-plugin.patch
+021-remove-cyclic-dependency.patch

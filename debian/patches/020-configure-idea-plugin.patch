@@ -4,6 +4,7 @@ Description: Updates Configuring idea plugin
  project.method instead of using them as ext.method.
 
 ---
+
 --- a/build.gradle
 +++ b/build.gradle
 @@ -627,19 +627,22 @@
