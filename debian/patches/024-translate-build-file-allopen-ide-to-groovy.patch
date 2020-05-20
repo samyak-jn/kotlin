@@ -1,0 +1,78 @@
+Description: the build file of allopen-ide to groovy
+ This patch converts plugins/allopen/allopen-ide/build.gradle.kts to
+ plugins/allopen/allopen-ide/build.gradle and make it compatible to
+ groovy.
+
+---
+
+--- /dev/null
++++ b/plugins/allopen/allopen-ide/build.gradle
+@@ -0,0 +1,34 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++project.description = "Kotlin AllOpen IDEA Plugin"
++
++dependencies {
++    compile(project(":kotlin-allopen-compiler-plugin"))
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:cli-common"))
++    compile(project(":idea"))
++    compile(project(":idea:idea-jvm"))
++    compile(project(":idea:idea-jps-common"))
++    compile(project(":plugins:annotation-based-compiler-plugins-ide-support"))
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij"))
++    if (!rootProject.ext.has("versions.androidStudioRelease")) {
++        compileOnly(IntellijDependenciesKt.getIntellijDep(project,"maven"))
++    }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"gradle"))
++}
++
++sourceSets {
++    "main" {
++		java.srcDirs("src")
++		resources.srcDir("resources")
++    }
++    "test" {}
++}
++
++ArtifactsKt.customRuntimeJar("allopen-ide")
++
++ArtifactsKt.customIdeaPlugin(project)
+--- a/plugins/allopen/allopen-ide/build.gradle.kts
++++ /dev/null
+@@ -1,31 +0,0 @@
+-
+-description = "Kotlin AllOpen IDEA Plugin"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":kotlin-allopen-compiler-plugin"))
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:cli-common"))
+-    compile(project(":idea"))
+-    compile(project(":idea:idea-jvm"))
+-    compile(project(":idea:idea-jps-common"))
+-    compile(project(":plugins:annotation-based-compiler-plugins-ide-support"))
+-    compileOnly(intellijDep())
+-    excludeInAndroidStudio(rootProject) { compileOnly(intellijPluginDep("maven")) }
+-    compileOnly(intellijPluginDep("gradle"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-runtimeJar()
+-
+-ideaPlugin()
+-

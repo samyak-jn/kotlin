@@ -21,3 +21,4 @@
 021-remove-cyclic-dependency.patch
 022-add-methods-for-intelliJ-dependencies.patch
 023-change-runtune-Jar-method.patch
+024-translate-build-file-allopen-ide-to-groovy.patch
