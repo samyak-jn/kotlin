@@ -1,0 +1,45 @@
+Description: Adds method in buildSrc/src/main/kotlin/dependencies.kt
+ The patch changes add method to use as intermediatery between build.gradle
+ kotlin method and create an intermediatory method for ProjectTests.
+ Adds intermediatory method for project.projectTest, overloaded customCommonDep
+ created an intermediatory method for dependencyhandler.projectRuntimeJar
+
+---
+
+--- a/buildSrc/src/main/kotlin/dependencies.kt
++++ b/buildSrc/src/main/kotlin/dependencies.kt
+@@ -22,11 +22,15 @@
+     }
+ }
+ 
++fun customCommonDep(project:Project,coord: String): String{ return project.commonDep(coord) } // to use as intermediatery between build.gradle kotlin method
++
+ fun Project.commonDep(group: String, artifact: String, vararg suffixesAndClassifiers: String): String {
+     val (classifiers, artifactSuffixes) = suffixesAndClassifiers.partition { it.startsWith(':') }
+     return "$group:$artifact${artifactSuffixes.joinToString("")}:${commonVer(group, artifact)}${classifiers.joinToString("")}"
+ }
+ 
++fun customCommonDep(project:Project,group: String, artifact: String, suffixesAndClassifiers: List<String>): String{ return project.commonDep(group, artifact,*suffixesAndClassifiers.toTypedArray()) } // to use as intermediatery between build.gradle kotlin method
++
+ fun Project.commonVer(group: String, artifact: String) =
+     when {
+         rootProject.extra.has("versions.$artifact") -> rootProject.extra["versions.$artifact"]
+@@ -84,6 +88,9 @@
+ fun DependencyHandler.projectRuntimeJar(name: String): ProjectDependency = project(name, configuration = "runtimeJar")
+ fun DependencyHandler.projectArchives(name: String): ProjectDependency = project(name, configuration = "archives")
+ 
++fun customProjectTests(dependencyHandler:DependencyHandler,name: String): ProjectDependency {return dependencyHandler.projectTests(name)}
++fun customProjectRuntimeJar(dependencyHandler:DependencyHandler,name: String): ProjectDependency {return dependencyHandler.projectRuntimeJar(name)}
++
+ val Project.protobufVersion: String get() = findProperty("versions.protobuf") as String
+ 
+ val Project.protobufRepo: String
+@@ -127,6 +134,8 @@
+ fun Project.toolsJar(jdkHome: File = File(this.property("JDK_18") as String)): File? =
+     firstFromJavaHomeThatExists("lib/tools.jar", jdkHome = jdkHome)
+ 
++fun customToolsJar(project:Project):File?{return project.toolsJar()}
++
+ val compilerManifestClassPath
+     get() = "annotations-13.0.jar kotlin-stdlib.jar kotlin-reflect.jar kotlin-script-runtime.jar trove4j.jar"
+ 
