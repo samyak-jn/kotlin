@@ -1,0 +1,27 @@
+Description: Change runtimeJar method which returns a Jar task
+ The patch changes runtimeJar method which returns a Jar task by introducing
+ intermediatory methods which are called from the buildscripts.
+
+---
+
+
+--- a/buildSrc/src/main/kotlin/artifacts.kt
++++ b/buildSrc/src/main/kotlin/artifacts.kt
+@@ -82,6 +82,8 @@
+ 
+ fun Project.runtimeJar(body: Jar.() -> Unit = {}): Jar = runtimeJar(getOrCreateTask("jar", body), { })
+ 
++fun customRuntimeJar(project : Project): Jar = project.runtimeJar({})
++
+ fun Project.sourcesJar(sourceSet: String? = "main", body: Jar.() -> Unit = {}): Jar =
+     getOrCreateTask("sourcesJar") {
+         setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+@@ -155,6 +157,8 @@
+     }
+ }
+ 
++fun customIdeaPlugin(project: Project): Copy {retutn project.ideaPlugin()}
++
+ fun Project.dist(
+     targetDir: File? = null,
+     targetName: String? = null,
