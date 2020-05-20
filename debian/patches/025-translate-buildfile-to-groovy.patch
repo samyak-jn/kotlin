@@ -1,0 +1,66 @@
+Description: Migrates build script from kts to groovy
+
+---
+
+--- /dev/null
++++ b/prepare/android-lint/build.gradle
+@@ -0,0 +1,27 @@
++
++plugins {
++    id("java-base")
++    id("jps-compatible")
++}
++
++description = "Kotlin Android Lint"
++
++ext.projectsToShadow = [
++        ":plugins:lint",
++        ":plugins:uast-kotlin",
++        ":plugins:uast-kotlin-idea"]
++
++sourceSets {
++    "main" {}
++    "test" {}
++}
++
++dependencies {
++    project.projectsToShadow.each { p ->
++        embeddedComponents(project(p)) { setTransitive(false) }
++    }
++}
++
++ArtifactsKt.customRuntimeJar(project,"android-lint")
++
++ArtifactsKt.customIdeaPlugin(project)
+--- a/prepare/android-lint/build.gradle.kts
++++ /dev/null
+@@ -1,29 +0,0 @@
+-
+-description = "Kotlin Android Lint"
+-
+-plugins {
+-    `java-base`
+-    id("jps-compatible")
+-}
+-
+-val projectsToShadow = listOf(
+-        ":plugins:lint",
+-        ":plugins:uast-kotlin",
+-        ":plugins:uast-kotlin-idea")
+-
+-sourceSets {
+-    "main" {}
+-    "test" {}
+-}
+-
+-dependencies {
+-    projectsToShadow.forEach { p ->
+-        embeddedComponents(project(p)) { isTransitive = false }
+-    }
+-}
+-
+-runtimeJar {
+-    fromEmbeddedComponents()
+-}
+-
+-ideaPlugin()
