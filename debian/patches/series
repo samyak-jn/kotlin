@@ -23,3 +23,5 @@
 023-change-runtune-Jar-method.patch
 024-translate-build-file-allopen-ide-to-groovy.patch
 025-translate-buildfile-to-groovy.patch
+026-intermediatory-method-for-ProjectTests.patch
+027-convert-compiler-build.gradle-to-groovy.patch

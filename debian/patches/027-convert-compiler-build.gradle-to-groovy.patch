@@ -1,0 +1,207 @@
+Description: Convert compiler/build.gradle from kts to groovy
+ This patch is used to covnvert from kts to groovy. Also, various
+ intermediatory methods for ProjectTests and ProjectRuntimeJar are added.
+
+---
+
+--- /dev/null
++++ b/compiler/build.gradle
+@@ -0,0 +1,94 @@
++import java.io.File
++import org.gradle.api.tasks.bundling.Jar
++import org.jetbrains.kotlin.gradle.dsl.KotlinCompile
++import org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++project.otherCompilerModules.removeAll([null])
++ext.compilerModules = rootProject.compilerModules
++ext.otherCompilerModules = compilerModules.collect { if(it != path){return it} }
++
++ext{
++	effectSystemEnabled = rootProject.effectSystemEnabled
++	newInferenceEnabled = rootProject.newInferenceEnabled
++}
++
++def configureFreeCompilerArg(Boolean isEnabled, String compilerArgument) {
++    if (isEnabled) {
++        allprojects {
++            tasks.withType(KotlinCompile) {
++                kotlinOptions {
++                    freeCompilerArgs += [compilerArgument]
++                }
++            }
++        }
++    }
++}
++
++configureFreeCompilerArg(effectSystemEnabled, "-Xeffect-system")
++configureFreeCompilerArg(newInferenceEnabled, "-Xnew-inference")
++
++configurations.create("antLauncherJar")
++
++dependencies {
++    testRuntime(IntellijDependenciesKt.getIntellijDep(project,"intellij")) // Should come before compiler, because of "progarded" stuff needed for tests
++
++    testCompile(project(":kotlin-script-runtime"))
++    testCompile(project(":kotlin-test:kotlin-test-jvm"))
++
++    testCompile(kotlinStdlib())
++
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++    testCompileOnly(project(":kotlin-test:kotlin-test-jvm"))
++    testCompileOnly(project(":kotlin-test:kotlin-test-junit"))
++    testCompile(DependenciesKt.customProjectTests(dependencies,":compiler:tests-common"))
++    testCompile(DependenciesKt.customProjectTests(dependencies,":compiler:fir:psi2fir"))
++    testCompile(DependenciesKt.customProjectTests(dependencies,":compiler:fir:resolve"))
++    testCompile(DependenciesKt.customProjectTests(dependencies,":generators:test-generator"))
++    testCompile(project(":compiler:ir.ir2cfg"))
++    testCompile(project(":compiler:ir.tree")) // used for deepCopyWithSymbols call that is removed by proguard from the compiler TODO: make it more straightforward
++    testCompile(project(":kotlin-scripting-compiler"))
++    testCompile(project(":kotlin-script-util"))
++    testCompileOnly(DependenciesKt.customProjectRuntimeJar(dependencies,":kotlin-daemon-client"))
++    testCompileOnly(project(":kotlin-reflect-api"))
++    otherCompilerModules.each {
++        testCompileOnly(project(it))
++    }
++
++    testCompileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    testCompileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["openapi", "idea", "idea_rt", "util", "asm-all"], rootProject) }
++    testRuntime(project(":kotlin-reflect"))
++    testRuntime(project(":kotlin-daemon-client"))
++    testRuntime(AndroidSdkDependenciesKt.customAndroidDxJar(project))
++    testRuntime(files(DependenciesKt.customToolsJar(project)))
++
++    antLauncherJar(DependenciesKt.customCommonDep(project,"org.apache.ant", "ant",[]))
++    antLauncherJar(files(DependenciesKt.customToolsJar(project)))
++
++    // For JPS build
++    if (System.getProperty("idea.active") != null) {
++        testRuntimeOnly(files("${rootProject.projectDir}/dist/kotlinc/lib/kotlin-reflect.jar"))
++    }
++}
++
++sourceSets {
++    "main" {}
++    "test" {
++        java.srcDirs("test", "tests")
++    }
++}
++
++def jar= tasks.jar
++jar.from("../idea/resources") {
++    include("META-INF/extensions/compiler.xml")
++}
++
++TasksKt.customProjectTest(project,rootDir,configurations.antLauncherJar.asPath,"test","compiler")
++
++task generateTests {return CommonUtilKt.customGenerator(project,"org.jetbrains.kotlin.generators.tests.GenerateCompilerTestsKt",null)}
++
++ArtifactsKt.customTestsJar(project,"compiler")
+--- a/compiler/build.gradle.kts
++++ /dev/null
+@@ -1,101 +0,0 @@
+-import java.io.File
+-import org.gradle.api.tasks.bundling.Jar
+-import org.jetbrains.kotlin.gradle.dsl.KotlinCompile
+-import org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-val compilerModules: Array<String> by rootProject.extra
+-val otherCompilerModules = compilerModules.filter { it != path }
+-
+-val effectSystemEnabled: Boolean by rootProject.extra
+-val newInferenceEnabled: Boolean by rootProject.extra
+-
+-configureFreeCompilerArg(effectSystemEnabled, "-Xeffect-system")
+-configureFreeCompilerArg(newInferenceEnabled, "-Xnew-inference")
+-
+-fun configureFreeCompilerArg(isEnabled: Boolean, compilerArgument: String) {
+-    if (isEnabled) {
+-        allprojects {
+-            tasks.withType<KotlinCompile<*>> {
+-                kotlinOptions {
+-                    freeCompilerArgs += listOf(compilerArgument)
+-                }
+-            }
+-        }
+-    }
+-}
+-
+-val antLauncherJar by configurations.creating
+-
+-dependencies {
+-    testRuntime(intellijDep()) // Should come before compiler, because of "progarded" stuff needed for tests
+-
+-    testCompile(project(":kotlin-script-runtime"))
+-    testCompile(project(":kotlin-test:kotlin-test-jvm"))
+-    
+-    testCompile(kotlinStdlib())
+-
+-    testCompile(commonDep("junit:junit"))
+-    testCompileOnly(project(":kotlin-test:kotlin-test-jvm"))
+-    testCompileOnly(project(":kotlin-test:kotlin-test-junit"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(projectTests(":compiler:fir:psi2fir"))
+-    testCompile(projectTests(":compiler:fir:resolve"))
+-    testCompile(projectTests(":generators:test-generator"))
+-    testCompile(project(":compiler:ir.ir2cfg"))
+-    testCompile(project(":compiler:ir.tree")) // used for deepCopyWithSymbols call that is removed by proguard from the compiler TODO: make it more straightforward
+-    testCompile(project(":kotlin-scripting-compiler"))
+-    testCompile(project(":kotlin-script-util"))
+-    testCompileOnly(projectRuntimeJar(":kotlin-daemon-client"))
+-    testCompileOnly(project(":kotlin-reflect-api"))
+-    otherCompilerModules.forEach {
+-        testCompileOnly(project(it))
+-    }
+-    testCompileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    testCompileOnly(intellijDep()) { includeJars("openapi", "idea", "idea_rt", "util", "asm-all", rootProject = rootProject) }
+-
+-    testRuntime(project(":kotlin-reflect"))
+-    testRuntime(project(":kotlin-daemon-client"))
+-    testRuntime(androidDxJar())
+-    testRuntime(files(toolsJar()))
+-
+-    antLauncherJar(commonDep("org.apache.ant", "ant"))
+-    antLauncherJar(files(toolsJar()))
+-
+-    // For JPS build
+-    if (System.getProperty("idea.active") != null) {
+-        testRuntimeOnly(files("${rootProject.projectDir}/dist/kotlinc/lib/kotlin-reflect.jar"))
+-    }
+-}
+-
+-sourceSets {
+-    "main" {}
+-    "test" {
+-        projectDefault()
+-    }
+-}
+-
+-val jar: Jar by tasks
+-jar.from("../idea/resources") {
+-    include("META-INF/extensions/compiler.xml")
+-}
+-
+-projectTest {
+-    dependsOn(":dist")
+-    workingDir = rootDir
+-    systemProperty("kotlin.test.script.classpath", testSourceSet.output.classesDirs.joinToString(File.pathSeparator))
+-    systemProperty("kotlin.suppress.expected.test.failures", project.findProperty("kotlin.suppress.expected.test.failures") ?: false)
+-    doFirst {
+-        systemProperty("kotlin.ant.classpath", antLauncherJar.asPath)
+-        systemProperty("kotlin.ant.launcher.class", "org.apache.tools.ant.Main")
+-    }
+-}
+-
+-
+-val generateTests by generator("org.jetbrains.kotlin.generators.tests.GenerateCompilerTestsKt")
+-
+-testsJar()
