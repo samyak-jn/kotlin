@@ -7,20 +7,34 @@ Description: Change runtimeJar method which returns a Jar task
 
 --- a/buildSrc/src/main/kotlin/artifacts.kt
 +++ b/buildSrc/src/main/kotlin/artifacts.kt
-@@ -82,6 +82,8 @@
+@@ -82,6 +82,22 @@
  
  fun Project.runtimeJar(body: Jar.() -> Unit = {}): Jar = runtimeJar(getOrCreateTask("jar", body), { })
  
-+fun customRuntimeJar(project : Project): Jar = project.runtimeJar({})
++fun customRuntimeJar(project : Project,choice:String): Jar {
++	when(choice){
++		"allopen-ide"->{
++			return project.runtimeJar({})
++		}
++		"android-lint"->{
++			return project.runtimeJar({
++    			fromEmbeddedComponents()
++				})
++		}
++		else -> {println("You messed up somewhere grep \"CONFRUNTIMEJARTASK\" to come here and see options")
++				return project.runtimeJar({})
++		}
++	}
++}
 +
  fun Project.sourcesJar(sourceSet: String? = "main", body: Jar.() -> Unit = {}): Jar =
      getOrCreateTask("sourcesJar") {
          setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
-@@ -155,6 +157,8 @@
+@@ -155,6 +171,8 @@
      }
  }
  
-+fun customIdeaPlugin(project: Project): Copy {retutn project.ideaPlugin()}
++fun customIdeaPlugin(project: Project): Copy {return project.ideaPlugin()}
 +
  fun Project.dist(
      targetDir: File? = null,
