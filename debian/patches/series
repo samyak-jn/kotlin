@@ -19,3 +19,4 @@
 019-change-cacheRedirectorEnabled-redirect-signature.patch
 020-configure-idea-plugin.patch
 021-remove-cyclic-dependency.patch
+022-add-methods-for-intelliJ-dependencies.patch

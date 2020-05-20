@@ -1,0 +1,14 @@
+Description: Add  intermediatory methods to get intellij dependencies
+--- a/buildSrc/src/main/kotlin/intellijDependencies.kt
++++ b/buildSrc/src/main/kotlin/intellijDependencies.kt
+@@ -58,6 +58,10 @@
+ 
+ fun Project.intellijDep(module: String = "intellij") = "kotlin.build.custom.deps:$module:${rootProject.extra["versions.intellijSdk"]}"
+ 
++fun getIntellijDep(project: Project, module: String = "intellij"): String {
++	return project.intellijDep(module)
++}
++
+ fun Project.intellijCoreDep() = intellijDep("intellij-core")
+ 
+ fun Project.intellijPluginDep(plugin: String) = intellijDep(plugin)
