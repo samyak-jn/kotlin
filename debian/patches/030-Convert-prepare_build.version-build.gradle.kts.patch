@@ -1,0 +1,190 @@
+Description: Convert prepare/build.version/build.gradle.kts to groovy
+ This patch converts kts to groovy. Replaces check() with assert() converts
+ repalceRange to replaceFirst since replaceRange is not supported in groovy.
+ Replaces """ strings with / strings, translated how tasks are created, changed
+ vals to defs and ext, created configurations using configurations.create(name)
+ instead of by configurations.
+
+---
+
+
+--- /dev/null
++++ b/prepare/build.version/build.gradle
+@@ -0,0 +1,90 @@
++
++import java.io.File
++
++ext.buildVersionFilePath = "${rootProject.ext["distDir"]}/build.txt"
++
++configurations.create("buildVersion")
++ext.buildNumber= rootProject.ext.buildNumber
++ext.kotlinVersion=rootProject.ext.kotlinVersion
++
++tasks.create("writeBuildNumber") {
++    def versionFile = new File(buildVersionFilePath)
++    inputs.property("version", buildNumber)
++    outputs.file(versionFile)
++    doLast {
++        versionFile.parentFile.mkdirs()
++        versionFile.setText(buildNumber)
++    }
++}
++
++ext.replaceVersion = { File versionFile,String versionPattern, Closure replacement ->
++    assert(versionFile.isFile()) : "Version file $versionFile is not found"
++    def text = versionFile.getText()
++    def pattern = ~versionPattern
++    def match = (text =~ pattern) ?: {throw new StopExecutionException("Version pattern is missing in file $versionFile")}
++    def newValue = replacement(match)
++    println("whoopsie")
++    println(match[0][1])
++    println(newValue)
++    versionFile.setText(text.replaceFirst(match[0][1], newValue))// caz I checked the files and they only have one iteration of version so we must be safe for this script, also for this script its not worth fixing .replacerange
++}
++
++tasks.create("writeStdlibVersion") {
++    def versionFile = new File(rootDir.toString()+"/libraries/stdlib/src/kotlin/util/KotlinVersion.kt") // we atre aiming to get the abs path
++    println("bleh ble")
++    println(versionFile)
++    inputs.property("version", kotlinVersion)
++    outputs.file(versionFile)
++    doLast {
++        replaceVersion(versionFile, /val CURRENT: KotlinVersion = KotlinVersion\((\d+, \d+, \d+)\)/) {
++            def (major, minor, _, optPatch) = (kotlinVersion=~ /^(\d+)\.(\d+)(\.(\d+))?/)[0][1..-1] ?: {throw new StopExecutionException("Cannot parse current version $kotlinVersion")}
++            println("weeber")
++            println("$optPatch")
++            def newVersion = "$major, $minor, ${if(optPatch){return optPatch}else{return "0"} }"
++            logger.lifecycle("Writing new standard library version components: $newVersion")
++            newVersion
++        }
++    }
++}
++
++tasks.create("writeCompilerVersion") {
++    def versionFile = new File(rootDir.toString()+"/core/util.runtime/src/org/jetbrains/kotlin/config/KotlinCompilerVersion.java")//we are aiming to get the abs path
++    inputs.property("version", kotlinVersion)
++    outputs.file(versionFile)
++    doLast {
++        replaceVersion(versionFile, /public static final String VERSION = "([^"]+)"/) {
++            logger.lifecycle("Writing new compiler version: $kotlinVersion")
++            kotlinVersion
++        }
++    }
++}
++
++tasks.create("writePluginVersion") {
++    def versionFile = new File(project(":").projectDir.toString()+"/resources/META-INF/ideaPlugin.xml")
++    def pluginVersion = rootProject.findProperty("pluginVersion") as String
++    inputs.property("version", pluginVersion)
++    outputs.file(versionFile)
++    doLast {
++        requireNotNull(pluginVersion) { "Specify 'pluginVersion' property" }
++        replaceVersion(versionFile, $/<version>([^<]+)</version>/$) {
++            logger.lifecycle("Writing new plugin version: $pluginVersion")
++            pluginVersion
++        }
++    }
++}
++
++tasks.create("writeVersions") {
++    dependsOn(writeBuildNumber, writeStdlibVersion, writeCompilerVersion)
++}
++
++
++artifacts.add(configurations.buildVersion.name, file(buildVersionFilePath)) {
++    builtBy(writeBuildNumber)
++}
++
++ext.distKotlinHomeDir=rootProject.ext.distKotlinHomeDir
++
++task('dist', type: Copy) {
++    from(writeBuildNumber)
++    into(new File(distKotlinHomeDir))
++}
+
+--- a/prepare/build.version/build.gradle.kts
++++ /dev/null
+@@ -1,83 +0,0 @@
+-
+-import java.io.File
+-
+-val buildVersionFilePath = "${rootProject.extra["distDir"]}/build.txt"
+-
+-val buildVersion by configurations.creating
+-val buildNumber: String by rootProject.extra
+-val kotlinVersion: String by rootProject.extra
+-
+-val writeBuildNumber by tasks.creating {
+-    val versionFile = File(buildVersionFilePath)
+-    inputs.property("version", buildNumber)
+-    outputs.file(versionFile)
+-    doLast {
+-        versionFile.parentFile.mkdirs()
+-        versionFile.writeText(buildNumber)
+-    }
+-}
+-
+-fun replaceVersion(versionFile: File, versionPattern: String, replacement: (MatchResult) -> String) {
+-    check(versionFile.isFile) { "Version file $versionFile is not found" }
+-    val text = versionFile.readText()
+-    val pattern = Regex(versionPattern)
+-    val match = pattern.find(text) ?: error("Version pattern is missing in file $versionFile")
+-    val newValue = replacement(match)
+-    versionFile.writeText(text.replaceRange(match.groups[1]!!.range, newValue))
+-}
+-
+-val writeStdlibVersion by tasks.creating {
+-    val versionFile = rootDir.resolve("libraries/stdlib/src/kotlin/util/KotlinVersion.kt")
+-    inputs.property("version", kotlinVersion)
+-    outputs.file(versionFile)
+-    doLast {
+-        replaceVersion(versionFile, """val CURRENT: KotlinVersion = KotlinVersion\((\d+, \d+, \d+)\)""") {
+-            val (major, minor, _, optPatch) = Regex("""^(\d+)\.(\d+)(\.(\d+))?""").find(kotlinVersion)?.destructured ?: error("Cannot parse current version $kotlinVersion")
+-            val newVersion = "$major, $minor, ${optPatch.takeIf { it.isNotEmpty() } ?: "0" }"
+-            logger.lifecycle("Writing new standard library version components: $newVersion")
+-            newVersion
+-        }
+-    }
+-}
+-
+-val writeCompilerVersion by tasks.creating {
+-    val versionFile = rootDir.resolve("core/util.runtime/src/org/jetbrains/kotlin/config/KotlinCompilerVersion.java")
+-    inputs.property("version", kotlinVersion)
+-    outputs.file(versionFile)
+-    doLast {
+-        replaceVersion(versionFile, """public static final String VERSION = "([^"]+)"""") {
+-            logger.lifecycle("Writing new compiler version: $kotlinVersion")
+-            kotlinVersion
+-        }
+-    }
+-}
+-
+-val writePluginVersion by tasks.creating {
+-    val versionFile = project(":idea").projectDir.resolve("resources/META-INF/plugin.xml")
+-    val pluginVersion = rootProject.findProperty("pluginVersion") as String?
+-    inputs.property("version", pluginVersion)
+-    outputs.file(versionFile)
+-    doLast {
+-        requireNotNull(pluginVersion) { "Specify 'pluginVersion' property" }
+-        replaceVersion(versionFile, """<version>([^<]+)</version>""") {
+-            logger.lifecycle("Writing new plugin version: $pluginVersion")
+-            pluginVersion!!
+-        }
+-    }
+-}
+-
+-val writeVersions by tasks.creating {
+-    dependsOn(writeBuildNumber, writeStdlibVersion, writeCompilerVersion)
+-}
+-
+-
+-artifacts.add(buildVersion.name, file(buildVersionFilePath)) {
+-    builtBy(writeBuildNumber)
+-}
+-
+-val distKotlinHomeDir: String by rootProject.extra
+-
+-val dist by task<Copy> {
+-    from(writeBuildNumber)
+-    into(File(distKotlinHomeDir))
+-}
