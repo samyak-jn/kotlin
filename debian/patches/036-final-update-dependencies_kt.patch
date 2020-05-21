@@ -1,0 +1,92 @@
+Description: Final changes are made to builtSrc/src/main/kotlin/dependencies.kt
+
+---
+
+
+--- a/buildSrc/src/main/kotlin/dependencies.kt
++++ b/buildSrc/src/main/kotlin/dependencies.kt
+@@ -7,8 +7,6 @@
+ import org.gradle.api.file.ConfigurableFileCollection
+ import org.gradle.api.tasks.AbstractCopyTask
+ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+-import org.gradle.kotlin.dsl.extra
+-import org.gradle.kotlin.dsl.project
+ import java.io.File
+ 
+ 
+@@ -33,8 +31,8 @@
+ 
+ fun Project.commonVer(group: String, artifact: String) =
+     when {
+-        rootProject.extra.has("versions.$artifact") -> rootProject.extra["versions.$artifact"]
+-        rootProject.extra.has("versions.$group") -> rootProject.extra["versions.$group"]
++        rootProject.getExtensions().getExtraProperties().has("versions.$artifact") -> rootProject.getExtensions().getExtraProperties()["versions.$artifact"]
++        rootProject.getExtensions().getExtraProperties().has("versions.$group") -> rootProject.getExtensions().getExtraProperties()["versions.$group"]
+         else -> throw GradleException("Neither versions.$artifact nor versions.$group is defined in the root project's extra")
+     }
+ 
+@@ -81,12 +79,13 @@
+     return if (useBootstrapStdlib)
+         kotlinDep(listOfNotNull("stdlib", suffix).joinToString("-"), project.findProperty("bootstrapKotlinVersion") as String)
+     else
+-        dependencies.project(listOfNotNull(":kotlin-stdlib", suffix).joinToString("-"))
++        getDependencies().project(mapOf<String,String>("path" to listOfNotNull(":kotlin-stdlib", suffix).joinToString("-"))) as ProjectDependency
+ }
++fun customKotlinStdlib(project:Project,suffix: String? = null): Any{return project.kotlinStdlib(suffix)}
+ 
+-fun DependencyHandler.projectTests(name: String): ProjectDependency = project(name, configuration = "tests-jar")
+-fun DependencyHandler.projectRuntimeJar(name: String): ProjectDependency = project(name, configuration = "runtimeJar")
+-fun DependencyHandler.projectArchives(name: String): ProjectDependency = project(name, configuration = "archives")
++fun DependencyHandler.projectTests(name: String): ProjectDependency = project(mapOf<String,String>("path" to name, "configuration" to "tests-jar")) as ProjectDependency
++fun DependencyHandler.projectRuntimeJar(name: String): ProjectDependency = project(mapOf<String,String>("path" to name, "configuration" to "runtimeJar")) as ProjectDependency
++fun DependencyHandler.projectArchives(name: String): ProjectDependency = project(mapOf<String,String>("path" to name, "configuration" to "archives")) as ProjectDependency
+ 
+ fun customProjectTests(dependencyHandler:DependencyHandler,name: String): ProjectDependency {return dependencyHandler.projectTests(name)}
+ fun customProjectRuntimeJar(dependencyHandler:DependencyHandler,name: String): ProjectDependency {return dependencyHandler.projectRuntimeJar(name)}
+@@ -96,13 +95,14 @@
+ val Project.protobufRepo: String
+     get() =
+         "https://teamcity.jetbrains.com/guestAuth/app/rest/builds/buildType:(id:Kotlin_Protobuf),status:SUCCESS,pinned:true,tag:$protobufVersion/artifacts/content/internal/repo/"
+-
+ fun getProtobufRepoFun(project: Project): String {
+ 	return project.protobufRepo
+ }
++fun Project.protobufLite(): String = "org.jetbrains.kotlin.protobuf:protobuf:debian"
++fun Project.protobufFull(): String = "org.jetbrains.kotlin.protobuf:protobuf:debian"
+ 
+-fun Project.protobufLite(): String = "org.jetbrains.kotlin:protobuf-lite:$protobufVersion"
+-fun Project.protobufFull(): String = "org.jetbrains.kotlin:protobuf-relocated:$protobufVersion"
++fun customProtobufLite(project:Project):String{return project.protobufLite()}
++fun customProtobufFull(project:Project):String{return project.protobufFull()}
+ 
+ fun File.matchMaybeVersionedArtifact(baseName: String) = name.matches(baseName.toMaybeVersionedJarRegex())
+ 
+@@ -125,17 +125,18 @@
+ }
+ 
+ 
+-fun Project.firstFromJavaHomeThatExists(vararg paths: String, jdkHome: File = File(this.property("JDK_18") as String)): File? =
++fun Project.firstFromJavaHomeThatExists(vararg paths: String, jdkHome: File = File(this.property("JDK_16") as String)): File? =
+     paths.map { File(jdkHome, it) }.firstOrNull { it.exists() }.also {
+         if (it == null)
+             logger.warn("Cannot find file by paths: ${paths.toList()} in $jdkHome")
+     }
+-
++fun customFirstFromJavaHomeThatExists(project: Project,paths: List<String>, jdkHome: File = File(project.property("JDK_16") as String)): File?{
++	println(project.property("JDK_16") as String)
++	return project.firstFromJavaHomeThatExists(*paths.toTypedArray(),jdkHome=jdkHome)
++}
+ fun Project.toolsJar(jdkHome: File = File(this.property("JDK_18") as String)): File? =
+     firstFromJavaHomeThatExists("lib/tools.jar", jdkHome = jdkHome)
+-
+ fun customToolsJar(project:Project):File?{return project.toolsJar()}
+-
+ val compilerManifestClassPath
+     get() = "annotations-13.0.jar kotlin-stdlib.jar kotlin-reflect.jar kotlin-script-runtime.jar trove4j.jar"
+ 
+@@ -159,3 +160,5 @@
+         }
+     }
+ }
++
++fun customFromEmbeddedComponents(abstractCopyTask:AbstractCopyTask){abstractCopyTask.fromEmbeddedComponents()}
