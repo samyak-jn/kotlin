@@ -1,0 +1,66 @@
+Description: Update from core/util.runtime/build.gradle.kts to groovy 
+
+---
+
+--- /dev/null
++++ b/core/util.runtime/build.gradle
+@@ -0,0 +1,29 @@
++
++plugins {
++    id("java")
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++ext.jvmTarget = "1.6"
++ext.javaHome = rootProject.ext["JDK_16"] as String
++
++dependencies {
++	compileOnly kotlinStdlib()
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
++tasks.withType(JavaCompile) {
++    sourceCompatibility = "1.6"
++    targetCompatibility = "1.6"
++}
++
++if (project.hasProperty("teamcity"))
++tasks["compileJava"].dependsOn(":prepare:build.version:writeCompilerVersion")
+--- a/core/util.runtime/build.gradle.kts
++++ /dev/null
+@@ -1,26 +0,0 @@
+-
+-plugins {
+-    java
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-jvmTarget = "1.6"
+-javaHome = rootProject.extra["JDK_16"] as String
+-
+-dependencies {
+-    compileOnly(kotlinStdlib())
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-tasks.withType<JavaCompile> {
+-    sourceCompatibility = "1.6"
+-    targetCompatibility = "1.6"
+-}
+-
+-if (project.hasProperty("teamcity"))
+-tasks["compileJava"].dependsOn(":prepare:build.version:writeCompilerVersion")
+\ No newline at end of file
