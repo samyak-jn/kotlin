@@ -1,0 +1,76 @@
+Description: Convert kts to groovy
+
+---
+
+
+--- /dev/null
++++ b/compiler/container/build.gradle
+@@ -0,0 +1,35 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":core:util.runtime"))
++    compile(DependenciesKt.customCommonDep(project,"javax.inject"))
++    compileOnly(DependenciesKt.customKotlinStdlib(project,null))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    testCompile(DependenciesKt.customKotlinStdlib(project,null))
++    testCompileOnly("org.jetbrains:annotations:13.0")
++    testCompile(project(":kotlin-test:kotlin-test-jvm"))
++    //testCompile(project(":kotlin-test:kotlin-test-junit"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++    testCompileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    testRuntime(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["trove4j", "util"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++    }
++    "test" {
++    	java.srcDirs("test", "tests")
++    }
++}
++
++ArtifactsKt.customTestsJar(project){}
++
++TasksKt.customProjectTest(project,"test"){
++	it.dependsOn(":dist")
++	it.workingDir = rootDir
++}
+--- a/compiler/container/build.gradle.kts
++++ /dev/null
+@@ -1,30 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":core:util.runtime"))
+-    compile(commonDep("javax.inject"))
+-    compileOnly(kotlinStdlib())
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    testCompile(kotlinStdlib())
+-    testCompileOnly("org.jetbrains:annotations:13.0")
+-    testCompile(project(":kotlin-test:kotlin-test-jvm"))
+-    testCompile(project(":kotlin-test:kotlin-test-junit"))
+-    testCompile(commonDep("junit:junit"))
+-    testCompileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    testRuntime(intellijDep()) { includeJars("trove4j", "util") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-testsJar {}
+-
+-projectTest {
+-    dependsOn(":dist")
+-    workingDir = rootDir
+-}
