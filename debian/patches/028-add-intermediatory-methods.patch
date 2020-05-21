@@ -67,7 +67,7 @@ Description: Add intermediate methods in
      fun getRepositoryRootDir(project: Project): File = with (project.rootProject) {
 --- a/buildSrc/src/main/kotlin/tasks.kt
 +++ b/buildSrc/src/main/kotlin/tasks.kt
-@@ -18,6 +18,7 @@
+@@ -18,13 +18,11 @@
  // usages in build scripts are not tracked properly
  @file:Suppress("unused")
  
@@ -75,14 +75,29 @@ Description: Add intermediate methods in
  import org.gradle.api.Project
  import org.gradle.api.Task
  import org.gradle.api.internal.tasks.testing.filter.DefaultTestFilter
-@@ -101,6 +102,26 @@
+ import org.gradle.api.tasks.testing.Test
+-import org.gradle.kotlin.dsl.extra
+-import org.gradle.kotlin.dsl.project
+-import org.gradle.kotlin.dsl.task
+ import java.lang.Character.isLowerCase
+ import java.lang.Character.isUpperCase
+ 
+@@ -96,15 +94,36 @@
+     environment("NO_FS_ROOTS_ACCESS_CHECK", "true")
+     environment("PROJECT_CLASSES_DIRS", testSourceSet.output.classesDirs.asPath)
+     environment("PROJECT_BUILD_DIR", buildDir)
+-    systemProperty("jps.kotlin.home", rootProject.extra["distKotlinHomeDir"]!!)
++    systemProperty("jps.kotlin.home", rootProject.getExtensions().getExtraProperties().get("distKotlinHomeDir")!!)
+     systemProperty("kotlin.ni", if (rootProject.hasProperty("newInferenceTests")) "true" else "false")
      body()
  }
  
++fun customProjectTest(project:Project,taskName: String = "test", body: Test.() -> Unit = {}):Test{return project.projectTest(taskName,body)}
++
 +fun customProjectTest(project:Project,rootDir:File,antLauncherJar:String,taskName: String = "test",decider:String): Test{
 +	when(decider){
 +		"compiler"->{
-+			return project.projectTest {
++			return project.projectTest(taskName) {
 +				dependsOn(":dist")
 +				workingDir = rootDir
 +				systemProperty("kotlin.test.script.classpath", project.sourceSets.getByName("test").output.classesDirs.joinToString(File.pathSeparator))
@@ -98,7 +113,26 @@ Description: Add intermediate methods in
 +		}
 +	}
 +}
-+
  private inline fun String.isFirstChar(f: (Char) -> Boolean) = isNotEmpty() && f(first())
  
  inline fun <reified T : Task> Project.getOrCreateTask(taskName: String, body: T.() -> Unit): T =
+-    (tasks.findByName(taskName)?.let { it as T } ?: task<T>(taskName)).apply { body() }
++    (tasks.findByName(taskName)?.let { it as T } ?: getTasks().create(taskName,T::class.java)).apply { body() }
+ 
+ object TaskUtils {
+     fun useAndroidSdk(task: Task) {
+@@ -122,7 +141,7 @@
+             .also {
+                 dependencies.add(
+                     configName,
+-                    dependencies.project(":custom-dependencies:android-sdk", configuration = configName)
++                    dependencies.project(mapOf<String,String>("path" to ":custom-dependencies:android-sdk", "configuration" to configName))
+                 )
+             }
+     }
+@@ -143,3 +162,5 @@
+ fun Task.useAndroidJar() {
+     TaskUtils.useAndroidJar(this)
+ }
++
++fun customUseAndroidJar(task:Task){task.useAndroidJar()}
