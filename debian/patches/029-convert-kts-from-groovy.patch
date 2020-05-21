@@ -1,0 +1,130 @@
+Description: Convert generators/build.gradle.kts to generators/build.gradle
+ Convert from kts to groovy. used intermediatory methods for projectTests,
+ intellijDep, projectTest, includeJar and projectDefaults. Change task to def.
+
+---
+
+
+--- /dev/null
++++ b/generators/build.gradle
+@@ -0,0 +1,60 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++sourceSets {
++    "main" { }
++    "test" {
++    	java.srcDirs("test", "tests")
++    }
++}
++
++ext.builtinsSourceSet = sourceSets.create("builtins") {
++    java.srcDir("builtins")
++}
++
++configurations {
++	builtinsCompile
++}
++dependencies {
++    compile(DependenciesKt.customProjectTests(dependencies,":compiler:cli"))
++    compile(DependenciesKt.customProjectTests(dependencies,":idea:idea-maven"))
++    compile(DependenciesKt.customProjectTests(dependencies,":j2k"))
++    compile(DependenciesKt.customProjectTests(dependencies,":idea:idea-android"))
++    compile(DependenciesKt.customProjectTests(dependencies,":jps-plugin"))
++    compile(DependenciesKt.customProjectTests(dependencies,":plugins:jvm-abi-gen"))
++    compile(DependenciesKt.customProjectTests(dependencies,":plugins:android-extensions-compiler"))
++    compile(DependenciesKt.customProjectTests(dependencies,":plugins:android-extensions-ide"))
++    compile(DependenciesKt.customProjectTests(dependencies,":kotlin-annotation-processing"))
++    compile(DependenciesKt.customProjectTests(dependencies,":kotlin-annotation-processing-cli"))
++    compile(DependenciesKt.customProjectTests(dependencies,":kotlin-allopen-compiler-plugin"))
++    compile(DependenciesKt.customProjectTests(dependencies,":kotlin-noarg-compiler-plugin"))
++    compile(DependenciesKt.customProjectTests(dependencies,":kotlin-sam-with-receiver-compiler-plugin"))
++    compile(DependenciesKt.customProjectTests(dependencies,":generators:test-generator"))
++    builtinsCompile("org.jetbrains.kotlin:kotlin-stdlib:${rootProject.ext["bootstrapKotlinVersion"]}")
++    testCompileOnly(project(":kotlin-reflect-api"))
++    testCompile(builtinsSourceSet.output)
++    testRuntime(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["idea_rt"], null) }
++    testRuntime(project(":kotlin-reflect"))
++    if (IdeCompatibilityDslKt.IJ()) {
++        testCompileOnly(IntellijDependenciesKt.getIntellijDep(project,"jps-build-test"))
++        testCompile(IntellijDependenciesKt.getIntellijDep(project,"jps-build-test"))
++    }
++}
++
++TasksKt.customProjectTest(project,"test"){
++	it.workingDir = rootDir
++}
++
++//what follows may not be an accurate translation
++def generateTests = CommonUtilKt.customGenerator(project,"org.jetbrains.kotlin.generators.tests.GenerateTestsKt",null)
++
++def generateProtoBuf = CommonUtilKt.customGenerator(project,"org.jetbrains.kotlin.generators.protobuf.GenerateProtoBufKt",null)
++def generateProtoBufCompare = CommonUtilKt.customGenerator(project,"org.jetbrains.kotlin.generators.protobuf.GenerateProtoBufCompare",null)
++
++def generateGradleOptions = CommonUtilKt.customGenerator(project,"org.jetbrains.kotlin.generators.arguments.GenerateGradleOptionsKt",null)
++
++def generateBuiltins =  CommonUtilKt.customGenerator(project,"org.jetbrains.kotlin.generators.builtins.generateBuiltIns.GenerateBuiltInsKt", builtinsSourceSet)
++
++ArtifactsKt.customTestsJar(project){}
+--- a/generators/build.gradle.kts
++++ /dev/null
+@@ -1,57 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-sourceSets {
+-    "main" { }
+-    "test" { projectDefault() }
+-}
+-
+-val builtinsSourceSet = sourceSets.create("builtins") {
+-    java.srcDir("builtins")
+-}
+-val builtinsCompile by configurations
+-
+-dependencies {
+-    compile(projectTests(":compiler:cli"))
+-    compile(projectTests(":idea:idea-maven"))
+-    compile(projectTests(":j2k"))
+-    compile(projectTests(":idea:idea-android"))
+-    compile(projectTests(":jps-plugin"))
+-    compile(projectTests(":plugins:jvm-abi-gen"))
+-    compile(projectTests(":plugins:android-extensions-compiler"))
+-    compile(projectTests(":plugins:android-extensions-ide"))
+-    compile(projectTests(":kotlin-annotation-processing"))
+-    compile(projectTests(":kotlin-annotation-processing-cli"))
+-    compile(projectTests(":kotlin-allopen-compiler-plugin"))
+-    compile(projectTests(":kotlin-noarg-compiler-plugin"))
+-    compile(projectTests(":kotlin-sam-with-receiver-compiler-plugin"))
+-    compile(projectTests(":generators:test-generator"))
+-	builtinsCompile("org.jetbrains.kotlin:kotlin-stdlib:${rootProject.extra["bootstrapKotlinVersion"]}")
+-    testCompileOnly(project(":kotlin-reflect-api"))
+-    testCompile(builtinsSourceSet.output)
+-    testRuntime(intellijDep()) { includeJars("idea_rt") }
+-    testRuntime(project(":kotlin-reflect"))
+-
+-    if (Ide.IJ()) {
+-        testCompileOnly(intellijDep("jps-build-test"))
+-        testCompile(intellijDep("jps-build-test"))
+-    }
+-}
+-
+-
+-projectTest {
+-    workingDir = rootDir
+-}
+-
+-val generateTests by generator("org.jetbrains.kotlin.generators.tests.GenerateTestsKt")
+-
+-val generateProtoBuf by generator("org.jetbrains.kotlin.generators.protobuf.GenerateProtoBufKt")
+-val generateProtoBufCompare by generator("org.jetbrains.kotlin.generators.protobuf.GenerateProtoBufCompare")
+-
+-val generateGradleOptions by generator("org.jetbrains.kotlin.generators.arguments.GenerateGradleOptionsKt")
+-
+-val generateBuiltins by generator("org.jetbrains.kotlin.generators.builtins.generateBuiltIns.GenerateBuiltInsKt", builtinsSourceSet)
+-
+-testsJar()
