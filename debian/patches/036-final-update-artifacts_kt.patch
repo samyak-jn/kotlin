@@ -1,0 +1,217 @@
+Description: Final changes are made to builtSrc/src/main/kotlin/artifacts.kt
+
+---
+
+--- a/buildSrc/src/main/kotlin/artifacts.kt
++++ b/buildSrc/src/main/kotlin/artifacts.kt
+@@ -15,16 +15,15 @@
+ import org.gradle.api.tasks.Upload
+ import org.gradle.api.tasks.javadoc.Javadoc
+ import org.gradle.jvm.tasks.Jar
+-import org.gradle.kotlin.dsl.*
+ import java.io.File
+ 
+ 
+ private const val MAGIC_DO_NOT_CHANGE_TEST_JAR_TASK_NAME = "testJar"
+ 
+ fun Project.testsJar(body: Jar.() -> Unit = {}): Jar {
+-    val testsJarCfg = configurations.getOrCreate("tests-jar").extendsFrom(configurations["testCompile"])
++    val testsJarCfg = getConfigurations().getOrCreate("tests-jar").extendsFrom(getConfigurations().getAt("testCompile"))
+ 
+-    return task<Jar>(MAGIC_DO_NOT_CHANGE_TEST_JAR_TASK_NAME) {
++    return getTasks().create(MAGIC_DO_NOT_CHANGE_TEST_JAR_TASK_NAME,Jar::class.java) {
+         dependsOn("testClasses")
+         pluginManager.withPlugin("java") {
+             from(testSourceSet.output)
+@@ -35,17 +34,12 @@
+     }
+ }
+ 
+-fun customTestsJar(project:Project,decider:String):Jar{
+-	when(decider){
+-		"compiler"->{return project.testsJar()}
+-		else->{return project.testsJar()}
+-	}
+-}
++fun customTestsJar(project:Project,body: Jar.() -> Unit = {}):Jar{return project.testsJar(body)}
+ 
+ var Project.artifactsRemovedDiagnosticFlag: Boolean
+-    get() = extra.has("artifactsRemovedDiagnosticFlag") && extra["artifactsRemovedDiagnosticFlag"] == true
++    get() = getExtensions().getExtraProperties().has("artifactsRemovedDiagnosticFlag") && getExtensions().getExtraProperties()["artifactsRemovedDiagnosticFlag"] == true
+     set(value) {
+-        extra["artifactsRemovedDiagnosticFlag"] = value
++        getExtensions().getExtraProperties().set("artifactsRemovedDiagnosticFlag", value)
+     }
+ 
+ fun Project.removeArtifacts(configuration: Configuration, task: Task) {
+@@ -66,6 +60,8 @@
+     }
+ }
+ 
++fun customNoDefaultJar(project:Project){return project.noDefaultJar()}
++
+ fun Project.runtimeJarArtifactBy(task: Task, artifactRef: Any, body: ConfigurablePublishArtifact.() -> Unit = {}) {
+     addArtifact("archives", task, artifactRef, body)
+     addArtifact("runtimeJar", task, artifactRef, body)
+@@ -74,24 +70,32 @@
+     }
+ }
+ 
++fun customRuntimeJarArtifactBy(project:Project,task: Task, artifactRef: Any, body: ConfigurablePublishArtifact.() -> Unit = {}){
++	return project.runtimeJarArtifactBy(task,artifactRef,body)
++}
++
+ fun <T : Jar> Project.runtimeJar(task: T, body: T.() -> Unit = {}): T {
+-    extra["runtimeJarTask"] = task
++    getExtensions().getExtraProperties().set("runtimeJarTask", task)
+     tasks.findByName("jar")?.let { defaultJarTask ->
+         removeArtifacts(configurations.getOrCreate("archives"), defaultJarTask)
+     }
+     return task.apply {
+-        setupPublicJar(project.the<BasePluginConvention>().archivesBaseName)
++        setupPublicJar(project.getConvention().getPlugin(BasePluginConvention::class.java).archivesBaseName)
+         setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+         body()
+         project.runtimeJarArtifactBy(this, this)
+     }
+ }
+ 
++fun <T : Jar> customRuntimeJar(project:Project,task: T, body: T.() -> Unit = {}): T {return project.runtimeJar(task,body)}
++
+ fun Project.runtimeJar(body: Jar.() -> Unit = {}): Jar = runtimeJar(getOrCreateTask("jar", body), { })
+ 
++fun customRuntimeJar(project : Project,body: Jar.() -> Unit = {}):Jar{return project.runtimeJar(body)}
++
+ fun customRuntimeJar(project : Project,choice:String): Jar {
+ 	when(choice){
+-		"allopen-ide"->{
++		"default"->{
+ 			return project.runtimeJar({})
+ 		}
+ 		"android-lint"->{
+@@ -111,8 +115,8 @@
+         classifier = "sources"
+         try {
+             if (sourceSet != null) {
+-                project.pluginManager.withPlugin("java-base") {
+-                    from(project.javaPluginConvention().sourceSets[sourceSet].allSource)
++                project.getPluginManager().withPlugin("java-base") {
++                    from(project.javaPluginConvention().getSourceSets().getAt(sourceSet).getAllSource())
+                 }
+             }
+         } catch (e: UnknownDomainObjectException) {
+@@ -121,7 +125,7 @@
+         body()
+         project.addArtifact("archives", this, this)
+     }
+-
++fun customSourcesJar(project:Project,sourceSet: String? = "main", body: Jar.() -> Unit = {}): Jar{return project.sourcesJar(sourceSet,body)}
+ fun Project.javadocJar(body: Jar.() -> Unit = {}): Jar = getOrCreateTask("javadocJar") {
+     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+     classifier = "javadoc"
+@@ -141,7 +145,7 @@
+ }
+ 
+ fun Project.publish(body: Upload.() -> Unit = {}): Upload {
+-    apply<plugins.PublishedKotlinModule>()
++    //apply<plugins.PublishedKotlinModule>()
+ 
+     if (artifactsRemovedDiagnosticFlag) {
+         error("`publish()` should be called before removing artifacts typically done in `noDefaultJar()` of `runtimeJar()` calls")
+@@ -159,18 +163,35 @@
+ 
+ fun Project.ideaPlugin(subdir: String = "lib", body: AbstractCopyTask.() -> Unit): Copy {
+     val thisProject = this
+-    val pluginTask = task<Copy>("ideaPlugin") {
++    val pluginTask = getTasks().create("ideaPlugin",Copy::class.java) {
+         body()
+-        into(File(rootProject.extra["ideaPluginDir"].toString(), subdir).path)
++        into(File(rootProject.getExtensions().getExtraProperties().get("ideaPluginDir").toString(), subdir).path)
+         rename("-${java.util.regex.Pattern.quote(thisProject.version.toString())}", "")
+     }
+ 
+-    task("idea-plugin") {
++    getTasks().create("idea-plugin") {
+         dependsOn(pluginTask)
+     }
+ 
+     return pluginTask
+ }
++fun customIdeaPlugin(project:Project,subdir: String = "lib", body: AbstractCopyTask.() -> Unit): Copy {return project.ideaPlugin(subdir,body)}
++fun customIdeaPlugin(project : Project, subdir: String = "lib", jar:Task ,choice:String): Copy {
++	when(choice){
++		"allopen-cli"->{
++			return project.ideaPlugin {
++					from(jar)
++				}
++		}
++		else->{
++			return project.ideaPlugin {
++					from(jar)
++				}
++		}
++	}
++
++
++}
+ 
+ fun Project.ideaPlugin(subdir: String = "lib"): Copy = ideaPlugin(subdir) {
+     runtimeJarTaskIfExists()?.let {
+@@ -187,11 +208,11 @@
+     body: AbstractCopyTask.() -> Unit = {}
+ ): AbstractCopyTask {
+     val distJarCfg = configurations.getOrCreate("distJar")
+-    val distLibDir: File by rootProject.extra
+-    val distJarName = targetName ?: (the<BasePluginConvention>().archivesBaseName + ".jar")
++    val distLibDir: File = rootProject.getExtensions().getExtraProperties().get("distLibDir") as File
++    val distJarName = targetName ?: (getConvention().getPlugin(BasePluginConvention::class.java).archivesBaseName + ".jar")
+     val thisProject = this
+ 
+-    return task<Copy>("dist") {
++    return getTasks().create("dist",Copy::class.java) {
+         body()
+         (fromTask ?: runtimeJarTaskIfExists())?.let {
+             from(it)
+@@ -205,15 +226,23 @@
+     }
+ }
+ 
++fun customDist(
++	project:Project,
++    targetDir: File? = null,
++    targetName: String? = null,
++    fromTask: Task? = null,
++    body: AbstractCopyTask.() -> Unit = {}
++): AbstractCopyTask {return project.dist(targetDir,targetName,fromTask,body)}
++
+ private fun Project.runtimeJarTaskIfExists(): Task? =
+-    if (extra.has("runtimeJarTask")) extra["runtimeJarTask"] as Task
++    if (getExtensions().getExtraProperties().has("runtimeJarTask")) getExtensions().getExtraProperties().get("runtimeJarTask") as Task
+     else tasks.findByName("jar")
+ 
+ 
+ fun ConfigurationContainer.getOrCreate(name: String): Configuration = findByName(name) ?: create(name)
+ 
+ fun Jar.setupPublicJar(baseName: String, classifier: String = "") {
+-    val buildNumber = project.rootProject.extra["buildNumber"] as String
++    val buildNumber = project.rootProject.getExtensions().getExtraProperties().get("buildNumber") as String
+     this.baseName = baseName
+     this.classifier = classifier
+     manifest.attributes.apply {
+@@ -223,6 +252,7 @@
+     }
+ }
+ 
++fun customSetupPublicJar(jar: Jar,baseName: String, classifier: String = "") {return jar.setupPublicJar(baseName,classifier)}
+ 
+ fun Project.addArtifact(configuration: Configuration, task: Task, artifactRef: Any, body: ConfigurablePublishArtifact.() -> Unit = {}) {
+     artifacts.add(configuration.name, artifactRef) {
+@@ -235,7 +265,7 @@
+     addArtifact(configurations.getOrCreate(configurationName), task, artifactRef, body)
+ 
+ fun Project.cleanArtifacts() {
+-    configurations["archives"].artifacts.let { artifacts ->
++    getConfigurations().getAt("archives").artifacts.let { artifacts ->
+         artifacts.forEach {
+             artifacts.remove(it)
+         }
