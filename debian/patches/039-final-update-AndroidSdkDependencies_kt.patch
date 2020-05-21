@@ -1,0 +1,14 @@
+Description: Final changes are made to builtSrc/src/main/kotlin/AndroidSdkDependencies.kt
+
+---
+
+--- a/buildSrc/src/main/kotlin/AndroidSdkDependencies.kt
++++ b/buildSrc/src/main/kotlin/AndroidSdkDependencies.kt
+@@ -10,7 +10,6 @@
+     ivyPattern("${baseDir.canonicalPath}/[organisation]/[module]/[revision]/[module].ivy.xml")
+     artifactPattern("${baseDir.canonicalPath}/[organisation]/[module]/[revision]/[artifact](-[classifier]).jar")
+ }
+-
+ //val rootProject:Project = null;
+ fun Project.androidDxJar():String {
+ 	val consta:String = rootProject.extensions.getExtraProperties().get("versions.androidBuildTools").toString()
