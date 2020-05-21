@@ -1,0 +1,61 @@
+Description: Convert kts to groovy
+
+---
+
+--- /dev/null
++++ b/core/metadata/build.gradle
+@@ -0,0 +1,27 @@
++import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++jvmTarget = "1.6"
++javaHome = rootProject.ext["JDK_16"] as String
++
++dependencies {
++    compile(DependenciesKt.customProtobufLite(project))
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
++tasks.withType(JavaCompile) {
++    sourceCompatibility = "1.6"
++    targetCompatibility = "1.6"
++}
+--- a/core/metadata/build.gradle.kts
++++ /dev/null
+@@ -1,24 +0,0 @@
+-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-jvmTarget = "1.6"
+-javaHome = rootProject.extra["JDK_16"] as String
+-
+-dependencies {
+-    compile(protobufLite())
+-    compile(kotlinStdlib())
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-tasks.withType<JavaCompile> {
+-    sourceCompatibility = "1.6"
+-    targetCompatibility = "1.6"
+-}
