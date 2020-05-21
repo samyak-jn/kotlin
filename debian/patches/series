@@ -28,3 +28,13 @@
 028-add-intermediatory-methods.patch
 029-convert-kts-from-groovy.patch
 030-Convert-prepare_build.version-build.gradle.kts.patch
+031-Convert-core_builtins_build.gradle.kts.patch
+032-Convert-core_util-runtime_build.gradle.kts.patch
+033-Convert-compiler-container-build.gradle.kts.patch
+034-Convert-core-descriptors-build.gradle.kts.patch
+035-Convert-core-metadata-build.gradle.kts.patch
+036-final-update-dependencies_kt.patch
+036-final-update-artifacts_kt.patch
+038-final-update-tasks_kt.patch
+039-final-update-AndroidSdkDependencies_kt.patch
+040-Convert-core-deserialization-build.gradle.kts-to-groovy.patch
