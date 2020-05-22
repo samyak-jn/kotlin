@@ -44,3 +44,4 @@
 045-Convert-compiler-resolution.gradle-kts-to-groovy.patch
 046-Convert-compiler-frontend-common.gradle-kts-to-groovy.patch
 047-convert-compiler_all-from-kts-to-groovy.patch
+048-update-plugins-dir-for-kotlin-1.3.30.patch

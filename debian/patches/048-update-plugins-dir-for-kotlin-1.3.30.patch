@@ -1,0 +1,2936 @@
+Description: Convert plugins directory compatible to build a/c to gradle 4.1
+Authors: Saif Abdul Casim
+
+---
+
+--- /dev/null
++++ b/plugins/allopen/allopen-cli/build.gradle
+@@ -0,0 +1,44 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin AllOpen Compiler Plugin"
++
++dependencies {
++    compileOnly(project(":compiler:plugin-api"))
++    compileOnly(project(":compiler:frontend"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++
++    runtime(DependenciesKt.customKotlinStdlib(project,null))
++
++    testRuntimeOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) {
++        IntellijDependenciesKt.customIncludeJars(it,["guava"], rootProject)
++    }
++    testRuntimeOnly(DependenciesKt.customProjectRuntimeJar(it,":kotlin-compiler"))
++
++    testCompile(project(":compiler:backend"))
++    testCompile(project(":compiler:cli"))
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++    	java.srcDirs("test", "tests")
++    }
++}
++
++Task jar = ArtifactsKt.customRuntimeJar(project,"default")
++
++ArtifactsKt.customTestsJar(project){}
++ArtifactsKt.customIdeaPlugin(project,"lib", jar,"allopen-cli")
++
++ArtifactsKt.customDist(project,null,CommonUtilKt.getTargetName(project),null,{})
++
++TasksKt.customProjectTest(project,rootDir,"","test","allopen-cli")
+--- a/plugins/allopen/allopen-cli/build.gradle.kts
++++ /dev/null
+@@ -1,44 +0,0 @@
+-
+-description = "Kotlin AllOpen Compiler Plugin"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compileOnly(project(":compiler:plugin-api"))
+-    compileOnly(project(":compiler:frontend"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-
+-    runtime(kotlinStdlib())
+-
+-    testRuntimeOnly(intellijDep()) {
+-        includeJars("guava", rootProject = rootProject)
+-    }
+-    testRuntimeOnly(projectRuntimeJar(":kotlin-compiler"))
+-
+-    testCompile(project(":compiler:backend"))
+-    testCompile(project(":compiler:cli"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(commonDep("junit:junit"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-val jar = runtimeJar {}
+-
+-testsJar {}
+-
+-dist(targetName = the<BasePluginConvention>().archivesBaseName.removePrefix("kotlin-") + ".jar")
+-
+-ideaPlugin {
+-    from(jar)
+-}
+-
+-projectTest {
+-    workingDir = rootDir
+-}
+--- a/plugins/allopen/allopen-ide/allopen-ide.iml
++++ /dev/null
+@@ -1,24 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<module type="JAVA_MODULE" version="4">
+-  <component name="NewModuleRootManager" inherit-compiler-output="true">
+-    <exclude-output />
+-    <content url="file://$MODULE_DIR$">
+-      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+-    </content>
+-    <orderEntry type="inheritedJdk" />
+-    <orderEntry type="sourceFolder" forTests="false" />
+-    <orderEntry type="library" name="kotlin-runtime" level="project" />
+-    <orderEntry type="module" module-name="frontend" />
+-    <orderEntry type="module" module-name="plugin-api" />
+-    <orderEntry type="module" module-name="allopen-cli" />
+-    <orderEntry type="library" name="idea-full" level="project" />
+-    <orderEntry type="library" scope="PROVIDED" name="gradle-and-groovy-plugin" level="project" />
+-    <orderEntry type="module" module-name="idea" />
+-    <orderEntry type="module" module-name="idea-maven" />
+-    <orderEntry type="library" scope="PROVIDED" name="maven" level="project" />
+-    <orderEntry type="module" module-name="cli-common" />
+-    <orderEntry type="module" module-name="idea-jps-common" />
+-    <orderEntry type="module" module-name="util" />
+-    <orderEntry type="module" module-name="annotation-based-compiler-plugins-ide-support" />
+-  </component>
+-</module>
+\ No newline at end of file
+--- a/plugins/allopen/allopen-ide/build.gradle
++++ b/plugins/allopen/allopen-ide/build.gradle
+@@ -29,6 +29,7 @@
+     "test" {}
+ }
+ 
+-ArtifactsKt.customRuntimeJar("allopen-ide")
++ArtifactsKt.customRuntimeJar(project,"default")
+ 
+ ArtifactsKt.customIdeaPlugin(project)
++
+--- /dev/null
++++ b/plugins/android-extensions/android-extensions-compiler/build.gradle
+@@ -0,0 +1,72 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin Android Extensions Compiler"
++
++configurations.create("robolectricClasspath")
++
++dependencies {
++    testCompileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++
++    compile(project(":compiler:util"))
++    compile(project(":compiler:plugin-api"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:frontend.java"))
++    compile(project(":compiler:backend"))
++    compileOnly(project(":kotlin-android-extensions-runtime"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["asm-all"], rootProject) }
++
++    testCompile(project(":compiler:util"))
++    testCompile(project(":compiler:backend"))
++    testCompile(project(":compiler:cli"))
++    testCompile(project(":kotlin-android-extensions-runtime"))
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(project(":kotlin-test:kotlin-test-jvm"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++
++    testRuntime(IntellijDependenciesKt.customIntellijPluginDep(project,"junit")) { IntellijDependenciesKt.customIncludeJars(it,["idea-junit", "resources_en"],null) }
++
++    robolectricClasspath(DependenciesKt.customCommonDep(project,"org.robolectric", "robolectric",[]))
++    robolectricClasspath("org.robolectric:android-all:4.4_r1-robolectric-1")
++    robolectricClasspath(project(":kotlin-android-extensions-runtime")) { setTransitive(false) }
++
++    embeddedComponents(project(":kotlin-android-extensions-runtime")) { setTransitive(false) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++    	java.srcDirs("test", "tests")
++    }
++}
++
++ArtifactsKt.customRuntimeJar(project){
++    DependenciesKt.customFromEmbeddedComponents(it)
++}
++
++ArtifactsKt.customDist(project,null,null,null){}
++
++ArtifactsKt.customIdeaPlugin(project,"lib") {}
++
++ArtifactsKt.customTestsJar(project){}
++
++evaluationDependsOn(":kotlin-android-extensions-runtime")
++
++TasksKt.customProjectTest(project,"test"){
++    it.environment("ANDROID_EXTENSIONS_RUNTIME_CLASSES", SourceSetsKt.customGetSourceSetsFrom(project,":kotlin-android-extensions-runtime")["main"].output.classesDirs.asPath)
++    it.dependsOn(":dist")
++    it.workingDir = rootDir
++    //TasksKt.customUseAndroidJar(it)
++    it.doFirst {
++        def androidPluginPath = new File(intellijRootDir(), "plugins/android").canonicalPath
++        systemProperty("ideaSdk.androidPlugin.path", androidPluginPath)
++        systemProperty("robolectric.classpath", robolectricClasspath.asPath)
++    }
++}
+--- a/plugins/android-extensions/android-extensions-compiler/build.gradle.kts
++++ /dev/null
+@@ -1,67 +0,0 @@
+-
+-description = "Kotlin Android Extensions Compiler"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-val robolectricClasspath by configurations.creating
+-
+-dependencies {
+-    testCompileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:plugin-api"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:frontend.java"))
+-    compile(project(":compiler:backend"))
+-    compileOnly(project(":kotlin-android-extensions-runtime"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("asm-all", rootProject = rootProject) }
+-
+-    testCompile(project(":compiler:util"))
+-    testCompile(project(":compiler:backend"))
+-    testCompile(project(":compiler:cli"))
+-    testCompile(project(":kotlin-android-extensions-runtime"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(project(":kotlin-test:kotlin-test-jvm"))
+-    testCompile(commonDep("junit:junit"))
+-
+-    testRuntime(intellijPluginDep("junit")) { includeJars("idea-junit", "resources_en") }
+-
+-    robolectricClasspath(commonDep("org.robolectric", "robolectric"))
+-    robolectricClasspath("org.robolectric:android-all:4.4_r1-robolectric-1")
+-    robolectricClasspath(project(":kotlin-android-extensions-runtime")) { isTransitive = false }
+-
+-    embeddedComponents(project(":kotlin-android-extensions-runtime")) { isTransitive = false }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-runtimeJar {
+-    fromEmbeddedComponents()
+-}
+-
+-dist()
+-
+-ideaPlugin()
+-
+-testsJar {}
+-
+-evaluationDependsOn(":kotlin-android-extensions-runtime")
+-
+-projectTest {
+-    environment("ANDROID_EXTENSIONS_RUNTIME_CLASSES", getSourceSetsFrom(":kotlin-android-extensions-runtime")["main"].output.classesDirs.asPath)
+-    dependsOn(":dist")
+-    workingDir = rootDir
+-    useAndroidJar()
+-    doFirst {
+-        val androidPluginPath = File(intellijRootDir(), "plugins/android").canonicalPath
+-        systemProperty("ideaSdk.androidPlugin.path", androidPluginPath)
+-        systemProperty("robolectric.classpath", robolectricClasspath.asPath)
+-    }
+-}
+--- a/plugins/android-extensions/android-extensions-compiler/src/org/jetbrains/kotlin/android/parcel/ParcelableClinitClassBuilderInterceptorExtension.kt
++++ b/plugins/android-extensions/android-extensions-compiler/src/org/jetbrains/kotlin/android/parcel/ParcelableClinitClassBuilderInterceptorExtension.kt
+@@ -134,7 +134,7 @@
+         }
+     }
+ 
+-    private class ClinitAwareMethodVisitor(val parcelableName: String, mv: MethodVisitor) : MethodVisitor(Opcodes.API_VERSION, mv) {
++    private class ClinitAwareMethodVisitor(val parcelableName: String, mv: MethodVisitor) : MethodVisitor(458752, mv) {
+         override fun visitInsn(opcode: Int) {
+             if (opcode == Opcodes.RETURN) {
+                 val iv = InstructionAdapter(this)
+--- a/plugins/android-extensions/android-extensions-compiler/src/org/jetbrains/kotlin/android/synthetic/codegen/AndroidOnDestroyClassBuilderInterceptorExtension.kt
++++ b/plugins/android-extensions/android-extensions-compiler/src/org/jetbrains/kotlin/android/synthetic/codegen/AndroidOnDestroyClassBuilderInterceptorExtension.kt
+@@ -101,7 +101,7 @@
+                 signature: String?,
+                 exceptions: Array<out String>?
+         ): MethodVisitor {
+-            return object : MethodVisitor(Opcodes.API_VERSION, super.newMethod(origin, access, name, desc, signature, exceptions)) {
++            return object : MethodVisitor(458752, super.newMethod(origin, access, name, desc, signature, exceptions)) {
+                 override fun visitInsn(opcode: Int) {
+                     if (opcode == Opcodes.RETURN) {
+                         generateClearCacheMethodCall()
+--- /dev/null
++++ b/plugins/android-extensions/android-extensions-runtime/build.gradle
+@@ -0,0 +1,30 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin Android Extensions Runtime"
++
++jvmTarget = "1.6"
++
++dependencies {
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++    compileOnly(DependenciesKt.customCommonDep(project,"com.google.android", "android",[]))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
++//publish()
++
++ArtifactsKt.customRuntimeJar(project,"default")
++//sourcesJar()
++//javadocJar()
++
++ArtifactsKt.customDist(project,null,"android-extensions-runtime.jar",null,{})
+--- a/plugins/android-extensions/android-extensions-runtime/build.gradle.kts
++++ /dev/null
+@@ -1,26 +0,0 @@
+-description = "Kotlin Android Extensions Runtime"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-jvmTarget = "1.6"
+-
+-dependencies {
+-    compile(kotlinStdlib())
+-    compileOnly(commonDep("com.google.android", "android"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-publish()
+-
+-runtimeJar()
+-sourcesJar()
+-javadocJar()
+-
+-dist(targetName = "android-extensions-runtime.jar")
+--- /dev/null
++++ b/plugins/imports-dumper/build.gradle
+@@ -0,0 +1,47 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Extension for saving imports of .kt-files in JSON"
++
++repositories {
++	maven({url("https://dl.bintray.com/kotlin/kotlinx")})
++    //maven({url("https://dl.bintray.com/kotlin/kotlinx")})
++}
++
++ext.kotlinxSerializationVersion = "0.4.2"
++
++dependencies {
++    compile(project(":compiler:frontend.java"))
++    compile(project(":compiler:plugin-api"))
++    compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-runtime:${kotlinxSerializationVersion}".toString()) { setTransitive(false) }
++
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++
++    embeddedComponents("org.jetbrains.kotlinx:kotlinx-serialization-runtime:${kotlinxSerializationVersion}".toString()) { setTransitive(false) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++    	java.srcDirs("test", "tests")
++    }
++}
++
++TasksKt.customProjectTest(project,"test"){
++    it.workingDir = rootDir
++    it.dependsOn(":dist")
++}
++
++ArtifactsKt.customRuntimeJar(project) {
++    DependenciesKt.customFromEmbeddedComponents(it)
++}
++
++ArtifactsKt.customDist(project,null,null,null){}
+--- a/plugins/imports-dumper/build.gradle.kts
++++ /dev/null
+@@ -1,41 +0,0 @@
+-
+-description = "Extension for saving imports of .kt-files in JSON"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-repositories {
+-    maven("https://dl.bintray.com/kotlin/kotlinx")
+-}
+-
+-val kotlinxSerializationVersion = "0.4.2"
+-
+-dependencies {
+-    compile(project(":compiler:frontend.java"))
+-    compile(project(":compiler:plugin-api"))
+-    compileOnly("org.jetbrains.kotlinx", "kotlinx-serialization-runtime", kotlinxSerializationVersion) { isTransitive = false }
+-
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-
+-    testCompile(projectTests(":compiler:tests-common"))
+-
+-    embeddedComponents("org.jetbrains.kotlinx", "kotlinx-serialization-runtime", kotlinxSerializationVersion) { isTransitive = false }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-projectTest {
+-    workingDir = rootDir
+-    dependsOn(":dist")
+-}
+-
+-runtimeJar {
+-    fromEmbeddedComponents()
+-}
+-
+-dist()
+\ No newline at end of file
+--- /dev/null
++++ b/plugins/jvm-abi-gen/build.gradle
+@@ -0,0 +1,47 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "ABI generation for Kotlin/JVM"
++
++dependencies {
++    compileOnly(project(":compiler:util"))
++    compileOnly(project(":compiler:cli"))
++    compileOnly(project(":compiler:backend"))
++    compileOnly(project(":compiler:frontend"))
++    compileOnly(project(":compiler:frontend.java"))
++    compileOnly(project(":compiler:plugin-api"))
++    compileOnly(project(":kotlin-build-common"))
++
++    runtimeOnly(project(":kotlin-compiler"))
++
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(DependenciesKt.customProjectTests(it,":compiler:incremental-compilation-impl"))
++    testRuntime(IntellijDependenciesKt.customIntellijCoreDep(project))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++    	java.srcDirs("test", "tests")
++    }
++}
++
++TasksKt.customProjectTest(project,"test"){
++    it.workingDir = rootDir
++    it.dependsOn(":dist")
++}
++
++//publish()
++
++ArtifactsKt.customSourcesJar(project,"main") {}
++//javadocJar()
++ArtifactsKt.customDist(project,null,null,null){}
++
++ArtifactsKt.customTestsJar(project){}
+--- a/plugins/jvm-abi-gen/build.gradle.kts
++++ /dev/null
+@@ -1,42 +0,0 @@
+-
+-description = "ABI generation for Kotlin/JVM"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compileOnly(project(":compiler:util"))
+-    compileOnly(project(":compiler:cli"))
+-    compileOnly(project(":compiler:backend"))
+-    compileOnly(project(":compiler:frontend"))
+-    compileOnly(project(":compiler:frontend.java"))
+-    compileOnly(project(":compiler:plugin-api"))
+-    compileOnly(project(":kotlin-build-common"))
+-
+-    runtimeOnly(project(":kotlin-compiler"))
+-
+-    testCompile(commonDep("junit:junit"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(projectTests(":compiler:incremental-compilation-impl"))
+-    testRuntime(intellijCoreDep())
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-projectTest {
+-    workingDir = rootDir
+-    dependsOn(":dist")
+-}
+-
+-publish()
+-
+-sourcesJar()
+-javadocJar()
+-dist()
+-
+-testsJar()
+\ No newline at end of file
+--- a/plugins/jvm-abi-gen/src/org/jetbrains/kotlin/jvm/abi/JvmAbiAnalysisHandlerExtension.kt
++++ b/plugins/jvm-abi-gen/src/org/jetbrains/kotlin/jvm/abi/JvmAbiAnalysisHandlerExtension.kt
+@@ -156,7 +156,7 @@
+                 output.delete()
+             } else {
+                 output.transform { writer ->
+-                    FilterInnerClassesVisitor(classesToRemove, Opcodes.API_VERSION, writer)
++                    FilterInnerClassesVisitor(classesToRemove, 458752, writer)
+                 }
+             }
+         }
+--- a/plugins/jvm-abi-gen/src/org/jetbrains/kotlin/jvm/abi/asm/InnerClassesCollectingVisitor.kt
++++ b/plugins/jvm-abi-gen/src/org/jetbrains/kotlin/jvm/abi/asm/InnerClassesCollectingVisitor.kt
+@@ -3,7 +3,7 @@
+ import org.jetbrains.org.objectweb.asm.ClassVisitor
+ import org.jetbrains.org.objectweb.asm.Opcodes
+ 
+-internal class InnerClassesCollectingVisitor : ClassVisitor(Opcodes.API_VERSION) {
++internal class InnerClassesCollectingVisitor : ClassVisitor(458752) {
+     lateinit var ownInternalName: String
+         private set
+ 
+--- a/plugins/jvm-abi-gen/src/org/jetbrains/kotlin/jvm/abi/asm/ReplaceWithEmptyMethodVisitor.kt
++++ b/plugins/jvm-abi-gen/src/org/jetbrains/kotlin/jvm/abi/asm/ReplaceWithEmptyMethodVisitor.kt
+@@ -16,7 +16,7 @@
+     desc: String,
+     signature: String?,
+     exceptions: Array<out String>?
+-) : TransformationMethodVisitor(delegate, access, name, desc, signature, exceptions, api = Opcodes.API_VERSION) {
++) : TransformationMethodVisitor(delegate, access, name, desc, signature, exceptions, api = 458752) {
+     override fun performTransformations(methodNode: MethodNode) {
+         methodNode.instructions.clear()
+         methodNode.localVariables.clear()
+--- /dev/null
++++ b/plugins/kapt3/kapt3-base/build.gradle
+@@ -0,0 +1,27 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++    compile(files("${System.getProperty("java.home")}/../lib/tools.jar"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++    	java.srcDirs("test", "tests")
++    }
++}
++
++ArtifactsKt.customTestsJar(project){}
++
++TasksKt.customProjectTest(project,"test") {
++    it.workingDir = rootDir
++    it.dependsOn(":dist")
++}
+--- a/plugins/kapt3/kapt3-base/build.gradle.kts
++++ /dev/null
+@@ -1,22 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(kotlinStdlib())
+-    compile(files("${System.getProperty("java.home")}/../lib/tools.jar"))
+-    testCompile(commonDep("junit:junit"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-testsJar {}
+-
+-projectTest {
+-    workingDir = rootDir
+-    dependsOn(":dist")
+-}
+\ No newline at end of file
+--- a/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/KaptContext.kt
++++ b/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/KaptContext.kt
+@@ -57,11 +57,16 @@
+         KaptJavaCompiler.preRegister(context)
+ 
+         cacheManager = options.incrementalCache?.let {
+-            JavaClassCacheManager(it, options.classpathFqNamesHistory!!)
++            JavaClassCacheManager(it)
++        }
++        if (options.flags[KaptFlag.INCREMENTAL_APT]) {
++            sourcesToReprocess =
++                cacheManager?.invalidateAndGetDirtyFiles(
++                    options.changedFiles, options.classpathChanges
++                ) ?: SourcesToReprocess.FullRebuild
++        } else {
++            sourcesToReprocess = SourcesToReprocess.FullRebuild
+         }
+-        sourcesToReprocess = cacheManager?.invalidateAndGetDirtyFiles(
+-            options.changedFiles.filter { it.extension == "java" }
+-        ) ?: SourcesToReprocess.FullRebuild
+ 
+         javacOptions = Options.instance(context).apply {
+             for ((key, value) in options.processingOptions) {
+@@ -88,7 +93,7 @@
+                 put("accessInternalAPI", "true")
+             }
+ 
+-            val compileClasspath = if (sourcesToReprocess is SourcesToReprocess.FullRebuild || options.changedFiles.isEmpty()) {
++            val compileClasspath = if (sourcesToReprocess is SourcesToReprocess.FullRebuild) {
+                 options.compileClasspath
+             } else {
+                 options.compileClasspath + options.compiledSources
+--- a/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/KaptOptions.kt
++++ b/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/KaptOptions.kt
+@@ -17,7 +17,7 @@
+     val changedFiles: List<File>,
+     val compiledSources: List<File>,
+     val incrementalCache: File?,
+-    val classpathFqNamesHistory: File?,
++    val classpathChanges: List<String>,
+ 
+     val sourcesOutputDir: File,
+     val classesOutputDir: File,
+@@ -45,7 +45,7 @@
+         val changedFiles: MutableList<File> = mutableListOf()
+         val compiledSources: MutableList<File> = mutableListOf()
+         var incrementalCache: File? = null
+-        var classpathFqNamesHistory: File? = null
++        val classpathChanges: MutableList<String> = mutableListOf()
+ 
+         var sourcesOutputDir: File? = null
+         var classesOutputDir: File? = null
+@@ -73,7 +73,7 @@
+ 
+             return KaptOptions(
+                 projectBaseDir, compileClasspath, javaSourceRoots,
+-                changedFiles, compiledSources, incrementalCache, classpathFqNamesHistory,
++                changedFiles, compiledSources, incrementalCache, classpathChanges,
+                 sourcesOutputDir, classesOutputDir, stubsOutputDir, incrementalDataOutputDir,
+                 processingClasspath, processors, processingOptions, javacOptions, KaptFlags.fromSet(flags),
+                 mode, detectMemoryLeaks
+@@ -104,7 +104,9 @@
+     CORRECT_ERROR_TYPES("Correct error types"),
+     MAP_DIAGNOSTIC_LOCATIONS("Map diagnostic locations"),
+     STRICT("Strict mode"),
+-    INCLUDE_COMPILE_CLASSPATH("Detect annotation processors in compile classpath");
++    INCLUDE_COMPILE_CLASSPATH("Detect annotation processors in compile classpath"),
++    INCREMENTAL_APT("Incremental annotation processing (apt mode)"),
++    ;
+ }
+ 
+ interface KaptSelector {
+@@ -169,5 +171,5 @@
+     appendln("[incremental apt] Changed files: $changedFiles")
+     appendln("[incremental apt] Compiled sources directories: ${compiledSources.joinToString()}")
+     appendln("[incremental apt] Cache directory for incremental compilation: $incrementalCache")
+-    appendln("[incremental apt] Classpath fq names history dir: $classpathFqNamesHistory")
++    appendln("[incremental apt] Changed classpath names: ${classpathChanges.joinToString()}")
+ }
+\ No newline at end of file
+--- a/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/annotationProcessing.kt
++++ b/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/annotationProcessing.kt
+@@ -5,6 +5,7 @@
+ 
+ package org.jetbrains.kotlin.kapt3.base
+ 
++import com.sun.source.util.Trees
+ import com.sun.tools.javac.comp.CompileStates.CompileState
+ import com.sun.tools.javac.main.JavaCompiler
+ import com.sun.tools.javac.processing.AnnotationProcessingError
+@@ -55,7 +56,7 @@
+         val sourcesStructureListener = cacheManager?.let {
+             if (processors.any { it.kind == DeclaredProcType.NON_INCREMENTAL }) return@let null
+ 
+-            val recordTypesListener = MentionedTypesTaskListener(cacheManager.javaCache, processingEnvironment.elementUtils)
++            val recordTypesListener = MentionedTypesTaskListener(cacheManager.javaCache, processingEnvironment.elementUtils, Trees.instance(processingEnvironment))
+             compiler.getTaskListeners().add(recordTypesListener)
+             recordTypesListener
+         }
+--- a/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/incremental/cache.kt
++++ b/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/incremental/cache.kt
+@@ -8,7 +8,7 @@
+ import java.io.*
+ 
+ // TODO(gavra): switch away from Java serialization
+-class JavaClassCacheManager(val file: File, private val classpathFqNamesHistory: File) : Closeable {
++class JavaClassCacheManager(val file: File) : Closeable {
+ 
+     private val javaCacheFile = file.resolve("java-cache.bin")
+     internal val javaCache = maybeGetJavaCacheFromFile()
+@@ -16,38 +16,8 @@
+     private val aptCacheFile = file.resolve("apt-cache.bin")
+     private val aptCache = maybeGetAptCacheFromFile()
+ 
+-    private val lastBuildTimestamp = file.resolve("last-build-ts.bin")
+-
+     private var closed = false
+ 
+-    private fun getDirtyFqNamesFromClasspath(): ClasspathChanged {
+-        if (!lastBuildTimestamp.exists()) return ClasspathChanged.FullRebuild
+-
+-        val lastTimestamp = lastBuildTimestamp.readText()
+-
+-        val (before, after) = classpathFqNamesHistory.listFiles().partition { it.name < lastTimestamp }
+-
+-        if (before.isEmpty()) {
+-            return ClasspathChanged.FullRebuild
+-        }
+-
+-        val dirtyFqNames = mutableSetOf<String>()
+-        after.forEach { file ->
+-            ObjectInputStream(file.inputStream().buffered()).use {
+-                @Suppress("UNCHECKED_CAST")
+-                dirtyFqNames.addAll(it.readObject() as Collection<String>)
+-            }
+-        }
+-
+-        return if (dirtyFqNames.isNotEmpty()) {
+-            // TODO(gavra): We need to handle constants from classpath that might change between runs being incremental. One solution
+-            // would be to fetch the changed symbols alongside changed fqNames, and to check if the symbol is a constant using ASM.
+-            ClasspathChanged.FullRebuild
+-        } else {
+-            ClasspathChanged.Incremental(dirtyFqNames)
+-        }
+-    }
+-
+     fun updateCache(processors: List<IncrementalProcessor>) {
+         if (!aptCache.updateCache(processors)) {
+             javaCache.invalidateAll()
+@@ -58,39 +28,38 @@
+      * From set of changed sources, get list of files to recompile using structural information and dependency information from
+      * annotation processing.
+      */
+-    fun invalidateAndGetDirtyFiles(changedSources: Collection<File>): SourcesToReprocess {
++    fun invalidateAndGetDirtyFiles(changedSources: Collection<File>, dirtyClasspathJvmNames: Collection<String>): SourcesToReprocess {
+         if (!aptCache.isIncremental) {
+             return SourcesToReprocess.FullRebuild
+         }
+ 
+-        val dirtyFqNamesFromClasspath = getDirtyFqNamesFromClasspath()
+-        return when (dirtyFqNamesFromClasspath) {
+-            is ClasspathChanged.FullRebuild -> SourcesToReprocess.FullRebuild
+-            is ClasspathChanged.Incremental -> {
+-                val changes = Changes(changedSources, dirtyFqNamesFromClasspath.dirtyFqNames)
+-                val filesToReprocess = javaCache.invalidateEntriesForChangedFiles(changes)
+-
+-                when (filesToReprocess) {
+-                    is SourcesToReprocess.FullRebuild -> SourcesToReprocess.FullRebuild
+-                    is SourcesToReprocess.Incremental -> {
+-                        val toReprocess = filesToReprocess.toReprocess.toMutableSet()
+-
+-                        val isolatingGenerated = aptCache.invalidateIsolatingGenerated(toReprocess)
+-                        val generatedDirtyTypes = javaCache.invalidateGeneratedTypes(isolatingGenerated).toMutableSet()
+-
+-                        if (!toReprocess.isEmpty()) {
+-                            // only if there are some files to reprocess we should invalidate the aggregating ones
+-                            val aggregatingGenerated = aptCache.invalidateAggregating()
+-                            generatedDirtyTypes.addAll(javaCache.invalidateGeneratedTypes(aggregatingGenerated))
+-
+-                            toReprocess.addAll(
+-                                javaCache.invalidateEntriesAnnotatedWith(aptCache.getAggregatingClaimedAnnotations())
+-                            )
+-                        }
+-
+-                        SourcesToReprocess.Incremental(toReprocess.toList(), generatedDirtyTypes)
+-                    }
++        val dirtyClasspathFqNames = HashSet<String>(dirtyClasspathJvmNames.size)
++        dirtyClasspathJvmNames.forEach {
++            dirtyClasspathFqNames.add(it.replace("$", ".").replace("/", "."))
++        }
++
++        val changes = Changes(changedSources, dirtyClasspathFqNames.toSet())
++        val filesToReprocess = javaCache.invalidateEntriesForChangedFiles(changes)
++
++        return when (filesToReprocess) {
++            is SourcesToReprocess.FullRebuild -> SourcesToReprocess.FullRebuild
++            is SourcesToReprocess.Incremental -> {
++                val toReprocess = filesToReprocess.toReprocess.toMutableSet()
++
++                val isolatingGenerated = aptCache.invalidateIsolatingGenerated(toReprocess)
++                val generatedDirtyTypes = javaCache.invalidateGeneratedTypes(isolatingGenerated).toMutableSet()
++
++                if (!toReprocess.isEmpty()) {
++                    // only if there are some files to reprocess we should invalidate the aggregating ones
++                    val aggregatingGenerated = aptCache.invalidateAggregating()
++                    generatedDirtyTypes.addAll(javaCache.invalidateGeneratedTypes(aggregatingGenerated))
++
++                    toReprocess.addAll(
++                        javaCache.invalidateEntriesAnnotatedWith(aptCache.getAggregatingClaimedAnnotations())
++                    )
+                 }
++
++                SourcesToReprocess.Incremental(toReprocess.toList(), generatedDirtyTypes)
+             }
+         }
+     }
+@@ -144,9 +113,6 @@
+             }
+         }
+ 
+-        with(lastBuildTimestamp) {
+-            writeText(System.currentTimeMillis().toString())
+-        }
+         closed = true
+     }
+ }
+@@ -154,9 +120,4 @@
+ sealed class SourcesToReprocess {
+     class Incremental(val toReprocess: List<File>, val dirtyTypes: Set<String>) : SourcesToReprocess()
+     object FullRebuild : SourcesToReprocess()
+-}
+-
+-sealed class ClasspathChanged {
+-    class Incremental(val dirtyFqNames: Set<String>) : ClasspathChanged()
+-    object FullRebuild : ClasspathChanged()
+ }
+\ No newline at end of file
+--- a/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/incremental/classStructureCache.kt
++++ b/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/incremental/classStructureCache.kt
+@@ -51,6 +51,12 @@
+                 dependants.add(sourceInfo.sourceFile)
+                 dependencyCache[mentionedType] = dependants
+             }
++            // Treat referred constants as ABI dependencies until we start supporting per-constant classpath updates.
++            for (mentionedConstants in sourceInfo.getMentionedConstants().keys) {
++                val dependants = dependencyCache[mentionedConstants] ?: mutableSetOf()
++                dependants.add(sourceInfo.sourceFile)
++                dependencyCache[mentionedConstants] = dependants
++            }
+         }
+         nonTransitiveCache = HashMap(sourceCache.size * 2)
+         for (sourceInfo in sourceCache.values) {
+@@ -67,7 +73,7 @@
+         output.writeObject(generatedTypes)
+     }
+ 
+-    fun isAlreadyProcessed(sourceFile: URI) = sourceCache.containsKey(sourceFile)
++    fun isAlreadyProcessed(sourceFile: URI) = sourceCache.containsKey(sourceFile) || generatedTypes.containsKey(File(sourceFile))
+ 
+     /** Used for testing only. */
+     internal fun getStructure(sourceFile: File) = sourceCache[sourceFile.toURI()]
+@@ -78,19 +84,20 @@
+      * */
+     fun invalidateEntriesForChangedFiles(changes: Changes): SourcesToReprocess {
+         val allDirtyFiles = mutableSetOf<URI>()
+-        var currentDirtyFiles = changes.sourceChanges.map { it.toURI() }
+-        val allDirtyTypes = mutableSetOf<String>()
++        var currentDirtyFiles = changes.sourceChanges.map { it.toURI() }.toMutableSet()
+ 
+-        // check for constants first because they cause full rebuilt
+-        for (sourceChange in currentDirtyFiles) {
+-            val structure = sourceCache[sourceChange] ?: continue
+-            if (structure.getDefinedConstants().isNotEmpty()) {
+-                // TODO(gavra): compare constant values, and only full rebuild if the value changes
+-                invalidateAll()
+-                return SourcesToReprocess.FullRebuild
++        for (classpathFqName in changes.dirtyFqNamesFromClasspath) {
++            nonTransitiveCache[classpathFqName]?.let {
++                allDirtyFiles.addAll(it)
++            }
++
++            dependencyCache[classpathFqName]?.let {
++                currentDirtyFiles.addAll(it)
+             }
+         }
+ 
++        val allDirtyTypes = mutableSetOf<String>()
++
+         while (currentDirtyFiles.isNotEmpty()) {
+ 
+             val nextRound = mutableSetOf<URI>()
+@@ -112,7 +119,7 @@
+                 }
+             }
+ 
+-            currentDirtyFiles = nextRound.filter { !allDirtyFiles.contains(it) }
++            currentDirtyFiles = nextRound.filter { !allDirtyFiles.contains(it) }.toMutableSet()
+         }
+ 
+         return SourcesToReprocess.Incremental(allDirtyFiles.map { File(it) }, allDirtyTypes)
+@@ -159,14 +166,14 @@
+     private val mentionedTypes: MutableSet<String> = mutableSetOf()
+     private val privateTypes: MutableSet<String> = mutableSetOf()
+ 
+-    private val definedConstants: MutableMap<String, Any> = mutableMapOf()
+     private val mentionedAnnotations: MutableSet<String> = mutableSetOf()
++    private val mentionedConstants: MutableMap<String, MutableSet<String>> = mutableMapOf()
+ 
+     fun getDeclaredTypes(): Set<String> = declaredTypes
+     fun getMentionedTypes(): Set<String> = mentionedTypes
+     fun getPrivateTypes(): Set<String> = privateTypes
+-    fun getDefinedConstants(): Map<String, Any> = definedConstants
+     fun getMentionedAnnotations(): Set<String> = mentionedAnnotations
++    fun getMentionedConstants(): Map<String, Set<String>> = mentionedConstants
+ 
+     fun addDeclaredType(declaredType: String) {
+         declaredTypes.add(declaredType)
+@@ -178,10 +185,6 @@
+         }
+     }
+ 
+-    fun addDefinedConstant(name: String, value: Any) {
+-        definedConstants[name] = value
+-    }
+-
+     fun addMentionedAnnotations(name: String) {
+         mentionedAnnotations.add(name)
+     }
+@@ -189,6 +192,12 @@
+     fun addPrivateType(name: String) {
+         privateTypes.add(name)
+     }
++
++    fun addMentionedConstant(containingClass: String, name: String) {
++        if (!declaredTypes.contains(containingClass)) {
++            mentionedConstants.getOrPut(containingClass) { HashSet() }.add(name)
++        }
++    }
+ }
+ 
+ 
+--- a/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/incremental/javacVisitors.kt
++++ b/plugins/kapt3/kapt3-base/src/org/jetbrains/kotlin/kapt3/base/incremental/javacVisitors.kt
+@@ -6,9 +6,7 @@
+ package org.jetbrains.kotlin.kapt3.base.incremental
+ 
+ import com.sun.source.tree.*
+-import com.sun.source.util.SimpleTreeVisitor
+-import com.sun.source.util.TaskEvent
+-import com.sun.source.util.TaskListener
++import com.sun.source.util.*
+ import com.sun.tools.javac.code.Symbol
+ import com.sun.tools.javac.tree.JCTree
+ import java.io.File
+@@ -19,7 +17,8 @@
+ 
+ class MentionedTypesTaskListener(
+     private val cache: JavaClassCache,
+-    private val elementUtils: Elements
++    private val elementUtils: Elements,
++    private val trees: Trees
+ ) : TaskListener {
+ 
+     var time = 0L
+@@ -35,7 +34,7 @@
+ 
+         val structure = SourceFileStructure(e.sourceFile.toUri())
+ 
+-        val treeVisitor = TypeTreeVisitor(elementUtils, structure)
++        val treeVisitor = TypeTreeVisitor(elementUtils, trees, compilationUnit, structure)
+         compilationUnit.typeDecls.forEach {
+             it.accept(treeVisitor, Visibility.ABI)
+         }
+@@ -48,9 +47,11 @@
+     ABI, NON_ABI
+ }
+ 
+-private class TypeTreeVisitor(val elementUtils: Elements, val sourceStructure: SourceFileStructure) :
++private class TypeTreeVisitor(val elementUtils: Elements, val trees: Trees, val compilationUnit: CompilationUnitTree,  val sourceStructure: SourceFileStructure) :
+     SimpleTreeVisitor<Void, Visibility>() {
+ 
++    val constantTreeVisitor = ConstantTreeVisitor(sourceStructure)
++
+     /** Handle annotations on this class, including the @Inherited ones as those are not visible using Tree APIs. */
+     private fun handleClassAnnotations(classSymbol: Symbol.ClassSymbol) {
+         elementUtils.getAllAnnotationMirrors(classSymbol).forEach {
+@@ -90,6 +91,9 @@
+         visit(node.returnType, methodVisibility)
+         node.parameters.forEach { visit(it, methodVisibility) }
+         visit(node.defaultValue, methodVisibility)
++        node.defaultValue?.let {
++            constantTreeVisitor.scan(trees.getPath(compilationUnit, it), null)
++        }
+         node.throws.forEach { visit(it, methodVisibility) }
+         node.typeParameters.forEach { visit(it, methodVisibility) }
+ 
+@@ -109,12 +113,7 @@
+             val flags = node.modifiers.getFlags()
+ 
+             node.sym.constValue?.let { constValue ->
+-                if (flags.contains(Modifier.FINAL)
+-                    && flags.contains(Modifier.STATIC)
+-                    && !flags.contains(Modifier.PRIVATE)
+-                ) {
+-                    sourceStructure.addDefinedConstant(node.sym.simpleName.toString(), constValue)
+-                }
++                constantTreeVisitor.scan(trees.getPath(compilationUnit, node.init), null)
+             }
+             if (flags.contains(Modifier.PRIVATE)) Visibility.NON_ABI else Visibility.ABI
+         } else {
+@@ -149,7 +148,10 @@
+ 
+     override fun visitAnnotation(node: AnnotationTree, visibility: Visibility): Void? {
+         visit(node.annotationType, visibility)
+-        node.arguments.forEach { visit(it, visibility) }
++        node.arguments.forEach {
++            visit(it, visibility)
++            constantTreeVisitor.scan(TreePath.getPath(compilationUnit, it), null)
++        }
+ 
+         return null
+     }
+@@ -194,6 +196,37 @@
+     }
+ }
+ 
++/**
++ * Visits a constant initializer expression, and extracts all references to constants, either through field select (A.MY_FIELD) or
++ * identifier (MY_FIELD, which happens if A.MY_FIELD is statically imported).
++ */
++private class ConstantTreeVisitor(val sourceStructure: SourceFileStructure) : TreePathScanner<Void, Void>() {
++
++
++    override fun visitAssignment(node: AssignmentTree, p: Void?): Void? {
++        // Annotation element values are in "element = expression" form, and we only want to analyze "expression" part. So ignore variable.
++        scan(node.expression, p)
++        return null
++    }
++
++    override fun visitMemberSelect(node: MemberSelectTree, p: Void?): Void? {
++        addConstantSymbol((node as JCTree.JCFieldAccess).sym)
++        return null
++    }
++
++    override fun visitIdentifier(node: IdentifierTree, p: Void?): Void? {
++        addConstantSymbol((node as JCTree.JCIdent).sym)
++        return null
++    }
++
++    private fun addConstantSymbol(sym: Symbol) {
++        val name = sym.name
++        val containingClass = sym.owner
++
++        sourceStructure.addMentionedConstant(containingClass.qualifiedName.toString(), name.toString())
++    }
++}
++
+ class GeneratedTypesTaskListener(private val cache: JavaClassCache) : TaskListener {
+ 
+     override fun started(e: TaskEvent) {
+--- a/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/IncrementalKaptTest.kt
++++ b/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/IncrementalKaptTest.kt
+@@ -5,10 +5,12 @@
+ 
+ package org.jetbrains.kotlin.kapt.base.test.org.jetbrains.kotlin.kapt3.base.incremental
+ 
++import org.jetbrains.kotlin.base.kapt3.KaptFlag
+ import org.jetbrains.kotlin.base.kapt3.KaptOptions
+ import org.jetbrains.kotlin.base.kapt3.collectJavaSourceFiles
+ import org.jetbrains.kotlin.kapt3.base.KaptContext
+ import org.jetbrains.kotlin.kapt3.base.doAnnotationProcessing
++import org.jetbrains.kotlin.kapt3.base.incremental.SourcesToReprocess
+ import org.jetbrains.kotlin.kapt3.base.util.WriterBackedKaptLogger
+ import org.junit.Assert.*
+ import org.junit.Rule
+@@ -32,9 +34,6 @@
+ 
+         val outputDir = tmp.newFolder()
+         val incrementalCacheDir = tmp.newFolder()
+-        val classpathHistory = tmp.newFolder().also {
+-            it.resolve("0").createNewFile()
+-        }
+         val options = KaptOptions.Builder().apply {
+             projectBaseDir = tmp.newFolder()
+             javaSourceRoots.add(sourcesDir)
+@@ -45,14 +44,12 @@
+             incrementalDataOutputDir = outputDir
+ 
+             incrementalCache = incrementalCacheDir
+-            classpathFqNamesHistory = classpathHistory
+         }.build()
+ 
+         val logger = WriterBackedKaptLogger(isVerbose = true)
+         KaptContext(options, true, logger).use {
+-            val toReprocess = it.cacheManager!!.invalidateAndGetDirtyFiles(options.changedFiles)
+             it.doAnnotationProcessing(
+-                options.collectJavaSourceFiles(toReprocess), listOf(SimpleProcessor().toIsolating())
++                options.collectJavaSourceFiles(SourcesToReprocess.FullRebuild), listOf(SimpleProcessor().toIsolating())
+             )
+         }
+ 
+@@ -72,14 +69,14 @@
+             incrementalDataOutputDir = outputDir
+ 
+             incrementalCache = incrementalCacheDir
+-            classpathFqNamesHistory = classpathHistory
+             compiledSources.add(classesOutput)
+             changedFiles.add(sourcesDir.resolve("User.java"))
++            flags.add(KaptFlag.INCREMENTAL_APT)
+         }.build()
+ 
+         KaptContext(optionsForSecondRun, true, logger).use {
+             val sourcesToReprocess =
+-                it.cacheManager!!.invalidateAndGetDirtyFiles(optionsForSecondRun.changedFiles)
++                it.cacheManager!!.invalidateAndGetDirtyFiles(optionsForSecondRun.changedFiles, emptyList())
+             assertFalse(outputDir.resolve("test/UserGenerated.java").exists())
+ 
+             it.doAnnotationProcessing(
+@@ -92,7 +89,7 @@
+ 
+         sourcesDir.resolve("User.java").delete()
+         KaptContext(optionsForSecondRun, true, logger).use {
+-            val sourcesToReprocess = it.cacheManager!!.invalidateAndGetDirtyFiles(optionsForSecondRun.changedFiles)
++            val sourcesToReprocess = it.cacheManager!!.invalidateAndGetDirtyFiles(optionsForSecondRun.changedFiles, emptyList())
+ 
+             it.doAnnotationProcessing(
+                 optionsForSecondRun.collectJavaSourceFiles(sourcesToReprocess), listOf(SimpleProcessor().toIsolating())
+@@ -114,9 +111,6 @@
+ 
+         val outputDir = tmp.newFolder()
+         val incrementalCacheDir = tmp.newFolder()
+-        val classpathHistory = tmp.newFolder().also {
+-            it.resolve("0").createNewFile()
+-        }
+         val options = KaptOptions.Builder().apply {
+             projectBaseDir = tmp.newFolder()
+             javaSourceRoots.add(sourcesDir)
+@@ -127,14 +121,12 @@
+             incrementalDataOutputDir = outputDir
+ 
+             incrementalCache = incrementalCacheDir
+-            classpathFqNamesHistory = classpathHistory
+         }.build()
+ 
+         val logger = WriterBackedKaptLogger(isVerbose = true)
+         KaptContext(options, true, logger).use {
+-            val toReprocess = it.cacheManager!!.invalidateAndGetDirtyFiles(options.changedFiles)
+             it.doAnnotationProcessing(
+-                options.collectJavaSourceFiles(toReprocess), listOf(SimpleGeneratingIfTypeDoesNotExist().toIsolating())
++                options.collectJavaSourceFiles(SourcesToReprocess.FullRebuild), listOf(SimpleGeneratingIfTypeDoesNotExist().toIsolating())
+             )
+         }
+ 
+@@ -151,14 +143,14 @@
+             incrementalDataOutputDir = outputDir
+ 
+             incrementalCache = incrementalCacheDir
+-            classpathFqNamesHistory = classpathHistory
+             compiledSources.add(classesOutput)
+             changedFiles.add(sourcesDir.resolve("User.java"))
++            flags.add(KaptFlag.INCREMENTAL_APT)
+         }.build()
+ 
+         KaptContext(optionsForSecondRun, true, logger).use {
+             val sourcesToReprocess =
+-                it.cacheManager!!.invalidateAndGetDirtyFiles(optionsForSecondRun.changedFiles)
++                it.cacheManager!!.invalidateAndGetDirtyFiles(optionsForSecondRun.changedFiles, emptyList())
+             assertFalse(outputDir.resolve("test/UserGenerated.java").exists())
+ 
+             it.doAnnotationProcessing(
+--- a/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/InheritedAnnotationTest.kt
++++ b/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/InheritedAnnotationTest.kt
+@@ -30,7 +30,7 @@
+         @BeforeClass
+         fun setUp() {
+             val classpathHistory = tmp.newFolder()
+-            cache = JavaClassCacheManager(tmp.newFolder(), classpathHistory)
++            cache = JavaClassCacheManager(tmp.newFolder())
+             generatedSources = tmp.newFolder()
+             cache.close()
+             classpathHistory.resolve("0").createNewFile()
+@@ -44,7 +44,7 @@
+                 srcFiles,
+                 listOf(processor),
+                 generatedSources
+-            ) { trees -> MentionedTypesTaskListener(cache.javaCache, trees) }
++            ) { elementUtils, trees -> MentionedTypesTaskListener(cache.javaCache, elementUtils, trees) }
+             cache.updateCache(listOf(processor))
+         }
+     }
+@@ -62,6 +62,5 @@
+                 "test.BaseClass"
+             ), shouldInheritAnnotation.getMentionedTypes()
+         )
+-        assertEquals(emptyMap<String, String>(), shouldInheritAnnotation.getDefinedConstants())
+     }
+ }
+\ No newline at end of file
+--- a/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/JavaClassCacheManagerTest.kt
++++ b/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/JavaClassCacheManagerTest.kt
+@@ -22,13 +22,11 @@
+ 
+     private lateinit var cache: JavaClassCacheManager
+     private lateinit var cacheDir: File
+-    private lateinit var classpathHistory: File
+ 
+     @Before
+     fun setUp() {
+         cacheDir = tmp.newFolder()
+-        classpathHistory = tmp.newFolder()
+-        cache = JavaClassCacheManager(cacheDir, classpathHistory)
++        cache = JavaClassCacheManager(cacheDir)
+     }
+ 
+ 
+@@ -38,7 +36,6 @@
+ 
+         assertTrue(cacheDir.resolve("java-cache.bin").exists())
+         assertTrue(cacheDir.resolve("apt-cache.bin").exists())
+-        assertTrue(cacheDir.resolve("last-build-ts.bin").exists())
+     }
+ 
+     @Test
+@@ -59,7 +56,7 @@
+         }
+         prepareForIncremental()
+ 
+-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(File("Mentioned.java"))) as SourcesToReprocess.Incremental
++        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(File("Mentioned.java")), emptyList()) as SourcesToReprocess.Incremental
+         assertEquals(
+             listOf(
+                 File("Mentioned.java").absoluteFile,
+@@ -87,7 +84,7 @@
+         }
+         prepareForIncremental()
+ 
+-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(File("Mentioned.java"))) as SourcesToReprocess.Incremental
++        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(File("Mentioned.java")), emptyList()) as SourcesToReprocess.Incremental
+         assertEquals(
+             listOf(
+                 File("Mentioned.java").absoluteFile,
+@@ -115,7 +112,7 @@
+         }
+         prepareForIncremental()
+ 
+-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(File("TwoTypes.java"))) as SourcesToReprocess.Incremental
++        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(File("TwoTypes.java")), emptyList()) as SourcesToReprocess.Incremental
+         assertEquals(
+             listOf(
+                 File("TwoTypes.java").absoluteFile,
+@@ -126,69 +123,44 @@
+     }
+ 
+     @Test
+-    fun testNoClasspathHistory() {
+-        SourceFileStructure(File("Src.java").toURI()).also {
+-            it.addDeclaredType("test.Src")
+-            cache.javaCache.addSourceStructure(it)
+-        }
+-        cache.close()
+-        classpathHistory.resolve(Long.MAX_VALUE.toString()).createNewFile()
+-
+-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf())
+-        assertEquals(SourcesToReprocess.FullRebuild, dirtyFiles)
+-    }
+-
+-    @Test
+-    fun testWithClasspathHistoryButNoNewChanges() {
++    fun testWithClasspathChanges() {
+         SourceFileStructure(File("Src.java").toURI()).also {
+             it.addDeclaredType("test.Src")
+             it.addMentionedType("test.Mentioned")
+             cache.javaCache.addSourceStructure(it)
+         }
+         prepareForIncremental()
+-        ObjectOutputStream(classpathHistory.resolve("0").outputStream()).use {
+-            it.writeObject(listOf("test.Mentioned"))
+-        }
+ 
+-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf()) as SourcesToReprocess.Incremental
+-        assertEquals(emptyList<File>(), dirtyFiles.toReprocess)
++        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(), listOf("test/Mentioned")) as SourcesToReprocess.Incremental
++        assertEquals(listOf(File("Src.java").absoluteFile), dirtyFiles.toReprocess)
+     }
+ 
+     @Test
+-    fun testWithClasspathHistoryWithChanges() {
+-        SourceFileStructure(File("Src.java").toURI()).also {
+-            it.addDeclaredType("test.Src")
+-            it.addMentionedType("test.Mentioned")
+-            cache.javaCache.addSourceStructure(it)
+-        }
+-        prepareForIncremental()
+-        ObjectOutputStream(classpathHistory.resolve(Long.MAX_VALUE.toString()).outputStream()).use {
+-            it.writeObject(listOf("test.Mentioned"))
+-        }
+-
+-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf())
+-        assertEquals(SourcesToReprocess.FullRebuild, dirtyFiles)
+-    }
+-
+-    @Test
+-    fun testDefinesConstant() {
++    fun testReferencedConstant() {
+         SourceFileStructure(File("Constants.java").toURI()).also {
+             it.addDeclaredType("test.Constants")
+-            it.addDefinedConstant("CONST", 123)
+             cache.javaCache.addSourceStructure(it)
+         }
+-        SourceFileStructure(File("Unrelated1.java").toURI()).also {
+-            it.addDeclaredType("test.Unrelated1")
++        SourceFileStructure(File("MentionsConst.java").toURI()).also {
++            it.addDeclaredType("test.MentionsConst")
++            it.addMentionedConstant("test.Constants", "CONST")
+             cache.javaCache.addSourceStructure(it)
+         }
+-        SourceFileStructure(File("Unrelated2.java").toURI()).also {
+-            it.addDeclaredType("test.Unrelated2")
++        SourceFileStructure(File("MentionsOtherConst.java").toURI()).also {
++            it.addDeclaredType("test.MentionsOtherConst")
++            it.addMentionedConstant("test.OtherConstants", "CONST")
+             cache.javaCache.addSourceStructure(it)
+         }
+         prepareForIncremental()
+ 
+-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(File("Constants.java")))
+-        assertEquals(SourcesToReprocess.FullRebuild, dirtyFiles)
++        val dirtyFiles =
++            cache.invalidateAndGetDirtyFiles(
++                listOf(File("Constants.java")), emptyList()
++            ) as SourcesToReprocess.Incremental
++        assertEquals(
++            listOf(File("Constants.java").absoluteFile, File("MentionsConst.java").absoluteFile),
++            dirtyFiles.toReprocess
++        )
+     }
+ 
+     @Test
+@@ -217,7 +189,6 @@
+ 
+     private fun prepareForIncremental() {
+         cache.close()
+-        classpathHistory.resolve("0").createNewFile()
+-        cache = JavaClassCacheManager(cacheDir, classpathHistory)
++        cache = JavaClassCacheManager(cacheDir)
+     }
+ }
+--- /dev/null
++++ b/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/ReferencedContantsTest.kt
+@@ -0,0 +1,98 @@
++/*
++ * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.kapt.base.test.org.jetbrains.kotlin.kapt3.base.incremental
++
++import org.jetbrains.kotlin.kapt3.base.incremental.JavaClassCacheManager
++import org.jetbrains.kotlin.kapt3.base.incremental.MentionedTypesTaskListener
++import org.junit.Assert.assertEquals
++import org.junit.BeforeClass
++import org.junit.ClassRule
++import org.junit.Test
++import org.junit.rules.TemporaryFolder
++import java.io.File
++
++private val MY_TEST_DIR = File("plugins/kapt3/kapt3-base/testData/runner/incremental/constants")
++
++class ReferencedConstantsTest {
++
++    companion object {
++        @ClassRule
++        @JvmField
++        var tmp = TemporaryFolder()
++
++        private lateinit var cache: JavaClassCacheManager
++        private lateinit var generatedSources: File
++
++        @JvmStatic
++        @BeforeClass
++        fun setUp() {
++            val compiledClasses = tmp.newFolder()
++            compileSources(listOf(MY_TEST_DIR.resolve("CKlass.java")), compiledClasses)
++
++            cache = JavaClassCacheManager(tmp.newFolder())
++            generatedSources = tmp.newFolder()
++            cache.close()
++            val processor = SimpleProcessor().toAggregating()
++            val srcFiles = listOf(
++                "A.java",
++                "B.java",
++                "AnnotationA.java",
++                "AnnotatedType.java"
++            ).map { File(MY_TEST_DIR, it) }
++            runAnnotationProcessing(
++                srcFiles,
++                listOf(processor),
++                generatedSources,
++                listOf(compiledClasses)
++            ) { elements, trees -> MentionedTypesTaskListener(cache.javaCache, elements, trees) }
++            cache.updateCache(listOf(processor))
++        }
++    }
++
++    @Test
++    fun testConstantInField() {
++        val klassA = cache.javaCache.getStructure(MY_TEST_DIR.resolve("A.java"))!!
++
++        assertEquals(setOf("test.A"), klassA.getDeclaredTypes())
++        assertEquals(emptySet<String>(), klassA.getMentionedAnnotations())
++        assertEquals(emptySet<String>(), klassA.getPrivateTypes())
++        assertEquals(setOf("test.A"), klassA.getMentionedTypes())
++        assertEquals(
++            mapOf(
++                "test.B" to setOf("INT_VALUE"),
++                "test.CKlass" to setOf("INT_VALUE")
++            ), klassA.getMentionedConstants()
++        )
++    }
++
++    @Test
++    fun testConstantInDefaultValue() {
++        val annotationA = cache.javaCache.getStructure(MY_TEST_DIR.resolve("AnnotationA.java"))!!
++
++        assertEquals(setOf("test.AnnotationA"), annotationA.getDeclaredTypes())
++        assertEquals(emptySet<String>(), annotationA.getMentionedAnnotations())
++        assertEquals(emptySet<String>(), annotationA.getPrivateTypes())
++        assertEquals(setOf("test.AnnotationA"), annotationA.getMentionedTypes())
++        assertEquals(mapOf("test.B" to setOf("INT_VALUE")), annotationA.getMentionedConstants()
++        )
++    }
++
++    @Test
++    fun testConstantInAnnotationElementValue() {
++        val annotated = cache.javaCache.getStructure(MY_TEST_DIR.resolve("AnnotatedType.java"))!!
++
++        assertEquals(setOf("test.AnnotatedType"), annotated.getDeclaredTypes())
++        assertEquals(setOf("test.AnnotationA"), annotated.getMentionedAnnotations())
++        assertEquals(emptySet<String>(), annotated.getPrivateTypes())
++        assertEquals(setOf("test.AnnotatedType", "test.AnnotationA"), annotated.getMentionedTypes())
++        assertEquals(
++            mapOf(
++                "test.B" to setOf("INT_VALUE"),
++                "test.CKlass" to setOf("INT_VALUE")
++            ), annotated.getMentionedConstants()
++        )
++    }
++}
+\ No newline at end of file
+--- a/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/TestComplexIncrementalAptCache.kt
++++ b/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/TestComplexIncrementalAptCache.kt
+@@ -29,11 +29,9 @@
+         @JvmStatic
+         @BeforeClass
+         fun setUp() {
+-            val classpathHistory = tmp.newFolder()
+-            cache = JavaClassCacheManager(tmp.newFolder(), classpathHistory)
++            cache = JavaClassCacheManager(tmp.newFolder())
+             generatedSources = tmp.newFolder()
+             cache.close()
+-            classpathHistory.resolve("0").createNewFile()
+             val processor = SimpleProcessor().toAggregating()
+             val srcFiles = listOf(
+                 "MyEnum.java",
+@@ -48,7 +46,7 @@
+                 srcFiles,
+                 listOf(processor),
+                 generatedSources
+-            ) { trees -> MentionedTypesTaskListener(cache.javaCache, trees) }
++            ) { elements, trees -> MentionedTypesTaskListener(cache.javaCache, elements, trees) }
+             cache.updateCache(listOf(processor))
+         }
+     }
+@@ -61,7 +59,6 @@
+         assertEquals(emptySet<String>(), myEnum.getMentionedAnnotations())
+         assertEquals(emptySet<String>(), myEnum.getPrivateTypes())
+         assertEquals(setOf("test.MyEnum", "test.TypeGeneratedByApt"), myEnum.getMentionedTypes())
+-        assertEquals(emptyMap<String, Any>(), myEnum.getDefinedConstants())
+     }
+ 
+     @Test
+@@ -115,7 +112,6 @@
+                 "java.util.HashSet"
+             ), myNumber.getMentionedTypes()
+         )
+-        assertEquals(emptyMap<String, String>(), myNumber.getDefinedConstants())
+     }
+ 
+     @Test
+@@ -134,7 +130,6 @@
+                 "test.NumberManager"
+             ), numberAnnotation.getMentionedTypes()
+         )
+-        assertEquals(emptyMap<String, String>(), numberAnnotation.getDefinedConstants())
+     }
+ 
+     @Test
+@@ -145,7 +140,6 @@
+         assertEquals(emptySet<String>(), numberException.getMentionedAnnotations())
+         assertEquals(emptySet<String>(), numberException.getPrivateTypes())
+         assertEquals(setOf("test.NumberException", "java.lang.RuntimeException"), numberException.getMentionedTypes())
+-        assertEquals(emptyMap<String, String>(), numberException.getDefinedConstants())
+     }
+ 
+     @Test
+@@ -168,7 +162,6 @@
+                 "test.NumberException"
+             ), numberHolder.getMentionedTypes()
+         )
+-        assertEquals(emptyMap<String, String>(), numberHolder.getDefinedConstants())
+     }
+ 
+     @Test
+@@ -185,7 +178,6 @@
+                 "test.NumberHolder"
+             ), numberManager.getMentionedTypes()
+         )
+-        assertEquals(mapOf("CONST" to "STRING_CONST", "INT_CONST" to 246), numberManager.getDefinedConstants())
+     }
+ 
+     @Test
+@@ -205,6 +197,5 @@
+                 "java.lang.Number"
+             ), genericNumber.getMentionedTypes()
+         )
+-        assertEquals(emptyMap<String, String>(), genericNumber.getDefinedConstants())
+     }
+ }
+\ No newline at end of file
+--- a/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/TestSimpleIncrementalAptCache.kt
++++ b/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/TestSimpleIncrementalAptCache.kt
+@@ -27,18 +27,16 @@
+ 
+     @Before
+     fun setUp() {
+-        val classpathHistory = tmp.newFolder()
+-        cache = JavaClassCacheManager(tmp.newFolder(), classpathHistory)
++        cache = JavaClassCacheManager(tmp.newFolder())
+         generatedSources = tmp.newFolder()
+         cache.close()
+-        classpathHistory.resolve("0").createNewFile()
+     }
+ 
+     @Test
+     fun testAggregatingAnnotations() {
+         runProcessor(SimpleProcessor().toAggregating())
+ 
+-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(TEST_DATA_DIR.resolve("User.java"))) as SourcesToReprocess.Incremental
++        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(TEST_DATA_DIR.resolve("User.java")), emptyList()) as SourcesToReprocess.Incremental
+         assertEquals(
+             listOf(TEST_DATA_DIR.resolve("User.java").absoluteFile, TEST_DATA_DIR.resolve("Address.java").absoluteFile),
+             dirtyFiles.toReprocess
+@@ -51,7 +49,7 @@
+     fun testIsolatingAnnotations() {
+         runProcessor(SimpleProcessor().toIsolating())
+ 
+-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(TEST_DATA_DIR.resolve("User.java"))) as SourcesToReprocess.Incremental
++        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(TEST_DATA_DIR.resolve("User.java")), emptyList()) as SourcesToReprocess.Incremental
+         assertFalse(generatedSources.resolve("test/UserGenerated.java").exists())
+         assertEquals(
+             listOf(TEST_DATA_DIR.resolve("User.java").absoluteFile),
+@@ -63,7 +61,7 @@
+     fun testNonIncremental() {
+         runProcessor(SimpleProcessor().toNonIncremental())
+ 
+-        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(TEST_DATA_DIR.resolve("User.java")))
++        val dirtyFiles = cache.invalidateAndGetDirtyFiles(listOf(TEST_DATA_DIR.resolve("User.java")), emptyList())
+         assertTrue(dirtyFiles is SourcesToReprocess.FullRebuild)
+     }
+ 
+@@ -73,7 +71,7 @@
+             srcFiles,
+             listOf(processor),
+             generatedSources
+-        ) { elementUtils -> MentionedTypesTaskListener(cache.javaCache, elementUtils) }
++        ) { elementUtils, trees -> MentionedTypesTaskListener(cache.javaCache, elementUtils, trees) }
+         cache.updateCache(listOf(processor))
+     }
+ }
+\ No newline at end of file
+--- a/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/fixtures.kt
++++ b/plugins/kapt3/kapt3-base/test/org/jetbrains/kotlin/kapt3/base/incremental/fixtures.kt
+@@ -6,6 +6,7 @@
+ package org.jetbrains.kotlin.kapt.base.test.org.jetbrains.kotlin.kapt3.base.incremental
+ 
+ import com.sun.source.util.TaskListener
++import com.sun.source.util.Trees
+ import com.sun.tools.javac.api.JavacTaskImpl
+ import org.jetbrains.kotlin.kapt3.base.incremental.DeclaredProcType
+ import org.jetbrains.kotlin.kapt3.base.incremental.IncrementalProcessor
+@@ -27,7 +28,8 @@
+     srcFiles: List<File>,
+     processor: List<IncrementalProcessor>,
+     generatedSources: File,
+-    listener: (Elements) -> TaskListener? = { null }
++    classpath: List<File> = emptyList(),
++    listener: (Elements, Trees) -> TaskListener? = { _, _ -> null }
+ ) {
+     val compiler = ToolProvider.getSystemJavaCompiler()
+     compiler.getStandardFileManager(null, null, null).use { fileManager ->
+@@ -37,12 +39,12 @@
+                 null,
+                 fileManager,
+                 null,
+-                listOf("-proc:only", "-s", generatedSources.absolutePath, "-d", generatedSources.absolutePath),
++                listOf("-proc:only", "-s", generatedSources.absolutePath, "-d", generatedSources.absolutePath, "-cp", classpath.joinToString(separator = File.pathSeparator)),
+                 null,
+                 javaSrcs
+             ) as JavacTaskImpl
+ 
+-        val taskListener = listener(compilationTask.elements)
++        val taskListener = listener(compilationTask.elements, Trees.instance(compilationTask))
+         taskListener?.let { compilationTask.addTaskListener(it) }
+ 
+         compilationTask.setProcessors(processor)
+--- /dev/null
++++ b/plugins/kapt3/kapt3-base/testData/runner/incremental/constants/A.java
+@@ -0,0 +1,5 @@
++package test;
++
++public class A {
++    final int myField = B.INT_VALUE + (1 < 5 ? CKlass.INT_VALUE : 13);
++}
+\ No newline at end of file
+--- /dev/null
++++ b/plugins/kapt3/kapt3-base/testData/runner/incremental/constants/AnnotatedType.java
+@@ -0,0 +1,5 @@
++package test;
++
++@AnnotationA(CKlass.INT_VALUE + B.INT_VALUE)
++public class AnnotatedType {
++}
+\ No newline at end of file
+--- /dev/null
++++ b/plugins/kapt3/kapt3-base/testData/runner/incremental/constants/AnnotationA.java
+@@ -0,0 +1,5 @@
++package test;
++
++public @interface AnnotationA {
++    int value() default (B.INT_VALUE + B.INT_VALUE) ;
++}
+\ No newline at end of file
+--- /dev/null
++++ b/plugins/kapt3/kapt3-base/testData/runner/incremental/constants/B.java
+@@ -0,0 +1,5 @@
++package test;
++
++public class B {
++    static final int INT_VALUE = 12;
++}
+\ No newline at end of file
+--- /dev/null
++++ b/plugins/kapt3/kapt3-base/testData/runner/incremental/constants/CKlass.java
+@@ -0,0 +1,5 @@
++package test;
++
++public class CKlass {
++    static final int INT_VALUE = 123;
++}
+\ No newline at end of file
+--- /dev/null
++++ b/plugins/kapt3/kapt3-cli/build.gradle
+@@ -0,0 +1,31 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:cli"))
++
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(DependenciesKt.customProjectTests(it,":compiler"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++        java.srcDirs("test", "tests")
++    }
++}
++
++ArtifactsKt.customTestsJar(project){}
++
++ArtifactsKt.customDist(project,null,null,null,{})
++
++TasksKt.customProjectTest(project,"test") {
++    it.workingDir = rootDir
++    it.dependsOn(":dist")
++}
+--- a/plugins/kapt3/kapt3-cli/build.gradle.kts
++++ /dev/null
+@@ -1,26 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:cli"))
+-
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(projectTests(":compiler"))
+-    testCompile(commonDep("junit:junit"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-testsJar {}
+-
+-dist()
+-
+-projectTest {
+-    workingDir = rootDir
+-    dependsOn(":dist")
+-}
+\ No newline at end of file
+--- a/plugins/kapt3/kapt3-cli/src/KaptCliOption.kt
++++ b/plugins/kapt3/kapt3-cli/src/KaptCliOption.kt
+@@ -90,10 +90,16 @@
+         "Use only in apt mode. Output directory for cache necessary to support incremental annotation processing."
+     ),
+ 
+-    CLASSPATH_FQ_NAMES_HISTORY(
+-        "classpathFqNamesHistory",
+-        "<path>",
+-        "Use only in apt mode. Directory containing history of classpath fq name changes."
++    CLASSPATH_CHANGES(
++        "classpathChange",
++        "<jvmInternalName,[jvmInternalName,...]>",
++        "Use only in apt mode. Classpath jvm internal names that changed."
++    ),
++
++    PROCESS_INCREMENTALLY(
++        "processIncrementally",
++        "boolean",
++        "Use only in apt mode. Enables incremental apt processing"
+     ),
+ 
+     ANNOTATION_PROCESSOR_CLASSPATH_OPTION(
+--- /dev/null
++++ b/plugins/kapt3/kapt3-compiler/build.gradle
+@@ -0,0 +1,65 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Annotation Processor for Kotlin"
++
++dependencies {
++    testCompileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    testRuntime(IntellijDependenciesKt.getIntellijDep(project,"intellij"))
++    testCompileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["idea", "idea_rt", "openapi"],null) }
++
++    if(IdeCompatibilityDslKt.PlatformOrHigher(181)) {
++        testCompileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["platform-api", "platform-impl"],null) }
++    }
++
++    compile(project(":compiler:util"))
++    compile(project(":compiler:cli"))
++    compile(project(":compiler:backend"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:frontend.java"))
++    compile(project(":compiler:plugin-api"))
++    compileOnly(project(":kotlin-annotation-processing-cli"))
++    compileOnly(project(":kotlin-annotation-processing-base"))
++    compileOnly(project(":kotlin-annotation-processing-runtime"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["asm-all"], rootProject) }
++
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(project(":kotlin-annotation-processing-base"))
++    testCompile(DependenciesKt.customProjectTests(it,":kotlin-annotation-processing-base"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++    testCompile(project(":kotlin-annotation-processing-runtime"))
++
++    embeddedComponents(project(":kotlin-annotation-processing-runtime")) { setTransitive(false) }
++    embeddedComponents(project(":kotlin-annotation-processing-cli")) { setTransitive(false) }
++    embeddedComponents(project(":kotlin-annotation-processing-base")) { setTransitive(false) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++        java.srcDirs("test", "tests")
++    }
++}
++
++ArtifactsKt.customTestsJar(project){}
++
++TasksKt.customProjectTest(project,"test"){
++    it.workingDir = rootDir
++    it.dependsOn(":dist")
++}
++
++//publish()
++
++ArtifactsKt.customRuntimeJar(project,"android-lint")
++
++//sourcesJar()
++//javadocJar()
++
++ArtifactsKt.customDist(project,null,null,null,{})
+--- a/plugins/kapt3/kapt3-compiler/build.gradle.kts
++++ /dev/null
+@@ -1,62 +0,0 @@
+-
+-description = "Annotation Processor for Kotlin"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    testCompileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    testRuntime(intellijDep())
+-    testCompileOnly(intellijDep()) { includeJars("idea", "idea_rt", "openapi") }
+-
+-    Platform[181].orHigher {
+-        testCompileOnly(intellijDep()) { includeJars("platform-api", "platform-impl") }
+-    }
+-
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:cli"))
+-    compile(project(":compiler:backend"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:frontend.java"))
+-    compile(project(":compiler:plugin-api"))
+-    compileOnly(project(":kotlin-annotation-processing-cli"))
+-    compileOnly(project(":kotlin-annotation-processing-base"))
+-    compileOnly(project(":kotlin-annotation-processing-runtime"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("asm-all", rootProject = rootProject) }
+-
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(project(":kotlin-annotation-processing-base"))
+-    testCompile(projectTests(":kotlin-annotation-processing-base"))
+-    testCompile(commonDep("junit:junit"))
+-    testCompile(project(":kotlin-annotation-processing-runtime"))
+-
+-    embeddedComponents(project(":kotlin-annotation-processing-runtime")) { isTransitive = false }
+-    embeddedComponents(project(":kotlin-annotation-processing-cli")) { isTransitive = false }
+-    embeddedComponents(project(":kotlin-annotation-processing-base")) { isTransitive = false }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-testsJar {}
+-
+-projectTest {
+-    workingDir = rootDir
+-    dependsOn(":dist")
+-}
+-
+-publish()
+-
+-runtimeJar {
+-    fromEmbeddedComponents()
+-}
+-
+-sourcesJar()
+-javadocJar()
+-
+-dist()
+--- a/plugins/kapt3/kapt3-compiler/src/org/jetbrains/kotlin/kapt3/Kapt3Plugin.kt
++++ b/plugins/kapt3/kapt3-compiler/src/org/jetbrains/kotlin/kapt3/Kapt3Plugin.kt
+@@ -100,7 +100,8 @@
+             CHANGED_FILES -> changedFiles.addAll(value.split(File.pathSeparator).map { File(it) })
+             COMPILED_SOURCES_DIR -> compiledSources.addAll(value.split(File.pathSeparator).map { File(it) })
+             INCREMENTAL_CACHE -> incrementalCache = File(value)
+-            CLASSPATH_FQ_NAMES_HISTORY -> classpathFqNamesHistory = File(value)
++            CLASSPATH_CHANGES -> classpathChanges.addAll(value.split(File.pathSeparator).map { it })
++            PROCESS_INCREMENTALLY -> setFlag(KaptFlag.INCREMENTAL_APT, value)
+ 
+             ANNOTATION_PROCESSOR_CLASSPATH_OPTION -> processingClasspath += File(value)
+             ANNOTATION_PROCESSORS_OPTION -> processors.addAll(value.split(',').map { it.trim() }.filter { it.isNotEmpty() })
+--- a/plugins/kapt3/kapt3-compiler/src/org/jetbrains/kotlin/kapt3/stubs/ClassFileToSourceStubConverter.kt
++++ b/plugins/kapt3/kapt3-compiler/src/org/jetbrains/kotlin/kapt3/stubs/ClassFileToSourceStubConverter.kt
+@@ -833,15 +833,7 @@
+                     else -> null
+                 }
+             },
+-            ifNonError = ifNonError@ {
+-                if (descriptor is PropertyDescriptor) {
+-                    val containingClass = descriptor.containingDeclaration
+-                    if (containingClass is ClassDescriptor && containingClass.kind == ClassKind.ANNOTATION_CLASS) {
+-                        return@ifNonError jcReturnType
+-                    }
+-                }
+-                genericSignature.returnType
+-            }
++            ifNonError = { genericSignature.returnType }
+         )
+ 
+         return Pair(genericSignature, returnType)
+--- a/plugins/kapt3/kapt3-compiler/src/org/jetbrains/kotlin/kapt3/stubs/SignatureParserVisitor.kt
++++ b/plugins/kapt3/kapt3-compiler/src/org/jetbrains/kotlin/kapt3/stubs/SignatureParserVisitor.kt
+@@ -314,7 +314,7 @@
+     }
+ }
+ 
+-private class SignatureParserVisitor : SignatureVisitor(Opcodes.API_VERSION) {
++private class SignatureParserVisitor : SignatureVisitor(458752) {
+     val root = SignatureNode(Root)
+     private val stack = ArrayDeque<SignatureNode>(5).apply { add(root) }
+ 
+@@ -417,4 +417,4 @@
+         }
+         stack.pop()
+     }
+-}
+\ No newline at end of file
++}
+--- a/plugins/kapt3/kapt3-compiler/test/org/jetbrains/kotlin/kapt3/test/ClassFileToSourceStubConverterTestGenerated.java
++++ b/plugins/kapt3/kapt3-compiler/test/org/jetbrains/kotlin/kapt3/test/ClassFileToSourceStubConverterTestGenerated.java
+@@ -359,11 +359,6 @@
+         runTest("plugins/kapt3/kapt3-compiler/testData/converter/nonExistentClassWIthoutCorrection.kt");
+     }
+ 
+-    @TestMetadata("outProjection.kt")
+-    public void testOutProjection() throws Exception {
+-        runTest("plugins/kapt3/kapt3-compiler/testData/converter/outProjection.kt");
+-    }
+-
+     @TestMetadata("primitiveTypes.kt")
+     public void testPrimitiveTypes() throws Exception {
+         runTest("plugins/kapt3/kapt3-compiler/testData/converter/primitiveTypes.kt");
+--- a/plugins/kapt3/kapt3-compiler/testData/converter/annotations.txt
++++ b/plugins/kapt3/kapt3-compiler/testData/converter/annotations.txt
+@@ -28,9 +28,9 @@
+ 
+     public abstract Colors[] colors() default {Colors.BLACK, Colors.WHITE};
+ 
+-    public abstract java.lang.Class clazz();
++    public abstract java.lang.Class<?> clazz();
+ 
+-    public abstract java.lang.Class[] classes();
++    public abstract java.lang.Class<?>[] classes();
+ }
+ 
+ ////////////////////
+--- a/plugins/kapt3/kapt3-compiler/testData/converter/errorLocationMapping.txt
++++ b/plugins/kapt3/kapt3-compiler/testData/converter/errorLocationMapping.txt
+@@ -4,7 +4,7 @@
+ @java.lang.annotation.Retention(value = java.lang.annotation.RetentionPolicy.RUNTIME)
+ public abstract @interface Anno {
+ 
+-    public abstract java.lang.Class a();
++    public abstract java.lang.Class<java.lang.Object> a();
+ }
+ 
+ ////////////////////
+--- a/plugins/kapt3/kapt3-compiler/testData/converter/nestedClasses2.txt
++++ b/plugins/kapt3/kapt3-compiler/testData/converter/nestedClasses2.txt
+@@ -159,7 +159,7 @@
+         @java.lang.annotation.Retention(value = java.lang.annotation.RetentionPolicy.RUNTIME)
+         public static abstract @interface Anno {
+ 
+-            public abstract java.lang.Class[] value();
++            public abstract java.lang.Class<?>[] value();
+         }
+ 
+         @kotlin.Metadata()
+--- a/plugins/kapt3/kapt3-compiler/testData/converter/nestedClassesNonRootPackage.txt
++++ b/plugins/kapt3/kapt3-compiler/testData/converter/nestedClassesNonRootPackage.txt
+@@ -164,7 +164,7 @@
+         @java.lang.annotation.Retention(value = java.lang.annotation.RetentionPolicy.RUNTIME)
+         public static abstract @interface Anno {
+ 
+-            public abstract java.lang.Class[] value();
++            public abstract java.lang.Class<?>[] value();
+         }
+ 
+         @kotlin.Metadata()
+--- a/plugins/kapt3/kapt3-compiler/testData/converter/nonExistentClassTypesConversion.txt
++++ b/plugins/kapt3/kapt3-compiler/testData/converter/nonExistentClassTypesConversion.txt
+@@ -5,13 +5,13 @@
+ @java.lang.annotation.Retention(value = java.lang.annotation.RetentionPolicy.RUNTIME)
+ public abstract @interface Anno {
+ 
+-    public abstract java.lang.Class a();
++    public abstract java.lang.Class<?> a();
+ 
+-    public abstract java.lang.Class[] b();
++    public abstract java.lang.Class<?>[] b();
+ 
+-    public abstract java.lang.Class[] c();
++    public abstract java.lang.Class<?>[] c();
+ 
+-    public abstract java.lang.Class[] d();
++    public abstract java.lang.Class<?>[] d();
+ }
+ 
+ ////////////////////
+--- a/plugins/kapt3/kapt3-compiler/testData/converter/outProjection.kt
++++ /dev/null
+@@ -1,10 +0,0 @@
+-import kotlin.reflect.KClass;
+-
+-annotation class Anno(val baseClass: KClass<out Intf<*, *, *>>)
+-
+-interface Intf<S, R, A>
+-
+-abstract class Base<S, R, A> : Intf<S, R, A>
+-
+-@Anno(baseClass = Base::class)
+-interface Impl
+\ No newline at end of file
+--- a/plugins/kapt3/kapt3-compiler/testData/converter/repeatableAnnotations.txt
++++ b/plugins/kapt3/kapt3-compiler/testData/converter/repeatableAnnotations.txt
+@@ -48,7 +48,7 @@
+ 
+     public abstract int x();
+ 
+-    public abstract java.lang.Class c();
++    public abstract java.lang.Class<Color> c();
+ }
+ 
+ ////////////////////
+--- /dev/null
++++ b/plugins/kapt3/kapt3-runtime/build.gradle
+@@ -0,0 +1,28 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin Annotation Processing Runtime"
++
++dependencies {
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++}
++
++jvmTarget = "1.6"
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
++//publish()
++ArtifactsKt.customRuntimeJar(project){} //used customRuntimeJar
++//sourcesJar()
++//javadocJar()
++
++ArtifactsKt.customDist(project,null,"kotlin-annotation-processing-runtime.jar",null,{}) //used customDist for project.dist
+--- a/plugins/kapt3/kapt3-runtime/build.gradle.kts
++++ /dev/null
+@@ -1,25 +0,0 @@
+-description = "Kotlin Annotation Processing Runtime"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(kotlinStdlib())
+-}
+-
+-jvmTarget = "1.6"
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-publish()
+-
+-runtimeJar()
+-sourcesJar()
+-javadocJar()
+-
+-dist(targetName = "kotlin-annotation-processing-runtime.jar")
+--- /dev/null
++++ b/plugins/kotlin-serialization/kotlin-serialization-compiler/build.gradle
+@@ -0,0 +1,37 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin Serialization Compiler Plugin"
++
++dependencies {
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++
++    compile(project(":compiler:plugin-api"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:backend"))
++    compile(project(":compiler:ir.backend.common"))
++    compile(project(":js:js.frontend"))
++    compile(project(":js:js.translator"))
++
++    runtime(DependenciesKt.customKotlinStdlib(project,null))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
++Task jar = ArtifactsKt.customRuntimeJar(project){}
++
++ext.targetName = CommonUtilKt.customGetBaseConvention(project).archivesBaseName + ".jar"
++ArtifactsKt.customDist(project,null,targetName,null){}
++
++ArtifactsKt.customIdeaPlugin(project,"lib") {
++    it.from(jar)
++}
+--- a/plugins/kotlin-serialization/kotlin-serialization-compiler/build.gradle.kts
++++ /dev/null
+@@ -1,32 +0,0 @@
+-description = "Kotlin Serialization Compiler Plugin"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-
+-    compile(project(":compiler:plugin-api"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:backend"))
+-    compile(project(":compiler:ir.backend.common"))
+-    compile(project(":js:js.frontend"))
+-    compile(project(":js:js.translator"))
+-
+-    runtime(kotlinStdlib())
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-val jar = runtimeJar {}
+-
+-dist(targetName = the<BasePluginConvention>().archivesBaseName + ".jar")
+-
+-ideaPlugin {
+-    from(jar)
+-}
+--- a/plugins/kotlin-serialization/kotlin-serialization-compiler/src/org/jetbrains/kotlinx/serialization/compiler/resolve/KSerializerDescriptorResolver.kt
++++ b/plugins/kotlin-serialization/kotlin-serialization-compiler/src/org/jetbrains/kotlinx/serialization/compiler/resolve/KSerializerDescriptorResolver.kt
+@@ -370,23 +370,23 @@
+         return constrDesc
+     }
+ 
+-    private fun createSerializerGetterDescriptor(thisClass: ClassDescriptor, serializableClass: ClassDescriptor): SimpleFunctionDescriptor {
+-        val f = SimpleFunctionDescriptorImpl.create(
+-            thisClass,
+-            Annotations.EMPTY,
+-            SerialEntityNames.SERIALIZER_PROVIDER_NAME,
+-            CallableMemberDescriptor.Kind.SYNTHESIZED,
+-            thisClass.source
+-        )
+-        val serializerClass = thisClass.getClassFromSerializationPackage(SerialEntityNames.KSERIALIZER_CLASS)
+-
++    /**
++     * Creates free type parameters T0, T1, ... for given serializable class
++     * Returns [T0, T1, ...] and [KSerializer<T0>, KSerializer<T1>,...]
++     */
++    private fun createKSerializerParamsForEachGenericArgument(
++        parentFunction: FunctionDescriptor,
++        serializableClass: ClassDescriptor,
++        actualArgsOffset: Int = 0
++    ): Pair<List<TypeParameterDescriptor>, List<ValueParameterDescriptor>> {
++        val serializerClass = serializableClass.getClassFromSerializationPackage(SerialEntityNames.KSERIALIZER_CLASS)
+         val args = mutableListOf<ValueParameterDescriptor>()
+         val typeArgs = mutableListOf<TypeParameterDescriptor>()
+         var i = 0
+ 
+         serializableClass.declaredTypeParameters.forEach { _ ->
+             val targ = TypeParameterDescriptorImpl.createWithDefaultBound(
+-                f, Annotations.EMPTY, false, Variance.INVARIANT,
++                parentFunction, Annotations.EMPTY, false, Variance.INVARIANT,
+                 Name.identifier("T$i"), i
+             )
+ 
+@@ -395,17 +395,17 @@
+ 
+             args.add(
+                 ValueParameterDescriptorImpl(
+-                    f,
+-                    null,
+-                    i,
+-                    Annotations.EMPTY,
+-                    Name.identifier("$typeArgPrefix$i"),
+-                    pType,
+-                    false,
+-                    false,
+-                    false,
+-                    null,
+-                    f.source
++                    containingDeclaration = parentFunction,
++                    original = null,
++                    index = actualArgsOffset + i,
++                    annotations = Annotations.EMPTY,
++                    name = Name.identifier("$typeArgPrefix$i"),
++                    outType = pType,
++                    declaresDefaultValue = false,
++                    isCrossinline = false,
++                    isNoinline = false,
++                    varargElementType = null,
++                    source = parentFunction.source
+                 )
+             )
+ 
+@@ -413,6 +413,21 @@
+             i++
+         }
+ 
++        return typeArgs to args
++    }
++
++    private fun createSerializerGetterDescriptor(thisClass: ClassDescriptor, serializableClass: ClassDescriptor): SimpleFunctionDescriptor {
++        val f = SimpleFunctionDescriptorImpl.create(
++            thisClass,
++            Annotations.EMPTY,
++            SerialEntityNames.SERIALIZER_PROVIDER_NAME,
++            CallableMemberDescriptor.Kind.SYNTHESIZED,
++            thisClass.source
++        )
++        val serializerClass = thisClass.getClassFromSerializationPackage(SerialEntityNames.KSERIALIZER_CLASS)
++
++        val (typeArgs, args) = createKSerializerParamsForEachGenericArgument(f, serializableClass)
++
+         val newSerializableType =
+             KotlinTypeFactory.simpleNotNullType(Annotations.EMPTY, serializableClass, typeArgs.map { TypeProjectionImpl(it.defaultType) })
+         val serialReturnType =
+@@ -446,79 +461,69 @@
+         )
+         val returnType = f.builtIns.unitType
+ 
++        val (typeArgs, argsKSer) = createKSerializerParamsForEachGenericArgument(f, thisClass, actualArgsOffset = 3)
++
+         val args = mutableListOf<ValueParameterDescriptor>()
+-        var i = 0
++
+         // object
++        val objectType =
++            KotlinTypeFactory.simpleNotNullType(Annotations.EMPTY, thisClass, typeArgs.map { TypeProjectionImpl(it.defaultType) })
+         args.add(
+             ValueParameterDescriptorImpl(
+-                f, null, i++, Annotations.EMPTY, Name.identifier("self"), thisClass.defaultType, false,
+-                false, false, null, f.source
++                containingDeclaration = f,
++                original = null,
++                index = 0,
++                annotations = Annotations.EMPTY,
++                name = Name.identifier("self"),
++                outType = objectType,
++                declaresDefaultValue = false,
++                isCrossinline = false,
++                isNoinline = false,
++                varargElementType = null,
++                source = f.source
+             )
+         )
+ 
+         // encoder
+         args.add(
+             ValueParameterDescriptorImpl(
+-                f,
+-                null,
+-                i++,
+-                Annotations.EMPTY,
+-                Name.identifier("output"),
+-                thisClass.getClassFromSerializationPackage(SerialEntityNames.STRUCTURE_ENCODER_CLASS).toSimpleType(false),
+-                false,
+-                false,
+-                false,
+-                null,
+-                f.source
++                containingDeclaration = f,
++                original = null,
++                index = 1,
++                annotations = Annotations.EMPTY,
++                name = Name.identifier("output"),
++                outType = thisClass.getClassFromSerializationPackage(SerialEntityNames.STRUCTURE_ENCODER_CLASS).toSimpleType(false),
++                declaresDefaultValue = false,
++                isCrossinline = false,
++                isNoinline = false,
++                varargElementType = null,
++                source = f.source
+             )
+         )
+ 
+         //descriptor
+         args.add(
+             ValueParameterDescriptorImpl(
+-                f,
+-                null,
+-                i++,
+-                Annotations.EMPTY,
+-                Name.identifier("serialDesc"),
+-                thisClass.getClassFromSerializationPackage(SerialEntityNames.SERIAL_DESCRIPTOR_CLASS).toSimpleType(false),
+-                false,
+-                false,
+-                false,
+-                null,
+-                f.source
++                containingDeclaration = f,
++                original = null,
++                index = 2,
++                annotations = Annotations.EMPTY,
++                name = Name.identifier("serialDesc"),
++                outType = thisClass.getClassFromSerializationPackage(SerialEntityNames.SERIAL_DESCRIPTOR_CLASS).toSimpleType(false),
++                declaresDefaultValue = false,
++                isCrossinline = false,
++                isNoinline = false,
++                varargElementType = null,
++                source = f.source
+             )
+         )
+ 
+-        val kSerialClassDesc = thisClass.getClassFromSerializationPackage(SerialEntityNames.KSERIALIZER_CLASS)
+-
+-        // type parameters serialziers
+-        thisClass.declaredTypeParameters.forEach {
+-            val typeArgument = TypeProjectionImpl(it.defaultType)
+-            val kSerialClass = KotlinTypeFactory.simpleNotNullType(Annotations.EMPTY, kSerialClassDesc, listOf(typeArgument))
+-
+-
+-            args.add(
+-                ValueParameterDescriptorImpl(
+-                    f,
+-                    null,
+-                    i++,
+-                    Annotations.EMPTY,
+-                    Name.identifier("$typeArgPrefix${i - 3}"),
+-                    kSerialClass,
+-                    false,
+-                    false,
+-                    false,
+-                    null,
+-                    f.source
+-                )
+-            )
+-        }
++        args.addAll(argsKSer)
+ 
+         f.initialize(
+             null,
+             thisClass.thisAsReceiverParameter,
+-            emptyList(),
++            typeArgs,
+             args,
+             returnType,
+             Modality.FINAL,
+--- /dev/null
++++ b/plugins/noarg/noarg-cli/build.gradle
+@@ -0,0 +1,50 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin NoArg Compiler Plugin"
++
++dependencies {
++    compileOnly(project(":compiler:frontend"))
++    compileOnly(project(":compiler:frontend.java"))
++    compileOnly(project(":compiler:backend"))
++    compileOnly(project(":compiler:util"))
++    compileOnly(project(":compiler:plugin-api"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["asm-all"], rootProject) }
++    runtime(DependenciesKt.customKotlinStdlib(project,null))
++    testRuntimeOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) {
++        IntellijDependenciesKt.customIncludeJars(it,["guava"], rootProject)
++    }
++    testRuntimeOnly(DependenciesKt.customProjectRuntimeJar(it,":kotlin-compiler"))
++    testCompile(project(":compiler:backend"))
++    testCompile(project(":compiler:cli"))
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++    	java.srcDirs("test", "tests")
++    }
++}
++
++Task jar = ArtifactsKt.customRuntimeJar(project){}
++
++ArtifactsKt.customTestsJar(project){}
++ext.targetName = CommonUtilKt.customGetBaseConvention(project).archivesBaseName - "kotlin-" + ".jar"
++ArtifactsKt.customDist(project,null,targetName,null){}
++
++ArtifactsKt.customIdeaPlugin(project,"lib") {
++    it.from(jar)
++}
++
++TasksKt.customProjectTest(project,"test"){
++    it.workingDir = rootDir
++}
+--- a/plugins/noarg/noarg-cli/build.gradle.kts
++++ /dev/null
+@@ -1,45 +0,0 @@
+-
+-description = "Kotlin NoArg Compiler Plugin"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compileOnly(project(":compiler:frontend"))
+-    compileOnly(project(":compiler:frontend.java"))
+-    compileOnly(project(":compiler:backend"))
+-    compileOnly(project(":compiler:util"))
+-    compileOnly(project(":compiler:plugin-api"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("asm-all", rootProject = rootProject) }
+-    runtime(kotlinStdlib())
+-    testRuntimeOnly(intellijDep()) {
+-        includeJars("guava", rootProject = rootProject)
+-    }
+-    testRuntimeOnly(projectRuntimeJar(":kotlin-compiler"))
+-    testCompile(project(":compiler:backend"))
+-    testCompile(project(":compiler:cli"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(commonDep("junit:junit"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-val jar = runtimeJar {}
+-
+-testsJar {}
+-
+-dist(targetName = the<BasePluginConvention>().archivesBaseName.removePrefix("kotlin-") + ".jar")
+-
+-ideaPlugin {
+-    from(jar)
+-}
+-
+-projectTest {
+-    workingDir = rootDir
+-}
+--- /dev/null
++++ b/plugins/sam-with-receiver/sam-with-receiver-cli/build.gradle
+@@ -0,0 +1,49 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin SamWithReceiver Compiler Plugin"
++
++dependencies {
++    compileOnly(project(":compiler:frontend"))
++    compileOnly(project(":compiler:frontend.java"))
++    compileOnly(project(":compiler:plugin-api"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++
++    testCompile(project(":compiler:backend"))
++    testCompile(project(":compiler:cli"))
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++    	java.srcDirs("test", "tests")
++    }
++}
++
++//publish()
++
++Task jar = ArtifactsKt.customRuntimeJar(project){}
++ArtifactsKt.customSourcesJar(project,"main"){}
++//javadocJar()
++ArtifactsKt.customTestsJar(project){}
++
++ArtifactsKt.customDist(project,null,null,null) {
++    it.rename("kotlin-", "")
++}
++
++ArtifactsKt.customIdeaPlugin(project,"lib") {
++    it.from(jar)
++}
++
++TasksKt.customProjectTest(project,"test"){
++    it.dependsOn(":kotlin-stdlib:jvm-minimal-for-test:dist")
++    it.workingDir = rootDir
++}
+--- a/plugins/sam-with-receiver/sam-with-receiver-cli/build.gradle.kts
++++ /dev/null
+@@ -1,44 +0,0 @@
+-
+-description = "Kotlin SamWithReceiver Compiler Plugin"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compileOnly(project(":compiler:frontend"))
+-    compileOnly(project(":compiler:frontend.java"))
+-    compileOnly(project(":compiler:plugin-api"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-
+-    testCompile(project(":compiler:backend"))
+-    testCompile(project(":compiler:cli"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(commonDep("junit:junit"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-publish()
+-
+-val jar = runtimeJar {}
+-sourcesJar()
+-javadocJar()
+-testsJar {}
+-
+-dist {
+-    rename("kotlin-", "")
+-}
+-
+-ideaPlugin {
+-    from(jar)
+-}
+-
+-projectTest {
+-    dependsOn(":kotlin-stdlib:jvm-minimal-for-test:dist")
+-    workingDir = rootDir
+-}
+--- a/plugins/scripting/scripting-cli/build.gradle.kts
++++ b/plugins/scripting/scripting-cli/build.gradle.kts
+@@ -1,11 +1,11 @@
+ 
+-description = "Kotlin Scripting Compiler Plugin"
+-
+ plugins {
+-    kotlin("jvm")
++    id("org.jetbrains.kotlin.jvm")
+     id("jps-compatible")
+ }
+ 
++description = "Kotlin Scripting Compiler Plugin"
++
+ dependencies {
+     compileOnly(project(":compiler:frontend"))
+     compileOnly(project(":compiler:frontend.java"))
+@@ -15,10 +15,10 @@
+     compile(project(":kotlin-scripting-impl"))
+     compile(project(":kotlin-scripting-common"))
+     compile(project(":kotlin-scripting-jvm"))
+-    compile(kotlinStdlib())
++    compile(DependenciesKt.customKotlinStdlib(project,null))
+     compileOnly(project(":kotlin-reflect-api"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("asm-all", rootProject = rootProject) }
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["asm-all"], rootProject) }
+ 
+     testCompile(project(":compiler:frontend"))
+     testCompile(project(":compiler:frontend.script"))
+@@ -27,16 +27,21 @@
+     testCompile(project(":compiler:cli"))
+     testCompile(project(":compiler:cli-common"))
+     testCompile(project(":compiler:frontend.java"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(commonDep("junit:junit"))
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
+ }
+ 
+ sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++        java.srcDirs("test", "tests")
++    }
+ }
+ 
+-tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>> {
++tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinCompile) {
+     kotlinOptions {
+         languageVersion = "1.2"
+         apiVersion = "1.2"
+@@ -44,16 +49,16 @@
+     }
+ }
+ 
+-publish()
++//publish()
+ 
+-val jar = runtimeJar {}
+-sourcesJar()
+-javadocJar()
++ArtifactsKt.customRuntimeJar(project){}
++ArtifactsKt.customSourcesJar(project,"main",{})
++//javadocJar()
+ 
+-dist()
++ArtifactsKt.customDist(project,null,null,null,{})
+ 
+-ideaPlugin()
++ArtifactsKt.customIdeaPlugin(project,"lib") {}
+ 
+-projectTest {
+-    workingDir = rootDir
++TasksKt.customProjectTest(project,"test"){
++	it.workingDir = rootDir
+ }
+--- /dev/null
++++ b/plugins/scripting/scripting-impl/build.gradle
+@@ -0,0 +1,53 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin Scripting Implementation - shared part"
++
++dependencies {
++    compileOnly(project(":compiler:frontend"))
++    compileOnly(project(":compiler:frontend.java"))
++    compileOnly(project(":compiler:frontend.script"))
++    compileOnly(project(":compiler:psi"))
++    compileOnly(project(":compiler:cli-common"))
++    compile(project(":kotlin-scripting-common"))
++    compile(project(":kotlin-scripting-jvm"))
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++    compileOnly(project(":kotlin-reflect-api"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["asm-all"], rootProject) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++        java.srcDirs("test", "tests")
++    }
++}
++
++tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinCompile) {
++    kotlinOptions {
++        languageVersion = "1.2"
++        apiVersion = "1.2"
++        freeCompilerArgs += "-Xskip-metadata-version-check"
++    }
++}
++
++//publish()
++
++ArtifactsKt.customRuntimeJar(project){}
++ArtifactsKt.customSourcesJar(project,"main",{})
++//javadocJar()
++
++ArtifactsKt.customDist(project,null,null,null,{})
++
++ArtifactsKt.customIdeaPlugin(project,"lib") {}
++
++TasksKt.customProjectTest(project,"test"){
++	it.workingDir = rootDir
++}
+--- a/plugins/scripting/scripting-impl/build.gradle.kts
++++ /dev/null
+@@ -1,48 +0,0 @@
+-
+-description = "Kotlin Scripting Implementation - shared part"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compileOnly(project(":compiler:frontend"))
+-    compileOnly(project(":compiler:frontend.java"))
+-    compileOnly(project(":compiler:frontend.script"))
+-    compileOnly(project(":compiler:psi"))
+-    compileOnly(project(":compiler:cli-common"))
+-    compile(project(":kotlin-scripting-common"))
+-    compile(project(":kotlin-scripting-jvm"))
+-    compile(kotlinStdlib())
+-    compileOnly(project(":kotlin-reflect-api"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("asm-all", rootProject = rootProject) }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>> {
+-    kotlinOptions {
+-        languageVersion = "1.2"
+-        apiVersion = "1.2"
+-        freeCompilerArgs += "-Xskip-metadata-version-check"
+-    }
+-}
+-
+-publish()
+-
+-val jar = runtimeJar {}
+-sourcesJar()
+-javadocJar()
+-
+-dist()
+-
+-ideaPlugin()
+-
+-projectTest {
+-    workingDir = rootDir
+-}
+--- a/plugins/scripting/scripting-impl/src/org/jetbrains/kotlin/scripting/shared/definitions/asmBasedAnnotationsLoading.kt
++++ b/plugins/scripting/scripting-impl/src/org/jetbrains/kotlin/scripting/shared/definitions/asmBasedAnnotationsLoading.kt
+@@ -17,13 +17,13 @@
+     val args: ArrayList<BinAnnArgData> = arrayListOf()
+ )
+ 
+-private class TemplateAnnotationVisitor(val anns: ArrayList<BinAnnData> = arrayListOf()) : AnnotationVisitor(Opcodes.API_VERSION) {
++private class TemplateAnnotationVisitor(val anns: ArrayList<BinAnnData> = arrayListOf()) : AnnotationVisitor(458752) {
+     override fun visit(name: String?, value: Any?) {
+         anns.last().args.add(BinAnnArgData(name, value.toString()))
+     }
+ }
+ 
+-private class TemplateClassVisitor(val annVisitor: TemplateAnnotationVisitor) : ClassVisitor(Opcodes.API_VERSION) {
++private class TemplateClassVisitor(val annVisitor: TemplateAnnotationVisitor) : ClassVisitor(458752) {
+     override fun visitAnnotation(desc: String, visible: Boolean): AnnotationVisitor? {
+         val shortName = Type.getType(desc).internalName.substringAfterLast("/")
+         if (shortName.startsWith("KotlinScript") || shortName.startsWith("ScriptTemplate")) {
+--- /dev/null
++++ b/plugins/source-sections/source-sections-compiler/build.gradle
+@@ -0,0 +1,51 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin SourceSections Compiler Plugin"
++
++dependencies {
++    compileOnly(project(":compiler:frontend"))
++    compileOnly(project(":compiler:frontend.script"))
++    compileOnly(project(":compiler:plugin-api"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++
++    testCompile(project(":compiler:frontend"))
++    testCompile(project(":compiler:frontend.script"))
++    testCompile(project(":compiler:plugin-api"))
++    testCompile(project(":compiler:util"))
++    testCompile(project(":compiler:cli"))
++    testCompile(project(":compiler:cli-common"))
++    testCompile(project(":compiler:frontend.java"))
++    testCompile(project(":compiler:daemon-common"))
++    testCompile(DependenciesKt.customProjectRuntimeJar(it,":kotlin-daemon-client"))
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++    testCompileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    testCompile(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["idea", "idea_rt", "openapi", "log4j", "jdom", "jps-model"],null) }
++    testRuntime(project(":kotlin-reflect"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++    	java.srcDirs("test", "tests")
++    }
++}
++
++TasksKt.customProjectTest(project,"test"){
++    it.workingDir = rootDir
++}
++
++//publish()
++
++ArtifactsKt.customRuntimeJar(project){}
++ArtifactsKt.customSourcesJar(project,"main"){}
++//javadocJar()
++
++ArtifactsKt.customDist(project,null,null,null) {}
+--- a/plugins/source-sections/source-sections-compiler/build.gradle.kts
++++ /dev/null
+@@ -1,47 +0,0 @@
+-
+-description = "Kotlin SourceSections Compiler Plugin"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-
+-dependencies {
+-    compileOnly(project(":compiler:frontend"))
+-    compileOnly(project(":compiler:frontend.script"))
+-    compileOnly(project(":compiler:plugin-api"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-
+-    testCompile(project(":compiler:frontend"))
+-    testCompile(project(":compiler:frontend.script"))
+-    testCompile(project(":compiler:plugin-api"))
+-    testCompile(project(":compiler:util"))
+-    testCompile(project(":compiler:cli"))
+-    testCompile(project(":compiler:cli-common"))
+-    testCompile(project(":compiler:frontend.java"))
+-    testCompile(project(":compiler:daemon-common"))
+-    testCompile(projectRuntimeJar(":kotlin-daemon-client"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(commonDep("junit:junit"))
+-    testCompileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    testCompile(intellijDep()) { includeJars("idea", "idea_rt", "openapi", "log4j", "jdom", "jps-model") }
+-    testRuntime(project(":kotlin-reflect"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-projectTest {
+-    workingDir = rootDir
+-}
+-
+-publish()
+-
+-runtimeJar()
+-sourcesJar()
+-javadocJar()
+-
+-dist()
