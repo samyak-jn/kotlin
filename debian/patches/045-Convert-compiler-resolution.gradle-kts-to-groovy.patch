@@ -1,0 +1,45 @@
+Description: Final changes are made to compiler/resolution/build.gradle.kts
+
+---
+
+--- /dev/null
++++ b/compiler/resolution/build.gradle
+@@ -0,0 +1,19 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":core:descriptors"))
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["trove4j"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
+--- a/compiler/resolution/build.gradle.kts
++++ /dev/null
+@@ -1,16 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":core:descriptors"))
+-    compileOnly(intellijDep()) { includeJars("trove4j") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}

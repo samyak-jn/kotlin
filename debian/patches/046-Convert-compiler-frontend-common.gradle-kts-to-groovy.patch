@@ -1,0 +1,26 @@
+Description: Final changes are made to compiler/resolution/build.gradle
+
+---
+
+--- /dev/null
++++ b/compiler/frontend.common/build.gradle
+@@ -0,0 +1,19 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:psi"))
++    compile(project(":compiler:container"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++                resources.srcDir("resources")
++        }
++    "test" {}
++}

@@ -1,0 +1,35 @@
+Description: Final changes are made to compiler/frontend/build.gradle
+
+---
+
+--- /dev/null
++++ b/compiler/frontend/build.gradle
+@@ -0,0 +1,28 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":kotlin-annotations-jvm"))
++    compile(project(":core:descriptors"))
++    compile(project(":core:deserialization"))
++    compile(project(":compiler:util"))
++    compile(project(":compiler:container"))
++    compile(project(":compiler:resolution"))
++    compile(project(":compiler:psi"))
++    compile(project(":compiler:frontend.common"))
++    compile(project(":kotlin-script-runtime"))
++    compile(DependenciesKt.customCommonDep(project,"io.javaslang","javaslang",[]))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["trove4j", "guava"], rootProject) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}

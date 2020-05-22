@@ -1,0 +1,54 @@
+Description: Final changes are made to compiler/util/build.gradle
+
+---
+
+--- /dev/null
++++ b/compiler/util/build.gradle
+@@ -0,0 +1,22 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++    compile(project(":core:deserialization"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeIntellijCoreJarDependencies(it,project) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"jps-standalone")) { IntellijDependenciesKt.customIncludeJars(it,["jps-model"],null) }
++}
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++		resources.srcDir("resources")
++        resources.srcDir(new File(rootDir, "resources"))
++    }
++    "test" {}
++}
+--- a/compiler/util/build.gradle.kts
++++ /dev/null
+@@ -1,22 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(kotlinStdlib())
+-    compile(project(":core:deserialization"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeIntellijCoreJarDependencies(project) }
+-    compileOnly(intellijDep("jps-standalone")) { includeJars("jps-model") }
+-}
+-
+-sourceSets {
+-    "main" {
+-        projectDefault()
+-        resources.srcDir(File(rootDir, "resources"))
+-    }
+-    "test" {}
+-}
+-

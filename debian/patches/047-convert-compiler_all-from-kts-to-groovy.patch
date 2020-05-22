@@ -1,0 +1,1151 @@
+Description: This patch converts all the major conversion from kts to groovy.
+
+---
+
+
+--- a/compiler/backend-common/build.gradle.kts
++++ /dev/null
+@@ -1,21 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":core:descriptors"))
+-    compile(project(":core:descriptors.jvm"))
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:ir.tree"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-}
+-
+-sourceSets {
+-    "main" {
+-        projectDefault()
+-    }
+-    "test" {}
+-}
+--- a/compiler/backend/build.gradle.kts
++++ /dev/null
+@@ -1,21 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":kotlin-annotations-jvm"))
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:backend-common"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:frontend.java"))
+-    compile(project(":compiler:serialization"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core", "asm-all", rootProject = rootProject) }
+-}
+-
+-sourceSets {
+-    "main" {
+-        projectDefault()
+-    }
+-    "test" {}
+-}
+--- a/compiler/cli/build.gradle.kts
++++ /dev/null
+@@ -1,56 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-jvmTarget = "1.8"
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:cli-common"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:frontend.java"))
+-    compile(project(":compiler:frontend.script"))
+-    compile(project(":compiler:backend-common"))
+-    compile(project(":compiler:backend"))
+-    compile(project(":compiler:backend.jvm"))
+-    compile(project(":compiler:light-classes"))
+-    compile(project(":compiler:serialization"))
+-    compile(project(":compiler:plugin-api"))
+-    compile(project(":js:js.translator"))
+-    compile(project(":js:js.serializer"))
+-    compile(project(":js:js.dce"))
+-    compile(commonDep("org.fusesource.jansi", "jansi"))
+-    compile(commonDep("org.jline", "jline"))
+-    compile(files("${System.getProperty("java.home")}/../lib/tools.jar"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeIntellijCoreJarDependencies(project) }
+-
+-    testCompile(project(":compiler:backend"))
+-    testCompile(project(":compiler:cli"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(commonDep("junit:junit"))
+-}
+-
+-sourceSets {
+-    "main" {
+-        projectDefault()
+-        java.srcDirs("../builtins-serializer/src",
+-                     "../javac-wrapper/src")
+-    }
+-    "test" { }
+-}
+-
+-tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>> {
+-    kotlinOptions {
+-        languageVersion = "1.2"
+-        apiVersion = "1.2"
+-        freeCompilerArgs += "-Xskip-metadata-version-check"
+-    }
+-}
+-
+-testsJar {}
+-
+-projectTest {
+-    workingDir = rootDir
+-}
+--- a/compiler/cli/cli-common/build.gradle.kts
++++ /dev/null
+@@ -1,20 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":core:util.runtime"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:frontend.java"))
+-    compile(project(":compiler:frontend.script"))
+-    compileOnly(project(":kotlin-reflect-api"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeIntellijCoreJarDependencies(project) }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+--- a/compiler/cli/cli-runner/build.gradle.kts
++++ /dev/null
+@@ -1,24 +0,0 @@
+-
+-description = "Kotlin Runner"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(kotlinStdlib())
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-runtimeJar {
+-    manifest.attributes.put("Main-Class", "org.jetbrains.kotlin.runner.Main")
+-    manifest.attributes.put("Class-Path", "kotlin-stdlib.jar")
+-}
+-
+-dist()
+-
+--- a/compiler/compiler-runner/build.gradle.kts
++++ b/compiler/compiler-runner/build.gradle.kts
+@@ -1,4 +1,3 @@
+-
+ import org.gradle.jvm.tasks.Jar
+ 
+ description = "Compiler runner + daemon client"
+--- a/compiler/daemon/build.gradle.kts
++++ /dev/null
+@@ -1,22 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:cli"))
+-    compile(project(":compiler:daemon-common"))
+-    compile(project(":compiler:incremental-compilation-impl"))
+-    compile(project(":kotlin-build-common"))
+-    compile(commonDep("org.fusesource.jansi", "jansi"))
+-    compile(commonDep("org.jline", "jline"))
+-    compileOnly(project(":kotlin-scripting-compiler"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeIntellijCoreJarDependencies(project) }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+--- a/compiler/daemon/daemon-client/build.gradle.kts
++++ /dev/null
+@@ -1,59 +0,0 @@
+-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+-
+-description = "Kotlin Daemon Client"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-val nativePlatformVariants = listOf(
+-    "windows-amd64",
+-    "windows-i386",
+-    "osx-amd64",
+-    "osx-i386",
+-    "linux-amd64",
+-    "linux-i386",
+-    "freebsd-amd64-libcpp",
+-    "freebsd-amd64-libstdcpp",
+-    "freebsd-i386-libcpp",
+-    "freebsd-i386-libstdcpp"
+-)
+-
+-dependencies {
+-    compileOnly(project(":compiler:util"))
+-    compileOnly(project(":compiler:cli-common"))
+-    compileOnly(project(":compiler:daemon-common"))
+-    compileOnly(project(":kotlin-reflect-api"))
+-    compileOnly(project(":js:js.frontend"))
+-    compileOnly(commonDep("net.rubygrapefruit", "native-platform"))
+-    compileOnly(intellijDep()) { includeIntellijCoreJarDependencies(project) }
+-
+-    embeddedComponents(project(":compiler:daemon-common")) { isTransitive = false }
+-    embeddedComponents(commonDep("net.rubygrapefruit", "native-platform"))
+-    nativePlatformVariants.forEach {
+-        embeddedComponents(commonDep("net.rubygrapefruit", "native-platform", "-$it"))
+-    }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-publish()
+-
+-noDefaultJar()
+-
+-runtimeJar(task<ShadowJar>("shadowJar")) {
+-    from(mainSourceSet.output)
+-    fromEmbeddedComponents()
+-}
+-
+-sourcesJar()
+-
+-javadocJar()
+-
+-dist()
+-
+-ideaPlugin()
+--- a/compiler/daemon/daemon-common/build.gradle.kts
++++ /dev/null
+@@ -1,22 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":core:descriptors"))
+-    compile(project(":core:descriptors.jvm"))
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:cli-common"))
+-    compile(kotlinStdlib())
+-    compileOnly(project(":js:js.frontend"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeIntellijCoreJarDependencies(project) }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- a/compiler/frontend.common/build.gradle.kts
++++ /dev/null
+@@ -1,18 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:psi"))
+-    compile(project(":compiler:container"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-}
+-
+-
+-sourceSets {
+-    "main" {
+-        projectDefault()
+-    }
+-    "test" {}
+-}
+\ No newline at end of file
+--- /dev/null
++++ b/compiler/frontend.java/build.gradle
+@@ -0,0 +1,25 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":core:descriptors"))
++    compile(project(":core:descriptors.jvm"))
++    compile(project(":compiler:util"))
++
++    if (IdeCompatibilityDslKt.PlatformOrHigher(182)) {
++        compile("javax.annotation:jsr250-api:1.0")
++    }
++    compile(project(":compiler:frontend"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["asm-all", "trove4j", "guava"], rootProject) }
++}
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++                resources.srcDir("resources")
++        }
++    "test" {}
++}
+--- a/compiler/frontend.java/build.gradle.kts
++++ /dev/null
+@@ -1,22 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":core:descriptors"))
+-    compile(project(":core:descriptors.jvm"))
+-    compile(project(":compiler:util"))
+-    if (Platform[182].orHigher()) {
+-        compile("javax.annotation:jsr250-api:1.0")
+-    }
+-    compile(project(":compiler:frontend"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("asm-all", "trove4j", "guava", rootProject = rootProject) }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- a/compiler/frontend.script/build.gradle.kts
++++ /dev/null
+@@ -1,20 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(kotlinStdlib())
+-    compileOnly(project(":kotlin-reflect-api"))
+-    compile(commonDep("org.jetbrains.kotlinx", "kotlinx-coroutines-core")) { isTransitive = false }
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    runtimeOnly(project(":kotlin-reflect"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+--- a/compiler/incremental-compilation-impl/build.gradle.kts
++++ /dev/null
+@@ -1,37 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":core:descriptors"))
+-    compile(project(":core:descriptors.jvm"))
+-    compile(project(":core:deserialization"))
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:frontend.java"))
+-    compile(project(":compiler:cli"))
+-    compile(project(":kotlin-build-common"))
+-    compile(project(":compiler:daemon-common"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-
+-    testCompile(commonDep("junit:junit"))
+-    testCompile(project(":kotlin-test:kotlin-test-junit"))
+-    testCompile(kotlinStdlib())
+-    testCompile(projectTests(":kotlin-build-common"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    testCompile(intellijDep()) { includeJars("log4j", "jdom") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-projectTest {
+-    workingDir = rootDir
+-}
+-
+-testsJar()
+--- a/compiler/ir/backend.common/build.gradle.kts
++++ /dev/null
+@@ -1,18 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:backend-common"))
+-    compile(project(":compiler:ir.tree"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- a/compiler/ir/backend.js/build.gradle.kts
++++ /dev/null
+@@ -1,23 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:backend-common"))
+-    compile(project(":compiler:ir.tree"))
+-    compile(project(":compiler:ir.psi2ir"))
+-    compile(project(":compiler:ir.backend.common"))
+-    compile(project(":js:js.ast"))
+-    compile(project(":js:js.frontend"))
+-
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- a/compiler/ir/backend.jvm/build.gradle.kts
++++ /dev/null
+@@ -1,20 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":kotlin-annotations-jvm"))
+-    compile(project(":compiler:backend"))
+-    compile(project(":compiler:ir.tree"))
+-    compile(project(":compiler:ir.psi2ir"))
+-    compile(project(":compiler:ir.backend.common"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core", "asm-all", rootProject = rootProject) }
+-}
+-
+-sourceSets {
+-    "main" {
+-        projectDefault()
+-    }
+-    "test" {}
+-}
+--- a/compiler/ir/ir.psi2ir/build.gradle.kts
++++ /dev/null
+@@ -1,18 +0,0 @@
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:backend-common"))
+-    compile(project(":compiler:ir.tree"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- a/compiler/ir/ir.tree/build.gradle.kts
++++ /dev/null
+@@ -1,19 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(intellijDep())
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:frontend.java"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- a/compiler/light-classes/build.gradle.kts
++++ /dev/null
+@@ -1,20 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:backend"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:frontend.java"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("asm-all", "trove4j", "guava", rootProject = rootProject) }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- a/compiler/preloader/build.gradle.kts
++++ /dev/null
+@@ -1,26 +0,0 @@
+-
+-description = "Kotlin Preloader"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compileOnly(intellijDep()) { includeJars("asm-all", rootProject = rootProject) }
+-}
+-
+-sourceSets {
+-    "main" {
+-        java {
+-            srcDirs( "src", "instrumentation/src")
+-        }
+-    }
+-    "test" {}
+-}
+-
+-runtimeJar {
+-    manifest.attributes.put("Main-Class", "org.jetbrains.kotlin.preloading.Preloader")
+-}
+-
+-dist()
+--- a/compiler/serialization/build.gradle.kts
++++ /dev/null
+@@ -1,17 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":core:descriptors"))
+-    compile(project(":core:deserialization"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+--- /dev/null
++++ b/compiler/backend/build.gradle
+@@ -0,0 +1,22 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":kotlin-annotations-jvm"))
++    compile(project(":compiler:util"))
++    compile(project(":compiler:backend-common"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:frontend.java"))
++    compile(project(":compiler:serialization"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core", "asm-all"], rootProject) }
++}
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++                resources.srcDir("resources")
++        }
++    "test" {}
++}
+--- /dev/null
++++ b/compiler/backend-common/build.gradle
+@@ -0,0 +1,21 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":core:descriptors"))
++    compile(project(":core:descriptors.jvm"))
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:ir.tree"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++                resources.srcDir("resources")
++        }
++    "test" {}
++}
+--- /dev/null
++++ b/compiler/cli/build.gradle
+@@ -0,0 +1,57 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++jvmTarget = "1.8"
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:cli-common"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:frontend.java"))
++    compile(project(":compiler:frontend.script"))
++    compile(project(":compiler:backend-common"))
++    compile(project(":compiler:backend"))
++    compile(project(":compiler:backend.jvm"))
++    compile(project(":compiler:light-classes"))
++    compile(project(":compiler:serialization"))
++    compile(project(":compiler:plugin-api"))
++    compile(project(":js:js.translator"))
++    compile(project(":js:js.serializer"))
++    compile(project(":js:js.dce"))
++    compile(DependenciesKt.customCommonDep(project,"org.fusesource.jansi", "jansi",[]))
++    compile(DependenciesKt.customCommonDep(project,"org.jline", "jline",[]))
++    compile(files("${System.getProperty("java.home")}/../lib/tools.jar"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeIntellijCoreJarDependencies(it,project) }
++
++    testCompile(project(":compiler:backend"))
++    testCompile(project(":compiler:cli"))
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++}
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++		resources.srcDir("resources")
++        java.srcDirs("../builtins-serializer/src",
++                     "../javac-wrapper/src")
++    }
++    "test" { }
++}
++
++tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinCompile) {
++    kotlinOptions {
++        languageVersion = "1.2"
++        apiVersion = "1.2"
++        freeCompilerArgs += "-Xskip-metadata-version-check"
++    }
++}
++
++ArtifactsKt.customTestsJar(project){}
++
++TasksKt.customProjectTest(project,"test") {
++    it.workingDir = rootDir
++}
+--- /dev/null
++++ b/compiler/cli/cli-common/build.gradle
+@@ -0,0 +1,22 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":core:util.runtime"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:frontend.java"))
++    compile(project(":compiler:frontend.script"))
++    compileOnly(project(":kotlin-reflect-api"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeIntellijCoreJarDependencies(it,project) }
++}
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++                resources.srcDir("resources")
++        }
++    "test" {}
++}
+--- /dev/null
++++ b/compiler/cli/cli-runner/build.gradle
+@@ -0,0 +1,25 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin Runner"
++
++dependencies {
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++}
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++                resources.srcDir("resources")
++        }
++    "test" {}
++}
++
++ArtifactsKt.customRuntimeJar(project) {
++    it.manifest.attributes.put("Main-Class", "org.jetbrains.kotlin.runner.Main")
++    it.manifest.attributes.put("Class-Path", "kotlin-stdlib.jar")
++}
++
++ArtifactsKt.customDist(project,null,null,null){}
+--- /dev/null
++++ b/compiler/daemon/build.gradle
+@@ -0,0 +1,24 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:cli"))
++    compile(project(":compiler:daemon-common"))
++    compile(project(":compiler:incremental-compilation-impl"))
++    compile(project(":kotlin-build-common"))
++    compile(DependenciesKt.customCommonDep(project,"org.fusesource.jansi", "jansi",[]))
++    compile(DependenciesKt.customCommonDep(project,"org.jline", "jline",[]))
++    compileOnly(project(":kotlin-scripting-compiler"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeIntellijCoreJarDependencies(it,project) }
++}
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++                resources.srcDir("resources")
++        }
++    "test" {}
++}
+--- /dev/null
++++ b/compiler/daemon/daemon-client/build.gradle
+@@ -0,0 +1,53 @@
++import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin Daemon Client"
++
++ext.nativePlatformVariants = [
++    "linux-amd64"
++]
++
++dependencies {
++    compileOnly(project(":compiler:util"))
++    compileOnly(project(":compiler:cli-common"))
++    compileOnly(project(":compiler:daemon-common"))
++    compileOnly(project(":kotlin-reflect-api"))
++    compileOnly(project(":js:js.frontend"))
++    compileOnly(DependenciesKt.customCommonDep(project,"net.rubygrapefruit", "native-platform",[]))
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeIntellijCoreJarDependencies(it,project) }
++
++    embeddedComponents(project(":compiler:daemon-common")) { setTransitive(false) }
++    embeddedComponents(DependenciesKt.customCommonDep(project,"net.rubygrapefruit", "native-platform",[]))
++    nativePlatformVariants.each {
++        embeddedComponents(DependenciesKt.customCommonDep(project,"net.rubygrapefruit", "native-platform", ["-$it".toString()]))
++    }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
++//publish()
++
++ArtifactsKt.customNoDefaultJar(project)
++
++ArtifactsKt.customRuntimeJar(project,task("shadowJar",type:ShadowJar)) {
++    it.from(SourceSetsKt.customMainSourceSet(project).output)
++    DependenciesKt.customFromEmbeddedComponents(it)
++}
++
++ArtifactsKt.customSourcesJar(project,"main"){}
++
++//javadocJar()
++
++ArtifactsKt.customDist(project,null,null,null){}
++
++ArtifactsKt.customIdeaPlugin(project)
+--- /dev/null
++++ b/compiler/daemon/daemon-common/build.gradle
+@@ -0,0 +1,23 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":core:descriptors"))
++    compile(project(":core:descriptors.jvm"))
++    compile(project(":compiler:util"))
++    compile(project(":compiler:cli-common"))
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++    compileOnly(project(":js:js.frontend"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeIntellijCoreJarDependencies(it,project) }
++}
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++                resources.srcDir("resources")
++        }
++    "test" {}
++}
+--- /dev/null
++++ b/compiler/frontend.script/build.gradle
+@@ -0,0 +1,23 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++    compileOnly(project(":kotlin-reflect-api"))
++    compile(DependenciesKt.customCommonDep(project,"org.jetbrains.kotlinx", "kotlinx-coroutines-core",[])) { setTransitive(false) }
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    runtimeOnly(project(":kotlin-reflect"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
+--- /dev/null
++++ b/compiler/incremental-compilation-impl/build.gradle
+@@ -0,0 +1,42 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":core:descriptors"))
++    compile(project(":core:descriptors.jvm"))
++    compile(project(":core:deserialization"))
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:frontend.java"))
++    compile(project(":compiler:cli"))
++    compile(project(":kotlin-build-common"))
++    compile(project(":compiler:daemon-common"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++    //testCompile(project(":kotlin-test:kotlin-test-junit"))
++    testCompile(DependenciesKt.customKotlinStdlib(project,null))
++    testCompile(DependenciesKt.customProjectTests(it,":kotlin-build-common"))
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    testCompile(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["log4j", "jdom"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++        java.srcDirs("test", "tests")
++    }
++}
++
++TasksKt.customProjectTest(project,"test"){
++	it.workingDir = rootDir
++}
++
++ArtifactsKt.customTestsJar(project){}
+--- /dev/null
++++ b/compiler/ir/backend.common/build.gradle
+@@ -0,0 +1,21 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:backend-common"))
++    compile(project(":compiler:ir.tree"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
+--- /dev/null
++++ b/compiler/ir/backend.js/build.gradle
+@@ -0,0 +1,26 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:backend-common"))
++    compile(project(":compiler:ir.tree"))
++    compile(project(":compiler:ir.psi2ir"))
++    compile(project(":compiler:ir.backend.common"))
++    compile(project(":js:js.ast"))
++    compile(project(":js:js.frontend"))
++
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
+--- /dev/null
++++ b/compiler/ir/backend.jvm/build.gradle
+@@ -0,0 +1,21 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":kotlin-annotations-jvm"))
++    compile(project(":compiler:backend"))
++    compile(project(":compiler:ir.tree"))
++    compile(project(":compiler:ir.psi2ir"))
++    compile(project(":compiler:ir.backend.common"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
+--- /dev/null
++++ b/compiler/ir/ir.psi2ir/build.gradle
+@@ -0,0 +1,21 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:backend-common"))
++    compile(project(":compiler:ir.tree"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
+--- /dev/null
++++ b/compiler/ir/ir.tree/build.gradle
+@@ -0,0 +1,23 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["asm-all-7.0","guava-25.1-jre","trove4j","platform-api","util","platform-impl","extensions"],null) }
++    compileOnly("org.ow2.asm:asm-all:debian")
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:frontend.java"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
+--- /dev/null
++++ b/compiler/light-classes/build.gradle
+@@ -0,0 +1,23 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:backend"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:frontend.java"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["asm-all", "trove4j", "guava"], rootProject) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
+--- /dev/null
++++ b/compiler/preloader/build.gradle
+@@ -0,0 +1,26 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin Preloader"
++
++dependencies {
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["asm-all"], rootProject) }
++}
++
++sourceSets {
++    "main" {
++        java {
++            srcDirs( "src", "instrumentation/src")
++        }
++    }
++    "test" {}
++}
++
++ArtifactsKt.customRuntimeJar(project) {
++    it.manifest.attributes.put("Main-Class", "org.jetbrains.kotlin.preloading.Preloader")
++}
++
++ArtifactsKt.customDist(project,null,null,null,{})
+--- /dev/null
++++ b/compiler/serialization/build.gradle
+@@ -0,0 +1,20 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":core:descriptors"))
++    compile(project(":core:deserialization"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}

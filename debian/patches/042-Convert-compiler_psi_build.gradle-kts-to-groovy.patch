@@ -1,0 +1,97 @@
+Description: Convert compiler/psi/build.gradle.kts to groovy
+
+---
+
+--- /dev/null
++++ b/compiler/psi/build.gradle
+@@ -0,0 +1,45 @@
++/*
++ * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++repositories {
++    maven({url("https://jetbrains.bintray.com/intellij-third-party-dependencies")})
++}
++
++configurations.create("jflexPath")
++
++dependencies {
++    /*val compile by configurations
++    val compileOnly by configurations*/
++
++    compile(project(":core:descriptors"))
++    compile(project(":compiler:util"))
++    compile(project(":kotlin-script-runtime"))
++
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["guava", "trove4j"],rootProject) }
++
++    jflexPath(DependenciesKt.customCommonDep(project,"org.jetbrains.intellij.deps.jflex", "jflex",[]))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++    }
++    "test" {}
++}
++
++
++
++ant.importBuild("buildLexer.xml")
++
++ant.properties["builddir"] = buildDir.absolutePath
++ant.properties["flex.classpath"] = configurations.jflexPath.asPath
+--- a/compiler/psi/build.gradle.kts
++++ /dev/null
+@@ -1,42 +0,0 @@
+-/*
+- * Copyright 2000-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+- * that can be found in the license/LICENSE.txt file.
+- */
+-
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-repositories {
+-    maven("https://jetbrains.bintray.com/intellij-third-party-dependencies")
+-}
+-
+-val jflexPath by configurations.creating
+-
+-dependencies {
+-    val compile by configurations
+-    val compileOnly by configurations
+-
+-    compile(project(":core:descriptors"))
+-    compile(project(":compiler:util"))
+-    compile(project(":kotlin-script-runtime"))
+-
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("guava", "trove4j", rootProject = rootProject) }
+-
+-    jflexPath(commonDep("org.jetbrains.intellij.deps.jflex", "jflex"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-
+-
+-ant.importBuild("buildLexer.xml")
+-
+-ant.properties["builddir"] = buildDir.absolutePath
+-ant.properties["flex.classpath"] = jflexPath.asPath

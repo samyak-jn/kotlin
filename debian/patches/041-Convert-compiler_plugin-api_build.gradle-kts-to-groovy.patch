@@ -1,0 +1,45 @@
+Description: Final changes are made to compiler/plugin-api/build.gradle
+
+---
+
+--- /dev/null
++++ b/compiler/plugin-api/build.gradle
+@@ -0,0 +1,19 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
+--- a/compiler/plugin-api/build.gradle.kts
++++ /dev/null
+@@ -1,16 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}

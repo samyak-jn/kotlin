@@ -35,6 +35,12 @@
 035-Convert-core-metadata-build.gradle.kts.patch
 036-final-update-dependencies_kt.patch
 036-final-update-artifacts_kt.patch
-038-final-update-tasks_kt.patch
 039-final-update-AndroidSdkDependencies_kt.patch
 040-Convert-core-deserialization-build.gradle.kts-to-groovy.patch
+041-Convert-compiler_plugin-api_build.gradle-kts-to-groovy.patch
+042-Convert-compiler_psi_build.gradle-kts-to-groovy.patch
+043-Convert-compiler-util.gradle-kts-to-groovy.patch
+044-Convert-compiler-frontend.gradle-kts-to-groovy.patch
+045-Convert-compiler-resolution.gradle-kts-to-groovy.patch
+046-Convert-compiler-frontend-common.gradle-kts-to-groovy.patch
+047-convert-compiler_all-from-kts-to-groovy.patch
