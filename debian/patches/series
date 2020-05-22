@@ -49,3 +49,4 @@
 050-convert-build-common_kts-to-groovy-add-intermediate-methods.patch
 051-remove-kotlin-ultimate.iml-from-ulitmate.patch
 052-convert-prepare-kts-to-groovy-add-method.patch
+053-convert-libraries-from-kts-to-groovy-add-intermediate-methods.patch

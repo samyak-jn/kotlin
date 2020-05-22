@@ -1,0 +1,4448 @@
+Description: Update libraries dir to make compatible to build with gradle
+ This patch adds build.gradle and remove kts file.
+ Added an intermediatory method for protobufFUll() called customProtobufFull().
+ Finished converting files to groovy and added an intemediatory method for
+ protobugFUll(), Ignored openapi.jar and remove unwanted dependencies.
+ Excluded the org.jetbrains:common since it shares classes with org.jetbrains:annotation.
+Author: Saif Abdul Casim
+---
+
+--- a/libraries/kotlin.test/junit5/build.gradle
++++ b/libraries/kotlin.test/junit5/build.gradle
+@@ -45,7 +45,7 @@
+     kotlinOptions.freeCompilerArgs = ["-Xallow-kotlin-package"]
+ }
+ 
+-test {
++/*test {
+     useJUnitPlatform()
+     executable = "$JDK_18/bin/java"
+-}
++}*/
+--- a/libraries/kotlin.test/jvm/build.gradle
++++ b/libraries/kotlin.test/jvm/build.gradle
+@@ -22,7 +22,7 @@
+ dependencies {
+     expectedBy project(':kotlin-test:kotlin-test-common')
+     compile kotlinStdlib()
+-    testCompile project(":kotlin-test:kotlin-test-junit")
++    //testCompile project(":kotlin-test:kotlin-test-junit")
+     testCompile('junit:junit:4.12')
+ }
+ 
+--- /dev/null
++++ b/libraries/reflect/build.gradle
+@@ -0,0 +1,239 @@
++import com.github.jengelman.gradle.plugins.shadow.transformers.Transformer
++import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
++import com.github.jengelman.gradle.plugins.shadow.transformers.TransformerContext
++import org.jetbrains.kotlin.pill.PillExtension
++import proguard.gradle.ProGuardTask
++import org.apache.tools.zip.ZipEntry
++import org.apache.tools.zip.ZipOutputStream
++import kotlinx.metadata.jvm.KotlinModuleMetadata
++import kotlinx.metadata.jvm.KmModuleVisitor
++
++buildscript {
++    repositories {
++        maven({url("https://kotlin.bintray.com/kotlinx/")})
++    }
++
++    dependencies {
++        classpath("org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.0.4")
++    }
++}
++
++plugins {
++    id("java")
++    id("pill-configurable")
++}
++
++description = "Kotlin Full Reflection Library"
++println("weehadd")
++println(project)
++CommonUtilKt.customCallGroovy(project,"configureJavaOnlyJvm6Project", [project])
++//publish()
++
++pill {
++    importAsLibrary = true
++}
++
++ext.core = "$rootDir/core"
++ext.relocatedCoreSrc = "$buildDir/core-relocated"
++ext.libsDir = property("libsDir")
++
++
++configurations.create("proguardDeps")
++configurations.create("proguardAdditionalInJars")
++configurations.create("shadows") {
++    setTransitive(false)
++}
++configurations.getByName("compileOnly").extendsFrom(configurations.shadows)
++configurations.create("mainJar")
++
++dependencies {
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++
++    proguardDeps(DependenciesKt.customKotlinStdlib(project,null))
++    proguardAdditionalInJars(project(":kotlin-annotations-jvm"))
++    proguardDeps(files(DependenciesKt.customFirstFromJavaHomeThatExists(project,["./jre/lib/rt.jar", "../Classes/classes.jar"], new File(property("JDK_16") as String))))
++
++    shadows(project(":kotlin-reflect-api"))
++    shadows(project(":core:metadata"))
++    shadows(project(":core:metadata.jvm"))
++    shadows(project(":core:descriptors"))
++    shadows(project(":core:descriptors.jvm"))
++    shadows(project(":core:deserialization"))
++    shadows(project(":core:descriptors.runtime"))
++    shadows(project(":core:util.runtime"))
++    shadows("javax.inject:javax.inject:1")
++    shadows(DependenciesKt.customProtobufLite(project))
++
++    compileOnly("org.jetbrains:annotations:13.0")
++}
++
++class KotlinModuleShadowTransformer implements Transformer {
++    private Logger logger
++    public static String KOTLIN_MODULE = "kotlin_module"
++    private class Entry{
++		public String path
++		public byte[] bytes
++		public Entry(String path,byte[] bytes){
++			this.path=path
++			this.bytes=bytes
++		}
++    }
++    private List<Entry> data = []
++	public KotlinModuleShadowTransformer(Logger logger){
++		this.logger=logger
++	}
++
++    boolean canTransformResource(FileTreeElement element){return element.path.tokenize('.')[-1] == KOTLIN_MODULE}
++	String relocate(TransformerContext context,String content){
++		for(relocator in context.relocators){
++			content = relocator.applyToSourceContent(content)
++		}
++		return content
++	}
++    void transform(TransformerContext context) {
++        def metadata = KotlinModuleMetadata.read(context.is.getBytes()) ?: error("Not a .kotlin_module file: ${context.path}")
++        def temper= new KotlinModuleMetadata()
++        def writer = new KotlinModuleMetadata.Writer()
++        logger.info("Transforming ${context.path}")
++        metadata.accept(new KmModuleVisitor(writer) {
++            void visitPackageParts(String fqName, List<String> fileFacades, Map<String, String> multiFileClassParts) {
++                assert(multiFileClassParts.isEmpty()) // There are no multi-file class parts in core
++                def fileFacadesTemp = fileFacades.collect {it=relocate(context,it)}
++                super.visitPackageParts(relocate(context,fqName), fileFacadesTemp, multiFileClassParts)
++            }
++        })
++        data += new Entry(context.path, writer.write().bytes)
++    }
++
++    boolean hasTransformedResource(){return !data.isEmpty()}
++
++    void modifyOutputStream(ZipOutputStream os, boolean preserveFileTimestamps) {
++        for (data in data) {
++            os.putNextEntry(ZipEntry(data.path))
++            os.write(data.bytes)
++        }
++        data.removeAll()
++    }
++}
++
++task("reflectShadowJar",type: ShadowJar) {
++    classifier = "shadow"
++    version = null
++    CommonUtilKt.customCallGroovy(project,"manifestAttributes", [manifest, project, "Main" /*true*/])
++
++    exclude("**/*.proto")
++
++    transform(new KotlinModuleShadowTransformer(logger))
++	println("mamamia")
++	println(project.configurations.shadows)
++    configurations = [project.configurations.shadows]
++    relocate("org.jetbrains.kotlin", "kotlin.reflect.jvm.internal.impl")
++    relocate("javax.inject", "kotlin.reflect.jvm.internal.impl.javax.inject")
++    mergeServiceFiles()
++}
++
++task("stripMetadata") {
++    dependsOn("reflectShadowJar")
++    def inputJar = reflectShadowJar.archivePath
++	println("Saif1")
++	println(reflectShadowJar.archivePath)
++    def outputJar = new File("$libsDir/kotlin-reflect-stripped.jar")
++    inputs.file(inputJar)
++    outputs.file(outputJar)
++    doLast {
++        StripMetadataKt.stripMetadata(logger, "kotlin/reflect/jvm/internal/impl/.*", inputJar, outputJar)
++    }
++}
++
++ext.proguardOutput = "$libsDir/${property("archivesBaseName")}-proguard.jar"
++
++task("proguard",type:ProGuardTask) {
++    dependsOn(stripMetadata)
++    configuration "$core/reflection.jvm/reflection.pro"
++    inputs.files(stripMetadata.outputs.files)
++    outputs.file(proguardOutput)
++
++    injars(stripMetadata.outputs.files,filter:"!META-INF/versions/**")
++    injars(project.configurations.proguardAdditionalInJars,filter:"!META-INF/**")
++    outjars(proguardOutput)
++
++    libraryjars(filter:"!META-INF/versions/**", project.configurations.proguardDeps)
++}
++
++task("relocateCoreSources", type: Copy) {
++    doFirst {
++        delete(relocatedCoreSrc)
++    }
++
++    from("$core/descriptors/src")
++    from("$core/descriptors.jvm/src")
++    from("$core/descriptors.runtime/src")
++    from("$core/deserialization/src")
++    from("$core/util.runtime/src")
++
++    exclude("META-INF/services/**")
++
++    into(relocatedCoreSrc)
++    includeEmptyDirs = false
++
++    eachFile {
++        path = path.replace("org/jetbrains/kotlin", "kotlin/reflect/jvm/internal/impl")
++    }
++
++    filter { line ->
++        line.replace("org.jetbrains.kotlin", "kotlin.reflect.jvm.internal.impl")
++    }
++}
++
++tasks.getByName("jar").enabled = false
++
++ext.sourcesJar = ArtifactsKt.customSourcesJar(project,null) {
++    it.dependsOn(relocateCoreSources)
++    it.from(relocatedCoreSrc)
++    it.from("$core/reflection.jvm/src")
++}
++
++task("result", type:Jar) {
++    dependsOn(proguard)
++    from(zipTree(file(proguardOutput)))
++//    from(zipTree(reflectShadowJar.archivePath)) {
++//        include("META-INF/versions/**")
++//    }
++    CommonUtilKt.customCallGroovy(project,"manifestAttributes", [manifest, project, "Main" /*true*/])
++}
++
++task("modularJar", type:Jar) {
++    dependsOn(proguard)
++    classifier = "modular"
++    from(zipTree(file(proguardOutput)))
++    from(zipTree(reflectShadowJar.archivePath)) {
++        include("META-INF/versions/**")
++    }
++    CommonUtilKt.customCallGroovy(project,"manifestAttributes", [manifest, project, "Main", true])
++}
++
++/*task("dexMethodCount", type:DexMethodCount) {
++    dependsOn(result)
++    jarFile = result.outputs.files.getSingleFile()
++    ownPackages = ["kotlin.reflect"]
++}
++tasks.getByName("check").dependsOn(dexMethodCount)*/
++
++artifacts {
++    def artifactJar = [
++        "file":result.outputs.files.getSingleFile(),
++        "builtBy":result,
++        "name":getArchivesBaseName()
++    ]
++
++    add(project.configurations.mainJar.name, artifactJar)
++    add("runtime", artifactJar)
++    add("archives", artifactJar)
++    add("archives", modularJar)
++}
++
++//javadocJar()
++
++ArtifactsKt.customDist(project,null,null,result) {
++    it.from(sourcesJar)
++}
+--- a/libraries/reflect/build.gradle.kts
++++ /dev/null
+@@ -1,229 +0,0 @@
+-import com.github.jengelman.gradle.plugins.shadow.transformers.Transformer
+-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+-import com.github.jengelman.gradle.plugins.shadow.transformers.TransformerContext
+-import org.gradle.kotlin.dsl.extra
+-import org.jetbrains.kotlin.pill.PillExtension
+-import proguard.gradle.ProGuardTask
+-import shadow.org.apache.tools.zip.ZipEntry
+-import shadow.org.apache.tools.zip.ZipOutputStream
+-import kotlinx.metadata.jvm.KotlinModuleMetadata
+-import kotlinx.metadata.jvm.KmModuleVisitor
+-
+-description = "Kotlin Full Reflection Library"
+-
+-buildscript {
+-    repositories {
+-        maven(url = "https://kotlin.bintray.com/kotlinx/")
+-    }
+-
+-    dependencies {
+-        classpath("org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.0.4")
+-    }
+-}
+-
+-plugins {
+-    java
+-    id("pill-configurable")
+-}
+-
+-callGroovy("configureJavaOnlyJvm6Project", this)
+-publish()
+-
+-pill {
+-    importAsLibrary = true
+-}
+-
+-val core = "$rootDir/core"
+-val relocatedCoreSrc = "$buildDir/core-relocated"
+-val libsDir = property("libsDir")
+-
+-
+-val proguardDeps by configurations.creating
+-val proguardAdditionalInJars by configurations.creating
+-val shadows by configurations.creating {
+-    isTransitive = false
+-}
+-configurations.getByName("compileOnly").extendsFrom(shadows)
+-val mainJar by configurations.creating
+-
+-dependencies {
+-    compile(kotlinStdlib())
+-
+-    proguardDeps(kotlinStdlib())
+-    proguardAdditionalInJars(project(":kotlin-annotations-jvm"))
+-    proguardDeps(files(firstFromJavaHomeThatExists("jre/lib/rt.jar", "../Classes/classes.jar", jdkHome = File(property("JDK_16") as String))))
+-
+-    shadows(project(":kotlin-reflect-api"))
+-    shadows(project(":core:metadata"))
+-    shadows(project(":core:metadata.jvm"))
+-    shadows(project(":core:descriptors"))
+-    shadows(project(":core:descriptors.jvm"))
+-    shadows(project(":core:deserialization"))
+-    shadows(project(":core:descriptors.runtime"))
+-    shadows(project(":core:util.runtime"))
+-    shadows("javax.inject:javax.inject:1")
+-    shadows(protobufLite())
+-    
+-    compileOnly("org.jetbrains:annotations:13.0")
+-}
+-
+-class KotlinModuleShadowTransformer(private val logger: Logger) : Transformer {
+-    @Suppress("ArrayInDataClass")
+-    private data class Entry(val path: String, val bytes: ByteArray)
+-    private val data = mutableListOf<Entry>()
+-
+-    override fun canTransformResource(element: FileTreeElement): Boolean =
+-            element.path.substringAfterLast(".") == KOTLIN_MODULE
+-
+-    override fun transform(context: TransformerContext) {
+-        fun relocate(content: String): String =
+-                context.relocators.fold(content) { acc, relocator -> relocator.applyToSourceContent(acc) }
+-
+-        val metadata = KotlinModuleMetadata.read(context.`is`.readBytes())
+-                ?: error("Not a .kotlin_module file: ${context.path}")
+-        val writer = KotlinModuleMetadata.Writer()
+-        logger.info("Transforming ${context.path}")
+-        metadata.accept(object : KmModuleVisitor(writer) {
+-            override fun visitPackageParts(fqName: String, fileFacades: List<String>, multiFileClassParts: Map<String, String>) {
+-                assert(multiFileClassParts.isEmpty()) { multiFileClassParts } // There are no multi-file class parts in core
+-                super.visitPackageParts(relocate(fqName), fileFacades.map(::relocate), multiFileClassParts)
+-            }
+-        })
+-        data += Entry(context.path, writer.write().bytes)
+-    }
+-
+-    override fun hasTransformedResource(): Boolean =
+-            data.isNotEmpty()
+-
+-    override fun modifyOutputStream(os: ZipOutputStream, preserveFileTimestamps: Boolean) {
+-        for ((path, bytes) in data) {
+-            os.putNextEntry(ZipEntry(path))
+-            os.write(bytes)
+-        }
+-        data.clear()
+-    }
+-
+-    companion object {
+-        const val KOTLIN_MODULE = "kotlin_module"
+-    }
+-}
+-
+-val reflectShadowJar by task<ShadowJar> {
+-    classifier = "shadow"
+-    version = null
+-    callGroovy("manifestAttributes", manifest, project, "Main" /*true*/)
+-
+-    exclude("**/*.proto")
+-
+-    transform(KotlinModuleShadowTransformer(logger))
+-
+-    configurations = listOf(shadows)
+-    relocate("org.jetbrains.kotlin", "kotlin.reflect.jvm.internal.impl")
+-    relocate("javax.inject", "kotlin.reflect.jvm.internal.impl.javax.inject")
+-    mergeServiceFiles()
+-}
+-
+-val stripMetadata by tasks.creating {
+-    dependsOn("reflectShadowJar")
+-    val inputJar = reflectShadowJar.archivePath
+-    val outputJar = File("$libsDir/kotlin-reflect-stripped.jar")
+-    inputs.file(inputJar)
+-    outputs.file(outputJar)
+-    doLast {
+-        stripMetadata(logger, "kotlin/reflect/jvm/internal/impl/.*", inputJar, outputJar)
+-    }
+-}
+-
+-val proguardOutput = "$libsDir/${property("archivesBaseName")}-proguard.jar"
+-
+-val proguard by task<ProGuardTask> {
+-    dependsOn(stripMetadata)
+-    inputs.files(stripMetadata.outputs.files)
+-    outputs.file(proguardOutput)
+-
+-    injars(mapOf("filter" to "!META-INF/versions/**"), stripMetadata.outputs.files)
+-    injars(mapOf("filter" to "!META-INF/**"), proguardAdditionalInJars)
+-    outjars(proguardOutput)
+-
+-    libraryjars(mapOf("filter" to "!META-INF/versions/**"), proguardDeps)
+-
+-    configuration("$core/reflection.jvm/reflection.pro")
+-}
+-
+-val relocateCoreSources by task<Copy> {
+-    doFirst {
+-        delete(relocatedCoreSrc)
+-    }
+-
+-    from("$core/descriptors/src")
+-    from("$core/descriptors.jvm/src")
+-    from("$core/descriptors.runtime/src")
+-    from("$core/deserialization/src")
+-    from("$core/util.runtime/src")
+-
+-    exclude("META-INF/services/**")
+-
+-    into(relocatedCoreSrc)
+-    includeEmptyDirs = false
+-
+-    eachFile {
+-        path = path.replace("org/jetbrains/kotlin", "kotlin/reflect/jvm/internal/impl")
+-    }
+-
+-    filter { line ->
+-        line.replace("org.jetbrains.kotlin", "kotlin.reflect.jvm.internal.impl")
+-    }
+-}
+-
+-tasks.getByName("jar").enabled = false
+-
+-val sourcesJar = sourcesJar(sourceSet = null) {
+-    dependsOn(relocateCoreSources)
+-    from(relocatedCoreSrc)
+-    from("$core/reflection.jvm/src")
+-}
+-
+-val result by task<Jar> {
+-    dependsOn(proguard)
+-    from(zipTree(file(proguardOutput)))
+-//    from(zipTree(reflectShadowJar.archivePath)) {
+-//        include("META-INF/versions/**")
+-//    }
+-    callGroovy("manifestAttributes", manifest, project, "Main" /*true*/)
+-}
+-
+-val modularJar by task<Jar> {
+-    dependsOn(proguard)
+-    classifier = "modular"
+-    from(zipTree(file(proguardOutput)))
+-    from(zipTree(reflectShadowJar.archivePath)) {
+-        include("META-INF/versions/**")
+-    }
+-    callGroovy("manifestAttributes", manifest, project, "Main", true)
+-}
+-
+-val dexMethodCount by task<DexMethodCount> {
+-    dependsOn(result)
+-    jarFile = result.outputs.files.single()
+-    ownPackages = listOf("kotlin.reflect")
+-}
+-tasks.getByName("check").dependsOn(dexMethodCount)
+-
+-artifacts {
+-    val artifactJar = mapOf(
+-        "file" to result.outputs.files.single(),
+-        "builtBy" to result,
+-        "name" to base.archivesBaseName
+-    )
+-
+-    add(mainJar.name, artifactJar)
+-    add("runtime", artifactJar)
+-    add("archives", artifactJar)
+-    add("archives", modularJar)
+-}
+-
+-javadocJar()
+-
+-dist(fromTask = result) {
+-    from(sourcesJar)
+-}
+--- /dev/null
++++ b/libraries/scripting/common/build.gradle
+@@ -0,0 +1,35 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++jvmTarget = "1.6"
++
++dependencies {
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++    compileOnly(project(":kotlin-reflect-api"))
++    compile(DependenciesKt.customCommonDep(project,"org.jetbrains.kotlinx", "kotlinx-coroutines-core",[])) { setTransitive(false) }
++    runtime(project(":kotlin-reflect"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
++//publish()
++
++ArtifactsKt.customRuntimeJar(project){}
++ArtifactsKt.customSourcesJar(project,"main",{})
++//val javadocJar = javadocJar()
++
++ArtifactsKt.customDist(project,null,null,null,{})
++//dist()
++
++ArtifactsKt.customIdeaPlugin(project,"lib") {
++    it.from(jar, sourcesJar)
++}
+--- a/libraries/scripting/common/build.gradle.kts
++++ /dev/null
+@@ -1,31 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-jvmTarget = "1.6"
+-
+-dependencies {
+-    compile(kotlinStdlib())
+-    compileOnly(project(":kotlin-reflect-api"))
+-    compile(commonDep("org.jetbrains.kotlinx", "kotlinx-coroutines-core")) { isTransitive = false }
+-    runtime(project(":kotlin-reflect"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-publish()
+-
+-val jar = runtimeJar()
+-val sourcesJar = sourcesJar()
+-val javadocJar = javadocJar()
+-
+-dist()
+-
+-ideaPlugin {
+-    from(jar, sourcesJar)
+-}
+--- /dev/null
++++ b/libraries/scripting/jvm/build.gradle
+@@ -0,0 +1,33 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++jvmTarget = "1.6"
++
++dependencies {
++    compile(project(":kotlin-script-runtime"))
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++    compile(project(":kotlin-scripting-common"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
++//publish()
++
++ArtifactsKt.customRuntimeJar(project){}
++ArtifactsKt.customSourcesJar(project,"main",{})
++//val javadocJar = javadocJar()
++
++ArtifactsKt.customDist(project,null,null,null,{})
++
++ArtifactsKt.customIdeaPlugin(project,"lib") {
++    it.from(jar, sourcesJar)
++}
+--- a/libraries/scripting/jvm/build.gradle.kts
++++ /dev/null
+@@ -1,30 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-jvmTarget = "1.6"
+-
+-dependencies {
+-    compile(project(":kotlin-script-runtime"))
+-    compile(kotlinStdlib())
+-    compile(project(":kotlin-scripting-common"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-publish()
+-
+-val jar = runtimeJar()
+-val sourcesJar = sourcesJar()
+-val javadocJar = javadocJar()
+-
+-dist()
+-
+-ideaPlugin {
+-    from(jar, sourcesJar)
+-}
+--- a/libraries/stdlib/jdk7/build.gradle
++++ b/libraries/stdlib/jdk7/build.gradle
+@@ -14,7 +14,7 @@
+ 
+ dependencies {
+     compile project(':kotlin-stdlib')
+-    testCompile project(':kotlin-test:kotlin-test-junit')
++    //testCompile project(':kotlin-test:kotlin-test-junit')
+ }
+ 
+ sourceSets {
+--- a/libraries/stdlib/jdk8/build.gradle
++++ b/libraries/stdlib/jdk8/build.gradle
+@@ -16,7 +16,7 @@
+ dependencies {
+     compile project(':kotlin-stdlib')
+     compile project(':kotlin-stdlib-jdk7')
+-    testCompile project(':kotlin-test:kotlin-test-junit')
++    //testCompile project(':kotlin-test:kotlin-test-junit')
+ }
+ 
+ sourceSets {
+--- a/libraries/stdlib/jvm/build.gradle
++++ b/libraries/stdlib/jvm/build.gradle
+@@ -74,9 +74,11 @@
+ 
+     commonSources project(path: ":kotlin-stdlib-common", configuration: "sources")
+ 
+-    compile group: 'org.jetbrains', name: 'annotations', version:'13.0'
++    compile('org.jetbrains:annotations:13.0'){
++        transitive = false
++    }
+ 
+-    testCompile project(':kotlin-test:kotlin-test-junit')
++    //testCompile project(':kotlin-test:kotlin-test-junit')
+     testCompile sourceSets.coroutinesExperimental.output
+ 
+     coroutinesExperimentalCompile sourceSets.main.output
+@@ -156,11 +158,11 @@
+     }
+ }
+ 
+-task dexMethodCount(type: DexMethodCount) {
++/*task dexMethodCount(type: DexMethodCount) {
+     from jar
+     ownPackages = ['kotlin']
+ }
+-check.dependsOn(dexMethodCount)
++check.dependsOn(dexMethodCount)*/
+ 
+ compileKotlin {
+     kotlinOptions {
+@@ -261,4 +263,4 @@
+ 
+ if (project.hasProperty("kotlin.stdlib.test.long.running")) {
+     check.dependsOn(longRunningTest)
+-}
+\ No newline at end of file
++}
+--- a/libraries/stdlib/jvm-minimal-for-test/build.gradle.kts
++++ b/libraries/stdlib/jvm-minimal-for-test/build.gradle.kts
+@@ -1,16 +1,15 @@
+ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+ 
+-description = "Kotlin Mock Runtime for Tests"
+-
+ plugins {
+-    kotlin("jvm")
+-    `maven-publish`
++    id("org.jetbrains.kotlin.jvm")
+ }
+ 
++description = "Kotlin Mock Runtime for Tests"
++
+ jvmTarget = "1.6"
+-javaHome = rootProject.extra["JDK_16"] as String
++javaHome = rootProject.ext["JDK_16"] as String
+ 
+-val builtins by configurations.creating
++configurations.create("builtins")
+ 
+ dependencies {
+     compileOnly(project(":kotlin-stdlib"))
+@@ -19,57 +18,60 @@
+ 
+ sourceSets {
+     "main" {
+-        java.apply {
+-            srcDir(File(buildDir, "src"))
++        java {
++            srcDir(new File(buildDir, "src"))
+         }
+     }
+     "test" {}
+ }
+ 
+-val copySources by task<Sync> {
+-    val stdlibProjectDir = project(":kotlin-stdlib").projectDir
+-
+-    from(stdlibProjectDir.resolve("runtime"))
++task("copySources",type:Sync) {
++    def stdlibProjectDir = project(":kotlin-stdlib").projectDir
++	println("Look at me woo")
++	println("$stdlibProjectDir")
++    from(stdlibProjectDir.toString()+"/runtime")
+         .include("kotlin/TypeAliases.kt",
+                  "kotlin/text/TypeAliases.kt")
+-    from(stdlibProjectDir.resolve("src"))
++    from(stdlibProjectDir.toString()+"/src")
+         .include("kotlin/collections/TypeAliases.kt")
+-    from(stdlibProjectDir.resolve("../src"))
++    from(stdlibProjectDir.toString()+"/../src")
+         .include("kotlin/util/Standard.kt",
+                  "kotlin/internal/Annotations.kt",
+                  "kotlin/contracts/ContractBuilder.kt",
+                  "kotlin/contracts/Effect.kt")
+-    into(File(buildDir, "src"))
++    into(new File(buildDir, "src"))
+ }
+ 
+-tasks.withType<JavaCompile> {
++tasks.withType(JavaCompile) {
+     sourceCompatibility = "1.6"
+     targetCompatibility = "1.6"
+ }
+ 
+-tasks.withType<KotlinCompile> {
++tasks.withType(KotlinCompile) {
+     dependsOn(copySources)
+     kotlinOptions {
+-        freeCompilerArgs += listOf(
++        freeCompilerArgs += [
+             "-module-name",
+             "kotlin-stdlib",
+             "-Xmulti-platform",
+             "-Xuse-experimental=kotlin.contracts.ExperimentalContracts",
+             "-Xuse-experimental=kotlin.Experimental"
+-        )
++        ]
+     }
+ }
+ 
+-val jar = runtimeJar {
+-    dependsOn(builtins)
+-    from(provider { zipTree(builtins.singleFile) }) { include("kotlin/**") }
++Task jar = ArtifactsKt.customRuntimeJar(project){
++	println("heeeeeeeeyooooo")
++	println(project.configurations.builtins.getSingleFile())
++    it.dependsOn(project.configurations.builtins)
++    it.from(provider { project.configurations.builtins.getSingleFile() }) { include("kotlin/**") }
+ }
+ 
+-val distDir: String by rootProject.extra
++ext.distDir= rootProject.ext.distDir
+ 
+-dist(targetName = "kotlin-stdlib-minimal-for-test.jar", targetDir = File(distDir), fromTask = jar)
++ArtifactsKt.customDist(project,new File(distDir),"kotlin-stdlib-minimal-for-test.jar",jar){}
+ 
+-publishing {
++/*publishing {
+     publications {
+         create<MavenPublication>("internal") {
+             artifactId = "kotlin-stdlib-minimal-for-test"
+@@ -81,4 +83,4 @@
+         maven("${rootProject.buildDir}/internal/repo")
+     }
+ }
+-
++*/
+--- /dev/null
++++ b/libraries/tools/kotlin-annotations-android/build.gradle
+@@ -0,0 +1,33 @@
++import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++}
++
++description = "Kotlin annotations for Android"
++
++jvmTarget = "1.6"
++javaHome = rootProject.ext["JDK_16"] as String
++
++tasks.withType(KotlinCompile) {
++    kotlinOptions.freeCompilerArgs += [
++            "-Xallow-kotlin-package",
++            "-module-name", project.name
++    ]
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++}
++
++//publish()
++
++//sourcesJar()
++//javadocJar()
++ArtifactsKt.customRuntimeJar(project){}
++
++ArtifactsKt.customDist(project,null,null,null,{})
++
+--- a/libraries/tools/kotlin-annotations-android/build.gradle.kts
++++ /dev/null
+@@ -1,31 +0,0 @@
+-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+-
+-description = "Kotlin annotations for Android"
+-
+-plugins {
+-    kotlin("jvm")
+-}
+-
+-jvmTarget = "1.6"
+-javaHome = rootProject.extra["JDK_16"] as String
+-
+-tasks.withType<KotlinCompile> {
+-    kotlinOptions.freeCompilerArgs += listOf(
+-            "-Xallow-kotlin-package",
+-            "-module-name", project.name
+-    )
+-}
+-
+-sourceSets {
+-    "main" {
+-        projectDefault()
+-    }
+-}
+-
+-publish()
+-
+-sourcesJar()
+-javadocJar()
+-runtimeJar()
+-dist()
+-
+--- a/libraries/tools/kotlin-gradle-plugin/build.gradle.kts
++++ b/libraries/tools/kotlin-gradle-plugin/build.gradle.kts
+@@ -15,7 +15,7 @@
+ 
+ // todo: make lazy
+ val jar: Jar by tasks
+-runtimeJar(rewriteDepsToShadedCompiler(jar))
++val jarContents by configurations.creating
+ 
+ sourcesJar()
+ javadocJar()
+@@ -61,6 +61,10 @@
+     runtime(projectRuntimeJar(":kotlin-scripting-compiler-embeddable"))
+     runtime(project(":kotlin-reflect"))
+ 
++    jarContents(compileOnly(intellijDep()) {
++        includeJars("asm-all", rootProject = rootProject)
++    })
++
+     // com.android.tools.build:gradle has ~50 unneeded transitive dependencies
+     compileOnly("com.android.tools.build:gradle:3.0.0") { isTransitive = false }
+     compileOnly("com.android.tools.build:gradle-core:3.0.0") { isTransitive = false }
+@@ -77,6 +81,17 @@
+     testCompileOnly(project(":kotlin-annotation-processing-gradle"))
+ }
+ 
++runtimeJar(rewriteDepsToShadedCompiler(jar)) {
++    dependsOn(jarContents)
++
++    from {
++        jarContents.asFileTree.map {
++            if (it.endsWith(".jar")) zipTree(it)
++            else it
++        }
++    }
++}
++
+ tasks {
+     withType<KotlinCompile> {
+         kotlinOptions.jdkHome = rootProject.extra["JDK_18"] as String
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/compilerRunner/GradleKotlinCompilerWork.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/compilerRunner/GradleKotlinCompilerWork.kt
+@@ -274,8 +274,7 @@
+             usePreciseJavaTracking = icEnv.usePreciseJavaTracking,
+             outputFiles = outputFiles,
+             multiModuleICSettings = icEnv.multiModuleICSettings,
+-            modulesInfo = incrementalModuleInfo!!,
+-            classpathFqNamesHistory = icEnv.classpathFqNamesHistory
++            modulesInfo = incrementalModuleInfo!!
+         )
+ 
+         log.info("Options for KOTLIN DAEMON: $compilationOptions")
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/compilerRunner/IncrementalCompilationEnvironment.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/compilerRunner/IncrementalCompilationEnvironment.kt
+@@ -15,8 +15,7 @@
+     val workingDir: File,
+     val usePreciseJavaTracking: Boolean = false,
+     val disableMultiModuleIC: Boolean = false,
+-    val multiModuleICSettings: MultiModuleICSettings,
+-    val classpathFqNamesHistory: File? = null
++    val multiModuleICSettings: MultiModuleICSettings
+ ) : Serializable {
+     companion object {
+         const val serialVersionUID: Long = 0
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/Kapt3KotlinGradleSubplugin.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/Kapt3KotlinGradleSubplugin.kt
+@@ -13,6 +13,7 @@
+ import org.gradle.api.Task
+ import org.gradle.api.artifacts.Configuration
+ import org.gradle.api.artifacts.Dependency
++import org.gradle.api.attributes.Attribute
+ import org.gradle.api.tasks.SourceSet
+ import org.gradle.api.tasks.TaskDependency
+ import org.gradle.api.tasks.compile.AbstractCompile
+@@ -23,6 +24,8 @@
+ import org.jetbrains.kotlin.gradle.internal.Kapt3GradleSubplugin.Companion.getKaptGeneratedKotlinSourcesDir
+ import org.jetbrains.kotlin.gradle.internal.Kapt3GradleSubplugin.Companion.getKaptGeneratedSourcesDir
+ import org.jetbrains.kotlin.gradle.internal.Kapt3KotlinGradleSubplugin.Companion.KAPT_WORKER_DEPENDENCIES_CONFIGURATION_NAME
++import org.jetbrains.kotlin.gradle.internal.kapt.incremental.CLASS_STRUCTURE_ARTIFACT_TYPE
++import org.jetbrains.kotlin.gradle.internal.kapt.incremental.StructureArtifactTransform
+ import org.jetbrains.kotlin.gradle.model.builder.KaptModelBuilder
+ import org.jetbrains.kotlin.gradle.plugin.*
+ import org.jetbrains.kotlin.gradle.tasks.CompilerPluginOptions
+@@ -234,9 +237,7 @@
+         )
+ 
+         val kaptGenerateStubsTask = context.createKaptGenerateStubsTask()
+-        val kaptTask = context.createKaptKotlinTask(
+-            useWorkerApi = project.isUseWorkerApi(),
+-            classpathHistoryDir = kaptGenerateStubsTask.getClasspathFqNamesHistoryDir())
++        val kaptTask = context.createKaptKotlinTask(useWorkerApi = project.isUseWorkerApi())
+ 
+         kaptGenerateStubsTask.source(*kaptConfigurations.toTypedArray())
+ 
+@@ -374,9 +375,10 @@
+         }
+     }
+ 
+-    private fun Kapt3SubpluginContext.createKaptKotlinTask(useWorkerApi: Boolean, classpathHistoryDir: File? = null): KaptTask {
++    private fun Kapt3SubpluginContext.createKaptKotlinTask(useWorkerApi: Boolean): KaptTask {
+         val taskClass = if (useWorkerApi) KaptWithoutKotlincTask::class.java else KaptWithKotlincTask::class.java
+-        val kaptTask = project.tasks.create(getKaptTaskName("kapt"), taskClass)
++        val taskName = getKaptTaskName("kapt")
++        val kaptTask = project.tasks.create(taskName, taskClass)
+ 
+         kaptTask.useBuildCache = kaptExtension.useBuildCache
+ 
+@@ -391,7 +393,13 @@
+         kaptTask.isIncremental = project.isIncrementalKapt()
+         if (kaptTask.isIncremental) {
+             kaptTask.incAptCache = getKaptIncrementalAnnotationProcessingCache()
+-            kaptTask.classpathDirtyFqNamesHistoryDir = project.files(classpathHistoryDir)
++
++            maybeRegisterTransform(project)
++            val classStructure = project.configurations.create("_classStructure${taskName}")
++            project.dependencies.add(classStructure.name, kotlinCompile.classpath)
++            kaptTask.classpathStructure = classStructure.incoming.artifactView { viewConfig ->
++                viewConfig.attributes.attribute(artifactType, CLASS_STRUCTURE_ARTIFACT_TYPE)
++            }.files
+         }
+ 
+         kotlinCompilation?.run {
+@@ -422,10 +430,6 @@
+                 kaptTask.pluginOptions.addPluginArgument(
+                     getCompilerPluginId(),
+                     SubpluginOption("incrementalCache", kaptTask.incAptCache!!.absolutePath))
+-
+-                kaptTask.pluginOptions.addPluginArgument(
+-                    getCompilerPluginId(),
+-                    SubpluginOption("classpathFqNamesHistory", kaptTask.classpathDirtyFqNamesHistoryDir.singleFile!!.absolutePath))
+             }
+ 
+             buildAndAddOptionsTo(kaptTask, kaptTask.pluginOptions, aptMode = "apt")
+@@ -444,6 +448,23 @@
+         return kaptTask
+     }
+ 
++    private fun maybeRegisterTransform(project: Project) {
++        if (!project.extensions.extraProperties.has("KaptStructureTransformAdded")) {
++            project.dependencies.registerTransform { variantTransform ->
++                variantTransform.artifactTransform(StructureArtifactTransform::class.java)
++                variantTransform.from.attribute(artifactType, "jar")
++                variantTransform.to.attribute(artifactType, CLASS_STRUCTURE_ARTIFACT_TYPE)
++            }
++            project.dependencies.registerTransform { variantTransform ->
++                variantTransform.artifactTransform(StructureArtifactTransform::class.java)
++                variantTransform.from.attribute(artifactType, "directory")
++                variantTransform.to.attribute(artifactType, CLASS_STRUCTURE_ARTIFACT_TYPE)
++            }
++
++            project.extensions.extraProperties["KaptStructureTransformAdded"] = true
++        }
++    }
++
+     private fun Kapt3SubpluginContext.createKaptGenerateStubsTask(): KaptGenerateStubsTask {
+         val kaptTask = project.tasks.create(
+             getKaptTaskName("kaptGenerateStubs"),
+@@ -502,6 +523,8 @@
+     override fun getPluginArtifact(): SubpluginArtifact =
+         JetBrainsSubpluginArtifact(artifactId = KAPT_ARTIFACT_NAME)
+ }
++private val artifactType = Attribute.of("artifactType", String::class.java)
++
+ 
+ internal fun registerGeneratedJavaSource(kaptTask: KaptTask, javaTask: AbstractCompile) {
+     javaTask.source(kaptTask.destinationDir)
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/KaptGenerateStubsTask.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/KaptGenerateStubsTask.kt
+@@ -74,11 +74,6 @@
+         super.setSource(sourceRootsContainer.set(sources))
+     }
+ 
+-    @Internal
+-    override fun getClasspathFqNamesHistoryDir(): File? {
+-        return taskBuildDirectory.resolve("classpath-fq-history")
+-    }
+-
+     private fun isSourceRootAllowed(source: File): Boolean =
+         !destinationDir.isParentOf(source) &&
+                 !stubsDir.isParentOf(source) &&
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/KaptTask.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/KaptTask.kt
+@@ -6,6 +6,10 @@
+ import org.gradle.api.internal.ConventionTask
+ import org.gradle.api.tasks.*
+ import org.gradle.api.tasks.incremental.IncrementalTaskInputs
++import org.jetbrains.kotlin.gradle.internal.kapt.incremental.KaptClasspathChanges
++import org.jetbrains.kotlin.gradle.internal.kapt.incremental.ClasspathSnapshot
++import org.jetbrains.kotlin.gradle.internal.kapt.incremental.KaptIncrementalChanges
++import org.jetbrains.kotlin.gradle.internal.kapt.incremental.UnknownSnapshot
+ import org.jetbrains.kotlin.gradle.internal.tasks.TaskWithLocalState
+ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+ import org.jetbrains.kotlin.gradle.tasks.cacheOnlyIfEnabledForKotlin
+@@ -47,6 +51,12 @@
+     @get:Internal
+     internal lateinit var kaptClasspathConfigurations: List<Configuration>
+ 
++
++    @get:PathSensitive(PathSensitivity.NONE)
++    @get:Optional
++    @get:InputFiles
++    internal var classpathStructure: FileCollection? = null
++
+     /** Output directory that contains caches necessary to support incremental annotation processing. */
+     @get:OutputDirectory
+     @get:Optional
+@@ -67,9 +77,6 @@
+     @get:Input
+     internal var includeCompileClasspath: Boolean = true
+ 
+-    @get:InputFiles
+-    internal var classpathDirtyFqNamesHistoryDir: FileCollection = project.files()
+-
+     @get:Input
+     internal var isIncremental = true
+ 
+@@ -159,17 +166,62 @@
+     @Internal
+     protected fun getCompiledSources() = listOfNotNull(kotlinCompileTask.destinationDir, kotlinCompileTask.javaOutputDir)
+ 
+-    protected fun getChangedFiles(inputs: IncrementalTaskInputs): List<File> {
+-        return if (!isIncremental || !inputs.isIncremental || !getCompiledSources().all { it.exists() }) {
++    protected fun getIncrementalChanges(inputs: IncrementalTaskInputs): KaptIncrementalChanges {
++        if (!isIncremental) {
++            clearLocalState()
++            return KaptIncrementalChanges.Unknown
++        }
++        if (!inputs.isIncremental) {
+             clearLocalState()
+-            emptyList()
+-        } else {
+-            with(mutableSetOf<File>()) {
+-                inputs.outOfDate { this.add(it.file) }
+-                inputs.removed { this.add(it.file) }
+-                return@with this.toList()
++            findClasspathChanges(classpath.files)
++            return KaptIncrementalChanges.Unknown
++        }
++
++        val changedFiles = with(mutableSetOf<File>()) {
++            inputs.outOfDate { this.add(it.file) }
++            inputs.removed { this.add(it.file) }
++            return@with this.toList()
++        }
++
++        val classpathChanges = classpath.files.let { cp -> changedFiles.filter { cp.contains(it) } }
++
++        val classpathStatus = findClasspathChanges(classpathChanges)
++        return when (classpathStatus) {
++            is KaptClasspathChanges.Unknown -> KaptIncrementalChanges.Unknown
++            is KaptClasspathChanges.Known -> KaptIncrementalChanges.Known(
++                changedFiles.filter { it.extension == "java" }.toSet(), classpathStatus.names
++            )
++        }
++    }
++
++    private fun findClasspathChanges(changedClasspath: Iterable<File>): KaptClasspathChanges {
++        val incAptCacheDir = incAptCache!!
++        incAptCacheDir.mkdirs()
++
++        val startTime = System.currentTimeMillis()
++
++        val previousSnapshot = ClasspathSnapshot.ClasspathSnapshotFactory.loadFrom(incAptCacheDir)
++        val currentSnapshot = ClasspathSnapshot.ClasspathSnapshotFactory.createCurrent(
++            incAptCacheDir, classpath.files.toList(), classpathStructure!!.files
++        )
++
++        val classpathChanges = currentSnapshot.diff(previousSnapshot, changedClasspath.toSet())
++        currentSnapshot.writeToCache()
++
++        if (logger.isInfoEnabled) {
++            val time = "Took ${System.currentTimeMillis() - startTime}ms."
++            when {
++                previousSnapshot == UnknownSnapshot ->
++                    logger.info("Initializing classpath information for KAPT. $time")
++                classpathChanges == KaptClasspathChanges.Unknown ->
++                    logger.info("Unable to use existing data, re-initializing classpath information for KAPT. $time")
++                else -> {
++                    classpathChanges as KaptClasspathChanges.Known
++                    logger.info("Full list of impacted classpath names: ${classpathChanges.names}. $time")
++                }
+             }
+         }
++        return classpathChanges
+     }
+ 
+     private fun hasAnnotationProcessors(file: File): Boolean {
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/KaptWithKotlincTask.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/KaptWithKotlincTask.kt
+@@ -16,17 +16,14 @@
+ import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
+ import org.jetbrains.kotlin.compilerRunner.GradleCompilerEnvironment
+ import org.jetbrains.kotlin.compilerRunner.GradleCompilerRunner
+-import org.jetbrains.kotlin.compilerRunner.IncrementalCompilationEnvironment
+-import org.jetbrains.kotlin.gradle.logging.GradleKotlinLogger
+ import org.jetbrains.kotlin.compilerRunner.OutputItemsCollectorImpl
+-import org.jetbrains.kotlin.gradle.incremental.ChangedFiles
++import org.jetbrains.kotlin.gradle.internal.kapt.incremental.KaptIncrementalChanges
+ import org.jetbrains.kotlin.gradle.internal.tasks.allOutputFiles
++import org.jetbrains.kotlin.gradle.logging.GradleKotlinLogger
++import org.jetbrains.kotlin.gradle.logging.GradlePrintingMessageCollector
+ import org.jetbrains.kotlin.gradle.plugin.PLUGIN_CLASSPATH_CONFIGURATION_NAME
+ import org.jetbrains.kotlin.gradle.tasks.CompilerPluginOptions
+-import org.jetbrains.kotlin.gradle.logging.GradlePrintingMessageCollector
+-import org.jetbrains.kotlin.gradle.tasks.clearLocalState
+ import org.jetbrains.kotlin.gradle.utils.toSortedPathsArray
+-import org.jetbrains.kotlin.incremental.ChangedFiles
+ import java.io.File
+ 
+ open class KaptWithKotlincTask : KaptTask(), CompilerArgumentAwareWithInput<K2JVMCompilerArguments> {
+@@ -54,7 +51,10 @@
+         val pluginOptionsWithKapt: CompilerPluginOptions = pluginOptions.withWrappedKaptOptions(
+             withApClasspath = kaptClasspath,
+             changedFiles = changedFiles,
+-            compiledSourcesDir = getCompiledSources())
++            classpathChanges = classpathChanges,
++            compiledSourcesDir = getCompiledSources(),
++            processIncrementally = processIncrementally
++        )
+ 
+         args.pluginOptions = (pluginOptionsWithKapt.arguments + args.pluginOptions!!).toTypedArray()
+ 
+@@ -66,13 +66,20 @@
+      * in the task action.
+      */
+     private var changedFiles: List<File> = emptyList()
++    private var classpathChanges: List<String> = emptyList()
++    private var processIncrementally = false
+ 
+     @TaskAction
+     fun compile(inputs: IncrementalTaskInputs) {
+         logger.debug("Running kapt annotation processing using the Kotlin compiler")
+         checkAnnotationProcessorClasspath()
+ 
+-        changedFiles = getChangedFiles(inputs)
++        val incrementalChanges = getIncrementalChanges(inputs)
++        if (incrementalChanges is KaptIncrementalChanges.Known) {
++            changedFiles = incrementalChanges.changedSources.toList()
++            classpathChanges = incrementalChanges.changedClasspathJvmNames.toList()
++            processIncrementally = true
++        }
+ 
+         val args = prepareCompilerArguments()
+ 
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/KaptWithoutKotlincTask.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/KaptWithoutKotlincTask.kt
+@@ -12,10 +12,9 @@
+ import org.gradle.api.tasks.incremental.IncrementalTaskInputs
+ import org.gradle.workers.IsolationMode
+ import org.gradle.workers.WorkerExecutor
+-import org.jetbrains.kotlin.gradle.incremental.ChangedFiles
+ import org.jetbrains.kotlin.gradle.internal.Kapt3KotlinGradleSubplugin.Companion.KAPT_WORKER_DEPENDENCIES_CONFIGURATION_NAME
++import org.jetbrains.kotlin.gradle.internal.kapt.incremental.KaptIncrementalChanges
+ import org.jetbrains.kotlin.gradle.plugin.KotlinAndroidPluginWrapper
+-import org.jetbrains.kotlin.gradle.tasks.clearLocalState
+ import org.jetbrains.kotlin.gradle.tasks.findKotlinStdlibClasspath
+ import org.jetbrains.kotlin.gradle.tasks.findToolsJar
+ import org.jetbrains.kotlin.utils.PathUtil
+@@ -51,6 +50,12 @@
+         logger.info("Running kapt annotation processing using the Gradle Worker API")
+         checkAnnotationProcessorClasspath()
+ 
++        val incrementalChanges = getIncrementalChanges(inputs)
++        val (changedFiles, classpathChanges) = when (incrementalChanges) {
++            is KaptIncrementalChanges.Unknown -> Pair(emptyList<File>(), emptyList<String>())
++            is KaptIncrementalChanges.Known -> Pair(incrementalChanges.changedSources.toList(), incrementalChanges.changedClasspathJvmNames)
++        }
++
+         val compileClasspath = classpath.files.toMutableList()
+         if (project.plugins.none { it is KotlinAndroidPluginWrapper }) {
+             compileClasspath.addAll(0, PathUtil.getJdkClassesRootsFromCurrentJre())
+@@ -60,6 +65,7 @@
+             if (isVerbose) add("VERBOSE")
+             if (mapDiagnosticLocations) add("MAP_DIAGNOSTIC_LOCATIONS")
+             if (includeCompileClasspath) add("INCLUDE_COMPILE_CLASSPATH")
++            if (incrementalChanges is KaptIncrementalChanges.Known) add("INCREMENTAL_APT")
+         }
+ 
+         val optionsForWorker = KaptOptionsForWorker(
+@@ -67,10 +73,10 @@
+             compileClasspath,
+             javaSourceRoots.toList(),
+ 
+-            getChangedFiles(inputs),
++            changedFiles,
+             getCompiledSources(),
+             incAptCache,
+-            classpathDirtyFqNamesHistoryDir.singleOrNull(),
++            classpathChanges.toList(),
+ 
+             destinationDir,
+             classesDir,
+@@ -93,7 +99,7 @@
+ 
+         workerExecutor.submit(KaptExecution::class.java) { config ->
+             val isolationModeStr = project.findProperty("kapt.workers.isolation") as String? ?: "none"
+-            config.isolationMode = when(isolationModeStr.toLowerCase()) {
++            config.isolationMode = when (isolationModeStr.toLowerCase()) {
+                 "process" -> IsolationMode.PROCESS
+                 "none" -> IsolationMode.NONE
+                 else -> IsolationMode.NONE
+@@ -147,7 +153,7 @@
+         }
+     }
+ 
+-    private fun createKaptOptions(classLoader: ClassLoader) = with (optionsForWorker) {
++    private fun createKaptOptions(classLoader: ClassLoader) = with(optionsForWorker) {
+         val flags = kaptClass(classLoader).declaredMethods.single { it.name == "kaptFlags" }.invoke(null, flags)
+ 
+         val mode = Class.forName("org.jetbrains.kotlin.base.kapt3.AptMode", true, classLoader)
+@@ -164,7 +170,7 @@
+             changedFiles,
+             compiledSources,
+             incAptCache,
+-            classpathFqNamesHistory,
++            classpathChanges,
+ 
+             sourcesOutputDir,
+             classesOutputDir,
+@@ -200,7 +206,7 @@
+     val changedFiles: List<File>,
+     val compiledSources: List<File>,
+     val incAptCache: File?,
+-    val classpathFqNamesHistory: File?,
++    val classpathChanges: List<String>,
+ 
+     val sourcesOutputDir: File,
+     val classesOutputDir: File,
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/incremental/ClassAbiExtractor.kt
+@@ -0,0 +1,53 @@
++/*
++ * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.gradle.internal.kapt.incremental
++
++import org.jetbrains.org.objectweb.asm.*
++
++const val metadataDescriptor: String = "Lkotlin/Metadata;"
++
++class ClassAbiExtractor(private val writer: ClassWriter) : ClassVisitor(Opcodes.API_VERSION, writer) {
++
++    override fun visitMethod(
++        access: Int,
++        name: String?,
++        desc: String?,
++        signature: String?,
++        exceptions: Array<out String>?
++    ): MethodVisitor? {
++        return if (access.isAbi()) {
++            super.visitMethod(access, name, desc, signature, exceptions)
++        } else {
++            null
++        }
++    }
++
++    override fun visitAnnotation(desc: String?, visible: Boolean): AnnotationVisitor? {
++        return if (desc != null && desc != metadataDescriptor) {
++            super.visitAnnotation(desc, visible)
++        } else {
++            null
++        }
++    }
++
++    override fun visitField(access: Int, name: String?, desc: String?, signature: String?, value: Any?): FieldVisitor? {
++        return if (access.isAbi()) {
++            super.visitField(access, name, desc, signature, value)
++        } else {
++            null
++        }
++    }
++
++    override fun visitInnerClass(name: String?, outerName: String?, innerName: String?, access: Int) {
++        if (access.isAbi() && outerName != null && innerName != null) {
++            super.visitInnerClass(name, outerName, innerName, access)
++        }
++    }
++
++    fun getBytes(): ByteArray = writer.toByteArray()
++
++    private fun Int.isAbi() = (this and Opcodes.ACC_PRIVATE) == 0
++}
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/incremental/ClassTypeExtractorVisitor.kt
+@@ -0,0 +1,177 @@
++/*
++ * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.gradle.internal.kapt.incremental
++
++import org.jetbrains.org.objectweb.asm.*
++
++private val toIgnore = setOf("java/lang/Object", "kotlin/Metadata", "org/jetbrains/annotations/NotNull")
++
++class ClassTypeExtractorVisitor(visitor: ClassVisitor) : ClassVisitor(Opcodes.API_VERSION, visitor) {
++
++    private val abiTypes = mutableSetOf<String>()
++    private val privateTypes = mutableSetOf<String>()
++
++    private lateinit var classInternalName: String
++
++    fun getAbiTypes() = abiTypes.filter { !toIgnore.contains(it) && it != classInternalName }.toSet()
++    fun getPrivateTypes() = privateTypes.filter { !toIgnore.contains(it) && it != classInternalName && !abiTypes.contains(it) }.toSet()
++
++    override fun visit(version: Int, access: Int, name: String?, signature: String?, superName: String?, interfaces: Array<out String>?) {
++        super.visit(version, access, name, signature, superName, interfaces)
++        classInternalName = name!!
++        superName?.let {
++            abiTypes.add(it)
++        }
++        interfaces?.let {
++            abiTypes.addAll(it)
++        }
++    }
++
++    override fun visitMethod(
++        access: Int,
++        name: String?,
++        desc: String?,
++        signature: String?,
++        exceptions: Array<out String>?
++    ): MethodVisitor? {
++        val typeCollector = if (access and Opcodes.ACC_PRIVATE != 0) {
++            privateTypes
++        } else {
++            abiTypes
++        }
++
++        desc?.also {
++            val type = Type.getType(desc)
++
++            maybeAdd(typeCollector, type.returnType)
++            type.argumentTypes.forEach {
++                maybeAdd(typeCollector, it)
++            }
++        }
++
++        return MethodTypeExtractorVisitor(typeCollector, super.visitMethod(access, name, desc, signature, exceptions))
++    }
++
++    override fun visitField(access: Int, name: String?, desc: String?, signature: String?, value: Any?): FieldVisitor? {
++        val typeCollector = if (access and Opcodes.ACC_PRIVATE != 0) {
++            privateTypes
++        } else {
++            abiTypes
++        }
++
++        desc?.also {
++            val type = Type.getType(desc)
++            maybeAdd(typeCollector, type)
++        }
++
++        return FieldTypeExtractorVisitor(typeCollector, super.visitField(access, name, desc, signature, value))
++    }
++
++    override fun visitAnnotation(desc: String?, visible: Boolean): AnnotationVisitor? {
++        desc?.let {
++            maybeAdd(abiTypes, Type.getType(it))
++        }
++        return AnnotationTypeExtractorVisitor(abiTypes, super.visitAnnotation(desc, visible))
++    }
++
++    override fun visitTypeAnnotation(typeRef: Int, typePath: TypePath?, desc: String?, visible: Boolean): AnnotationVisitor? {
++        desc?.let {
++            maybeAdd(abiTypes, Type.getType(it))
++        }
++
++        return AnnotationTypeExtractorVisitor(abiTypes, super.visitTypeAnnotation(typeRef, typePath, desc, visible))
++    }
++}
++
++private class AnnotationTypeExtractorVisitor(private val typeCollector: MutableSet<String>, visitor: AnnotationVisitor?) :
++    AnnotationVisitor(Opcodes.ASM5, visitor) {
++
++    override fun visit(name: String?, value: Any?) {
++        if (value is Type) {
++            typeCollector.add(value.className)
++        }
++        super.visit(name, value)
++    }
++
++    override fun visitAnnotation(name: String?, desc: String?): AnnotationVisitor? {
++        desc?.let {
++            maybeAdd(typeCollector, Type.getType(it))
++        }
++        return super.visitAnnotation(name, desc)
++    }
++
++    override fun visitArray(name: String?): AnnotationVisitor? {
++        return AnnotationTypeExtractorVisitor(typeCollector, super.visitArray(name))
++    }
++
++    override fun visitEnum(name: String?, desc: String?, value: String?) {
++        desc?.let {
++            maybeAdd(typeCollector, Type.getType(it))
++        }
++        super.visitEnum(name, desc, value)
++    }
++}
++
++private class FieldTypeExtractorVisitor(private val typeCollector: MutableSet<String>, visitor: FieldVisitor?) :
++    FieldVisitor(Opcodes.ASM5, visitor) {
++    override fun visitAnnotation(desc: String?, visible: Boolean): AnnotationVisitor? {
++        desc?.let {
++            maybeAdd(typeCollector, Type.getType(it))
++        }
++        return AnnotationTypeExtractorVisitor(typeCollector, super.visitAnnotation(desc, visible))
++    }
++
++    override fun visitTypeAnnotation(typeRef: Int, typePath: TypePath?, desc: String?, visible: Boolean): AnnotationVisitor? {
++        desc?.let {
++            maybeAdd(typeCollector, Type.getType(it))
++        }
++        return AnnotationTypeExtractorVisitor(typeCollector, super.visitTypeAnnotation(typeRef, typePath, desc, visible))
++    }
++}
++
++private class MethodTypeExtractorVisitor(private val typeCollector: MutableSet<String>, visitor: MethodVisitor?) :
++    MethodVisitor(Opcodes.ASM5, visitor) {
++
++    override fun visitAnnotationDefault(): AnnotationVisitor {
++        return AnnotationTypeExtractorVisitor(typeCollector, super.visitAnnotationDefault())
++    }
++
++    override fun visitAnnotation(desc: String?, visible: Boolean): AnnotationVisitor? {
++        desc?.let {
++            maybeAdd(typeCollector, Type.getType(it))
++        }
++        return AnnotationTypeExtractorVisitor(typeCollector, super.visitAnnotation(desc, visible))
++    }
++
++    override fun visitParameterAnnotation(parameter: Int, desc: String?, visible: Boolean): AnnotationVisitor? {
++        desc?.let {
++            maybeAdd(typeCollector, Type.getType(it))
++        }
++        return AnnotationTypeExtractorVisitor(typeCollector, super.visitParameterAnnotation(parameter, desc, visible))
++    }
++
++    override fun visitTypeAnnotation(typeRef: Int, typePath: TypePath?, desc: String?, visible: Boolean): AnnotationVisitor? {
++        desc?.let {
++            maybeAdd(typeCollector, Type.getType(it))
++        }
++
++        return AnnotationTypeExtractorVisitor(typeCollector, super.visitTypeAnnotation(typeRef, typePath, desc, visible))
++    }
++}
++
++private fun maybeAdd(set: MutableSet<String>, type: Type) {
++    type.finalInternalName()?.let { set.add(it) }
++}
++
++private fun Type.finalInternalName(): String? {
++    return when (this.sort) {
++        Type.VOID, Type.BOOLEAN, Type.CHAR, Type.BYTE, Type.SHORT, Type.INT, Type.FLOAT, Type.DOUBLE -> null
++        Type.ARRAY -> this.elementType.finalInternalName()
++        Type.OBJECT -> this.internalName
++        Type.METHOD -> null
++        else -> null
++    }
++}
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/incremental/ClasspathAnalyzer.kt
+@@ -0,0 +1,211 @@
++/*
++ * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.gradle.internal.kapt.incremental
++
++import org.gradle.api.artifacts.transform.ArtifactTransform
++import org.jetbrains.org.objectweb.asm.ClassReader
++import org.jetbrains.org.objectweb.asm.ClassWriter
++import java.io.*
++import java.security.MessageDigest
++import java.util.zip.ZipFile
++
++const val CLASS_STRUCTURE_ARTIFACT_TYPE = "class-structure"
++
++class StructureArtifactTransform : ArtifactTransform() {
++    override fun transform(input: File): MutableList<File> {
++        try {
++            val data = if (input.isDirectory) {
++                visitDirectory(input)
++            } else {
++                visitJar(input)
++            }
++
++            val dataFile = outputDirectory.resolve("output.bin")
++            data.saveTo(dataFile)
++
++            val lazyStructureFile = outputDirectory.resolve("lazy-output.bin")
++            LazyClasspathEntryData(input, dataFile).saveToFile(lazyStructureFile)
++
++            return mutableListOf(lazyStructureFile)
++        } catch (e: Throwable) {
++            throw e
++        }
++    }
++}
++
++private fun visitDirectory(directory: File): ClasspathEntryData {
++    val entryData = ClasspathEntryData()
++
++    directory.walk().filter {
++        it.extension == "class" && !it.relativeTo(directory).toString().toLowerCase().startsWith("meta-inf")
++    }.forEach {
++        val internalName = it.relativeTo(directory).invariantSeparatorsPath.dropLast(".class".length)
++        analyzeInputStream(it.inputStream(), internalName, entryData)
++    }
++
++    return entryData
++}
++
++private fun visitJar(jar: File): ClasspathEntryData {
++    val entryData = ClasspathEntryData()
++
++    ZipFile(jar).use { zipFile ->
++        val entries = zipFile.entries()
++        while (entries.hasMoreElements()) {
++            val entry = entries.nextElement()
++
++            if (entry.name.endsWith("class") && !entry.name.toLowerCase().startsWith("meta-inf")) {
++                analyzeInputStream(zipFile.getInputStream(entry), entry.name.dropLast(".class".length), entryData)
++            }
++        }
++    }
++
++    return entryData
++}
++
++private fun analyzeInputStream(input: InputStream, internalName: String, entryData: ClasspathEntryData) {
++    val abiExtractor = ClassAbiExtractor(ClassWriter(0))
++    val typeDependenciesExtractor = ClassTypeExtractorVisitor(abiExtractor)
++    ClassReader(BufferedInputStream(input).readBytes()).accept(
++        typeDependenciesExtractor,
++        ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES
++    )
++
++    val bytes = abiExtractor.getBytes()
++    val digest = MessageDigest.getInstance("MD5").digest(bytes)
++
++    entryData.classAbiHash[internalName] = digest
++    entryData.classDependencies[internalName] =
++        ClassDependencies(typeDependenciesExtractor.getAbiTypes(), typeDependenciesExtractor.getPrivateTypes())
++}
++
++class LazyClasspathEntryData(val classpathEntry: File, private val dataFile: File) : Serializable {
++
++    object LazyClasspathEntrySerializer {
++        fun loadFromFile(file: File): LazyClasspathEntryData {
++            ObjectInputStream(BufferedInputStream(file.inputStream())).use {
++                return it.readObject() as LazyClasspathEntryData
++            }
++        }
++    }
++
++    fun saveToFile(file: File) {
++        ObjectOutputStream(BufferedOutputStream(file.outputStream())).use {
++            it.writeObject(this)
++        }
++    }
++
++    fun getClasspathEntryData(): ClasspathEntryData = ClasspathEntryData.ClasspathEntrySerializer.loadFrom(dataFile)
++}
++
++class ClasspathEntryData : Serializable {
++
++    object ClasspathEntrySerializer {
++        fun loadFrom(file: File): ClasspathEntryData {
++            ObjectInputStream(BufferedInputStream(file.inputStream())).use {
++                return it.readObject() as ClasspathEntryData
++            }
++        }
++    }
++
++    @Transient
++    var classAbiHash = mutableMapOf<String, ByteArray>()
++    @Transient
++    var classDependencies = mutableMapOf<String, ClassDependencies>()
++
++    private fun writeObject(output: ObjectOutputStream) {
++        val names = mutableMapOf<String, Int>()
++        classAbiHash.keys.forEach { names[it] = names.size }
++        classDependencies.values.forEach {
++            it.abiTypes.forEach {
++                if (!names.containsKey(it)) names[it] = names.size
++            }
++            it.privateTypes.forEach {
++                if (!names.containsKey(it)) names[it] = names.size
++            }
++        }
++
++        output.writeInt(names.size)
++        names.forEach { key, value ->
++            output.writeInt(value)
++            output.writeUTF(key)
++        }
++
++        output.writeInt(classAbiHash.size)
++        classAbiHash.forEach {
++            output.writeInt(names[it.key]!!)
++            output.writeInt(it.value.size)
++            output.write(it.value)
++        }
++
++        output.writeInt(classDependencies.size)
++        classDependencies.forEach {
++            output.writeInt(names[it.key]!!)
++
++            output.writeInt(it.value.abiTypes.size)
++            it.value.abiTypes.forEach {
++                output.writeInt(names[it]!!)
++            }
++
++            output.writeInt(it.value.privateTypes.size)
++            it.value.privateTypes.forEach {
++                output.writeInt(names[it]!!)
++            }
++        }
++    }
++
++    @Suppress("UNCHECKED_CAST")
++    private fun readObject(input: ObjectInputStream) {
++        val namesSize = input.readInt()
++        val names = HashMap<Int, String>(namesSize)
++        repeat(namesSize) {
++            val classId = input.readInt()
++            val classInternalName = input.readUTF()
++            names[classId] = classInternalName
++        }
++
++        val abiHashesSize = input.readInt()
++        classAbiHash = HashMap(abiHashesSize)
++        repeat(abiHashesSize) {
++            val internalName = names[input.readInt()]!!
++            val byteArraySize = input.readInt()
++            val hash = ByteArray(byteArraySize)
++            repeat(byteArraySize) {
++                hash[it] = input.readByte()
++            }
++            classAbiHash[internalName] = hash
++        }
++
++        val dependenciesSize = input.readInt()
++        classDependencies = HashMap(dependenciesSize)
++
++        repeat(dependenciesSize) {
++            val internalName = names[input.readInt()]!!
++
++            val abiTypesSize = input.readInt()
++            val abiTypeNames = HashSet<String>(abiTypesSize)
++            repeat(abiTypesSize) {
++                abiTypeNames.add(names[input.readInt()]!!)
++            }
++
++            val privateTypesSize = input.readInt()
++            val privateTypeNames = HashSet<String>(privateTypesSize)
++            repeat(privateTypesSize) {
++                privateTypeNames.add(names[input.readInt()]!!)
++            }
++
++            classDependencies[internalName] = ClassDependencies(abiTypeNames, privateTypeNames)
++        }
++    }
++
++    fun saveTo(file: File) {
++        ObjectOutputStream(BufferedOutputStream(file.outputStream())).use {
++            it.writeObject(this)
++        }
++    }
++}
++
++class ClassDependencies(val abiTypes: Collection<String>, val privateTypes: Collection<String>)
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/incremental/ClasspathSnapshot.kt
+@@ -0,0 +1,178 @@
++/*
++ * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.gradle.internal.kapt.incremental
++
++import java.io.*
++import java.util.*
++
++open class ClasspathSnapshot protected constructor(
++    private val cacheDir: File,
++    private val classpath: Iterable<File>,
++    val dataForFiles: (Set<File>) -> Map<File, ClasspathEntryData>
++) {
++    val classpathData: (Set<File>) -> Map<File, ClasspathEntryData> = { files ->
++        val missingFiles = files.filter { !computedClasspathData.keys.contains(it) }.toSet()
++
++        if (!missingFiles.isEmpty()) {
++            val computedData = dataForFiles(missingFiles)
++            computedClasspathData.putAll(computedData)
++        }
++        computedClasspathData
++    }
++    private val computedClasspathData: MutableMap<File, ClasspathEntryData> = mutableMapOf()
++
++    object ClasspathSnapshotFactory {
++        fun loadFrom(cacheDir: File): ClasspathSnapshot {
++            val classpathEntries = cacheDir.resolve("classpath-entries.bin")
++            val classpathStructureData = cacheDir.resolve("classpath-structure.bin")
++            if (!classpathEntries.exists() || !classpathStructureData.exists()) {
++                return UnknownSnapshot
++            }
++
++            val classpathFiles = ObjectInputStream(BufferedInputStream(classpathEntries.inputStream())).use {
++                @Suppress("UNCHECKED_CAST")
++                it.readObject() as Iterable<File>
++            }
++
++            val classpathData = { _: Set<File> ->
++                loadPreviousData(classpathStructureData)
++            }
++            return ClasspathSnapshot(cacheDir, classpathFiles, classpathData)
++        }
++
++        fun createCurrent(cacheDir: File, classpath: Iterable<File>, lazyClasspathData: Set<File>): ClasspathSnapshot {
++            val lazyData = lazyClasspathData.map { LazyClasspathEntryData.LazyClasspathEntrySerializer.loadFromFile(it) }
++            val data = { files: Set<File> ->
++                lazyData.filter { files.contains(it.classpathEntry) }.associate { it.classpathEntry to it.getClasspathEntryData() }
++            }
++
++            return ClasspathSnapshot(cacheDir, classpath, data)
++        }
++
++        private fun loadPreviousData(file: File): Map<File, ClasspathEntryData> {
++            ObjectInputStream(BufferedInputStream(file.inputStream())).use {
++                @Suppress("UNCHECKED_CAST")
++                return it.readObject() as Map<File, ClasspathEntryData>
++            }
++        }
++    }
++
++    private fun isCompatible(snapshot: ClasspathSnapshot) =
++        this != UnknownSnapshot && classpath == snapshot.classpath
++
++    /** Compare this snapshot with the specified one only for the specified files. */
++    fun diff(previousSnapshot: ClasspathSnapshot, changedFiles: Set<File>): KaptClasspathChanges {
++        if (!isCompatible(previousSnapshot)) {
++            return KaptClasspathChanges.Unknown
++        }
++
++        val currentData = classpathData(changedFiles)
++        val previousData = previousSnapshot.classpathData(changedFiles)
++
++        val changedClasses = mutableSetOf<String>()
++
++        for (changed in changedFiles) {
++            val previous = previousData.getValue(changed)
++            val current = currentData.getValue(changed)
++
++            for (key in previous.classAbiHash.keys + current.classAbiHash.keys) {
++                val previousHash = previous.classAbiHash[key]
++                if (previousHash == null) {
++                    changedClasses.add(key)
++                    continue
++                }
++                val currentHash = current.classAbiHash[key]
++                if (currentHash == null) {
++                    changedClasses.add(key)
++                    continue
++                }
++                if (!previousHash.contentEquals(currentHash)) {
++                    changedClasses.add(key)
++                }
++            }
++        }
++
++        // We do not compute structural data for unchanged files of the current snapshot for performance reasons.
++        // That is why we reuse the previous snapshot as that one contains all unchanged entries.
++        previousData.filterTo(computedClasspathData) { (key, _) -> key !in computedClasspathData }
++
++        val allImpactedClasses = findAllImpacted(changedClasses)
++
++        return KaptClasspathChanges.Known(allImpactedClasses)
++    }
++
++    fun writeToCache() {
++        val classpathEntries = cacheDir.resolve("classpath-entries.bin")
++        ObjectOutputStream(BufferedOutputStream(classpathEntries.outputStream())).use {
++            it.writeObject(classpath)
++        }
++
++        val classpathStructureData = cacheDir.resolve("classpath-structure.bin")
++        storeCurrentStructure(classpathStructureData, classpathData(classpath.toSet()))
++    }
++
++    private fun storeCurrentStructure(file: File, structure: Map<File, ClasspathEntryData>) {
++        ObjectOutputStream(BufferedOutputStream(file.outputStream())).use {
++            it.writeObject(structure)
++        }
++    }
++
++    private fun findAllImpacted(changedClasses: Set<String>): Set<String> {
++        // TODO (gavra): Avoid building all reverse lookups. Most changes are local to the classpath entry, use that.
++        val transitiveDeps = HashMap<String, MutableList<String>>()
++        val nonTransitiveDeps = HashMap<String, MutableList<String>>()
++
++        for (entry in computedClasspathData.values) {
++            for ((className, classDependency) in entry.classDependencies) {
++                for (abiType in classDependency.abiTypes) {
++                    (transitiveDeps[abiType] ?: LinkedList()).let {
++                        it.add(className)
++                        transitiveDeps[abiType] = it
++                    }
++                }
++                for (privateType in classDependency.privateTypes) {
++                    (nonTransitiveDeps[privateType] ?: LinkedList()).let {
++                        it.add(className)
++                        nonTransitiveDeps[privateType] = it
++                    }
++
++                }
++            }
++        }
++
++        val allImpacted = mutableSetOf<String>()
++        var current = changedClasses
++        while (current.isNotEmpty()) {
++            val newRound = mutableSetOf<String>()
++            for (klass in current) {
++                if (allImpacted.add(klass)) {
++                    transitiveDeps[klass]?.let {
++                        newRound.addAll(it)
++                    }
++
++                    nonTransitiveDeps[klass]?.let {
++                        allImpacted.addAll(it)
++                    }
++                }
++            }
++            current = newRound
++        }
++
++        return allImpacted
++    }
++}
++
++object UnknownSnapshot : ClasspathSnapshot(File(""), emptyList(), { emptyMap() })
++
++sealed class KaptIncrementalChanges {
++    object Unknown : KaptIncrementalChanges()
++    class Known(val changedSources: Set<File>, val changedClasspathJvmNames: Set<String>) : KaptIncrementalChanges()
++}
++
++sealed class KaptClasspathChanges {
++    object Unknown : KaptClasspathChanges()
++    class Known(val names: Set<String>) : KaptClasspathChanges()
++}
+\ No newline at end of file
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/subpluginUtils.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/internal/subpluginUtils.kt
+@@ -44,13 +44,22 @@
+ }
+ 
+ internal fun CompilerPluginOptions.withWrappedKaptOptions(
+-    withApClasspath: Iterable<File>, changedFiles: List<File> = emptyList(), compiledSourcesDir: List<File> = emptyList()
++    withApClasspath: Iterable<File>,
++    changedFiles: List<File> = emptyList(),
++    classpathChanges: List<String> = emptyList(),
++    compiledSourcesDir: List<File> = emptyList(),
++    processIncrementally: Boolean = false
+ ): CompilerPluginOptions {
+     val resultOptionsByPluginId: MutableMap<String, List<SubpluginOption>> =
+         subpluginOptionsByPluginId.toMutableMap()
+ 
+     resultOptionsByPluginId.compute(Kapt3KotlinGradleSubplugin.KAPT_SUBPLUGIN_ID) { _, kaptOptions ->
+         val changedFilesOption = FilesSubpluginOption("changedFile", changedFiles).takeIf { changedFiles.isNotEmpty() }
++        val classpathChangesOption = SubpluginOption(
++            "classpathChange",
++            classpathChanges.joinToString(separator = File.pathSeparator)
++        ).takeIf { classpathChanges.isNotEmpty() }
++        val processIncrementallyOption = SubpluginOption("processIncrementally", processIncrementally.toString())
+         val compiledSourcesOption =
+             FilesSubpluginOption("compiledSourcesDir", compiledSourcesDir).takeIf { compiledSourcesDir.isNotEmpty() }
+ 
+@@ -58,7 +67,9 @@
+             kaptOptions.orEmpty() +
+                     withApClasspath.map { FilesSubpluginOption("apclasspath", listOf(it)) } +
+                     changedFilesOption +
+-                    compiledSourcesOption
++                    classpathChangesOption +
++                    compiledSourcesOption +
++                    processIncrementallyOption
+ 
+         wrapPluginOptions(kaptOptionsWithClasspath.filterNotNull(), "configuration")
+     }
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/plugin/KotlinPlugin.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/plugin/KotlinPlugin.kt
+@@ -735,7 +735,13 @@
+ 
+         val kotlinOptions = KotlinJvmOptionsImpl()
+         project.whenEvaluated {
+-            applyAndroidJavaVersion(project.extensions.getByType(BaseExtension::class.java), kotlinOptions)
++            // TODO don't require the flag once there is an Android Gradle plugin build that supports desugaring of Long.hashCode and
++            //  Boolean.hashCode. Instead, run conditionally, only with the AGP versions that play well with Kotlin bytecode for
++            //  JVM target 1.8.
++            //  See: KT-31027
++            if (PropertiesProvider(project).setJvmTargetFromAndroidCompileOptions == true) {
++                applyAndroidJavaVersion(project.extensions.getByType(BaseExtension::class.java), kotlinOptions)
++            }
+         }
+ 
+         kotlinOptions.noJdk = true
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/plugin/KotlinProperties.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/plugin/KotlinProperties.kt
+@@ -85,6 +85,9 @@
+     val ignorePluginLoadedInMultipleProjects: Boolean?
+         get() = booleanProperty("kotlin.pluginLoadedInMultipleProjects.ignore")
+ 
++    val setJvmTargetFromAndroidCompileOptions: Boolean?
++        get() = booleanProperty("kotlin.setJvmTargetFromAndroidCompileOptions")
++
+     /**
+      * Enables parallel tasks execution within a project with Workers API.
+      * Does not enable using actual worker proccesses
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/plugin/cocoapods/KotlinCocoapodsPlugin.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/plugin/cocoapods/KotlinCocoapodsPlugin.kt
+@@ -15,10 +15,7 @@
+ import org.jetbrains.kotlin.gradle.plugin.addExtension
+ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+ import org.jetbrains.kotlin.gradle.plugin.whenEvaluated
+-import org.jetbrains.kotlin.gradle.tasks.DefFileTask
+-import org.jetbrains.kotlin.gradle.tasks.DummyFrameworkTask
+-import org.jetbrains.kotlin.gradle.tasks.FatFrameworkTask
+-import org.jetbrains.kotlin.gradle.tasks.PodspecTask
++import org.jetbrains.kotlin.gradle.tasks.*
+ import org.jetbrains.kotlin.gradle.utils.asValidTaskName
+ import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
+ import org.jetbrains.kotlin.konan.target.Family
+@@ -189,7 +186,8 @@
+             kotlinExtension.supportedTargets().all { target ->
+                 target.compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME).cinterops.create(pod.name) { interop ->
+ 
+-                    project.tasks.getByPath(interop.interopProcessingTaskName).dependsOn(defTask)
++                    val interopTask = project.tasks.getByPath(interop.interopProcessingTaskName)
++                    interopTask.dependsOn(defTask)
+                     interop.defFile = defTask.outputFile
+                     interop.packageName = "cocoapods.${pod.moduleName}"
+ 
+@@ -204,6 +202,27 @@
+                     project.findProperty(FRAMEWORK_PATHS_PROPERTY)?.toString()?.let { args ->
+                         interop.compilerOpts.addAll(args.splitQuotedArgs().map { "-F$it" })
+                     }
++
++                    // Show a human-readable error messages if the interop is created
++                    // but there are no parameters set by Xcode or manually by user (KT-31062).
++                    interopTask.doFirst { _ ->
++                        val hasCompilerOpts = interop.compilerOpts.isNotEmpty()
++                        val hasHeaderSearchPath = interop.includeDirs.let {
++                            !it.headerFilterDirs.isEmpty || !it.allHeadersDirs.isEmpty
++                        }
++
++                        check(hasCompilerOpts || hasHeaderSearchPath) {
++                            """
++                                |Cannot perform cinterop processing for ${pod.name}: cannot determine headers location.
++                                |
++                                |Probably the build is executed from command line.
++                                |Note that a Kotlin/Native module using CocoaPods dependencies can be built only from Xcode.
++                                |
++                                |See details at https://kotlinlang.org/docs/reference/native/cocoapods.html#interoperability.
++                            """.trimMargin()
++                        }
++                    }
++
+                 }
+             }
+         }
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/tasks/FatFrameworkTask.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/tasks/FatFrameworkTask.kt
+@@ -315,7 +315,7 @@
+         // TODO: handle bundle id.
+         project.copy {
+             it.from(dsymInputs.values.first().infoPlist)
+-            it.into(fatDsym.infoPlist)
++            it.into(fatDsym.infoPlist.parentFile)
+         }
+     }
+ 
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/tasks/Tasks.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/tasks/Tasks.kt
+@@ -433,8 +433,7 @@
+                 taskBuildDirectory,
+                 usePreciseJavaTracking = usePreciseJavaTracking,
+                 disableMultiModuleIC = disableMultiModuleIC(),
+-                multiModuleICSettings = multiModuleICSettings,
+-                classpathFqNamesHistory = getClasspathFqNamesHistoryDir()
++                multiModuleICSettings = multiModuleICSettings
+             )
+         } else null
+ 
+@@ -476,10 +475,6 @@
+         return false
+     }
+ 
+-    @Optional
+-    @Internal
+-    internal open fun getClasspathFqNamesHistoryDir(): File? = null
+-
+     // override setSource to track source directory sets and files (for generated android folders)
+     override fun setSource(sources: Any?) {
+         sourceRootsContainer.set(sources)
+--- a/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/utils/NativeCompilerDownloader.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/main/kotlin/org/jetbrains/kotlin/gradle/utils/NativeCompilerDownloader.kt
+@@ -25,7 +25,7 @@
+ ) {
+ 
+     internal companion object {
+-        val DEFAULT_KONAN_VERSION = KonanVersionImpl(MetaVersion.RELEASE, 1, 2, 0)
++        val DEFAULT_KONAN_VERSION = KonanVersionImpl(MetaVersion.RELEASE, 1, 2, 1)
+         const val BASE_DOWNLOAD_URL = "https://download.jetbrains.com/kotlin/native/builds"
+     }
+ 
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin/src/test/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/incremental/ClassAbiExtractorTest.kt
+@@ -0,0 +1,346 @@
++/*
++ * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.gradle.internal.kapt.incremental
++
++import org.jetbrains.kotlin.gradle.util.compileSources
++import org.jetbrains.org.objectweb.asm.ClassReader
++import org.jetbrains.org.objectweb.asm.ClassWriter
++import org.jetbrains.org.objectweb.asm.Opcodes
++import org.junit.Assert
++import org.junit.Assert.assertArrayEquals
++import org.junit.Rule
++import org.junit.Test
++import org.junit.rules.TemporaryFolder
++import java.util.*
++
++class ClassAbiExtractorTest {
++    @Rule
++    @JvmField
++    var tmp = TemporaryFolder()
++
++    @Test
++    fun testDifferentClassName() {
++        val firstHash = getHash(
++            """
++                public class A {
++                }
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class B {
++                }
++        """.trimIndent(), "B"
++        )
++
++        assertArrayNotEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testAbiMethod() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  public void run() {}
++                  void doSomething1() {}
++                }
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  public void run() {}
++                  void doSomething2() {}
++                }
++        """.trimIndent()
++        )
++
++        assertArrayNotEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testAbiMethodAnnotations() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  @Annotation1
++                  public void run() {}
++                }
++                @interface Annotation1 {}
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  @Annotation2
++                  public void run() {}
++                }
++                @interface Annotation2 {}
++        """.trimIndent()
++        )
++
++        assertArrayNotEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testMethodBodiesIgnored() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  public void run() {
++                    System.out.println("1");
++                  }
++                }
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  public void run() {
++                    System.out.println("2");
++                  }
++                }
++        """.trimIndent()
++        )
++
++        assertArrayEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testPrivateMethodIgnored() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  public void run() {}
++                  private void doSomething1() {}
++                }
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  public void run() {}
++                  private void doSomething2() {}
++                }
++        """.trimIndent()
++        )
++
++        assertArrayEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testAbiField() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  protected String value;
++                  public String data1;
++                }
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  protected String value;
++                  public String data2;
++                }
++        """.trimIndent()
++        )
++
++        assertArrayNotEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testFieldAnnotation() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  @Annotation1
++                  protected String value;
++                }
++                @interface Annotation1 {}
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  @Annotation2
++                  protected String value;
++                }
++                @interface Annotation2 {}
++        """.trimIndent()
++        )
++
++        assertArrayNotEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testConstants() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  static final String VALUE = "value_1";
++                }
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  static final String VALUE = "value_2";
++                }
++        """.trimIndent()
++        )
++
++        assertArrayNotEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testSameConstants() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  static final String VALUE = "value_1";
++                }
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  static final String VALUE = "value_1";
++                }
++        """.trimIndent()
++        )
++
++        assertArrayEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testPrivateFieldsIgnored() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  protected String value;
++                  private String data;
++                }
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  protected String value;
++                  private int data;
++                }
++        """.trimIndent()
++        )
++
++        assertArrayEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testAbiInnerClass() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  class Inner1 {}
++                }
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  class Inner2 {}
++                }
++        """.trimIndent()
++        )
++
++        assertArrayNotEquals(firstHash, secondHash)
++    }
++
++
++    @Test
++    fun testPrivateInnerClassesIgnored() {
++        val firstHash = getHash(
++            """
++                public class A {
++                  protected String value;
++                  private String data;
++
++                  private static class Inner1 {}
++                }
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                public class A {
++                  protected String value;
++                  private int data;
++                  private static class Inner2 {}
++                }
++        """.trimIndent()
++        )
++
++        assertArrayEquals(firstHash, secondHash)
++    }
++
++    @Test
++    fun testKotlinMetadataIgnored() {
++        val firstHash = getHash(
++            """
++                package kotlin;
++
++                @Metadata
++                public class A {
++                }
++                @interface Metadata {}
++        """.trimIndent()
++        )
++
++        val secondHash = getHash(
++            """
++                package kotlin;
++                public class A {
++
++                }
++        """.trimIndent()
++        )
++
++        assertArrayEquals(firstHash, secondHash)
++    }
++
++    private fun assertArrayNotEquals(first: ByteArray, second: ByteArray) {
++        Assert.assertFalse(Arrays.equals(first, second))
++    }
++
++
++    private fun getHash(source: String, className: String = "A"): ByteArray {
++        val src = tmp.newFolder().resolve("$className.java")
++
++        src.writeText(source)
++
++        val output = tmp.newFolder()
++        compileSources(listOf(src), output)
++
++        val classFile = output.walk().filter { it.name == "$className.class" }.single()
++
++        classFile.inputStream().use {
++            val extractor = ClassAbiExtractor(ClassWriter(0))
++            ClassReader(it.readBytes()).accept(extractor, ClassReader.SKIP_CODE or ClassReader.SKIP_FRAMES or ClassReader.SKIP_DEBUG)
++            return extractor.getBytes()
++        }
++    }
++}
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin/src/test/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/incremental/ClassTypeExtractorVisitorTest.kt
+@@ -0,0 +1,138 @@
++/*
++ * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.gradle.internal.kapt.incremental
++
++import org.jetbrains.kotlin.gradle.util.compileSources
++import org.jetbrains.org.objectweb.asm.ClassReader
++import org.jetbrains.org.objectweb.asm.ClassVisitor
++import org.jetbrains.org.objectweb.asm.Opcodes
++import org.junit.Assert.assertEquals
++import org.junit.Rule
++import org.junit.Test
++import org.junit.rules.TemporaryFolder
++class ClassTypeExtractorVisitorTest {
++    @Rule
++    @JvmField
++    var tmp = TemporaryFolder()
++
++    @Test
++    fun testSupertypes() {
++        val src = """
++            public class A extends B implements java.lang.Runnable {
++              public void run() {}
++            }
++
++            class B {}
++        """.trimIndent()
++        val (abiTypes, privateTypes) = extractTypesFor(src)
++        assertEquals(setOf("B", "java/lang/Runnable"), abiTypes)
++        assertEquals(emptySet<String>(), privateTypes)
++    }
++
++    @Test
++    fun testObjectIgnored() {
++        val src = """
++            public class A {}
++        """.trimIndent()
++        val (abiTypes, privateTypes) = extractTypesFor(src)
++        assertEquals(emptySet<String>(), abiTypes)
++        assertEquals(emptySet<String>(), privateTypes)
++    }
++
++    @Test
++    fun testMethod() {
++        val src = """
++            public class A {
++              public String process(Cloneable c) {
++                Runnable ignored = null;
++                return null;
++              }
++              public int ignorePrimitiveTypes(char c, boolean z, float f, double d, short s, long j, long[] jArray) {
++                return 1;
++              }
++              private java.util.HashSet[] getSets(java.util.ArrayList list) {
++                Runnable ignored = null;
++                return null;
++              }
++            }
++        """.trimIndent()
++        val (abiTypes, privateTypes) = extractTypesFor(src)
++        assertEquals(setOf("java/lang/String", "java/lang/Cloneable"), abiTypes)
++        assertEquals(setOf("java/util/HashSet", "java/util/ArrayList"), privateTypes)
++    }
++
++    @Test
++    fun testField() {
++        val src = """
++            public class A {
++              public String first;
++              protected String second;
++              String third;
++              private Runnable fourth;
++              public int ignored;
++            }
++        """.trimIndent()
++        val (abiTypes, privateTypes) = extractTypesFor(src)
++        assertEquals(setOf("java/lang/String"), abiTypes)
++        assertEquals(setOf("java/lang/Runnable"), privateTypes)
++    }
++
++    @Test
++    fun testClassAnnotations() {
++        val src = """
++            import java.lang.annotation.*;
++
++            @Annotation
++            public class A extends @TypeAnnotation B {
++            }
++            class B {}
++            @interface Annotation {}
++
++            @Target(value=ElementType.TYPE_USE)
++            @interface TypeAnnotation {}
++        """.trimIndent()
++        val (abiTypes, privateTypes) = extractTypesFor(src)
++        assertEquals(setOf("B", "Annotation", "TypeAnnotation"), abiTypes)
++        assertEquals(emptySet<String>(), privateTypes)
++    }
++
++    @Test
++    fun testMemberAnnotations() {
++        val src = """
++            import java.lang.annotation.*;
++
++            public class A {
++              @FieldAnnotation String data;
++
++              @MethodAnnotation
++              String getName(@ParameterAnnotation String originalName) {
++                return originalName + "suffix";
++              }
++            }
++            @interface FieldAnnotation {}
++            @interface MethodAnnotation {}
++            @interface ParameterAnnotation {}
++        """.trimIndent()
++        val (abiTypes, privateTypes) = extractTypesFor(src)
++        assertEquals(setOf("FieldAnnotation", "MethodAnnotation", "ParameterAnnotation", "java/lang/String"), abiTypes)
++        assertEquals(emptySet<String>(), privateTypes)
++    }
++
++    private fun extractTypesFor(source: String, className: String = "A"): Pair<Set<String>, Set<String>> {
++        val src = tmp.newFolder().resolve("$className.java")
++        src.writeText(source)
++
++        val output = tmp.newFolder()
++        compileSources(listOf(src), output)
++        val classFile = output.walk().filter { it.name == "$className.class" }.single()
++        val extractor = ClassTypeExtractorVisitor(object : ClassVisitor(Opcodes.API_VERSION) {})
++
++        classFile.inputStream().use {
++            ClassReader(it.readBytes()).accept(extractor, ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES)
++            return Pair(extractor.getAbiTypes(), extractor.getPrivateTypes())
++        }
++    }
++}
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin/src/test/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/incremental/ClasspathAnalyzerTest.kt
+@@ -0,0 +1,106 @@
++/*
++ * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.gradle.internal.kapt.incremental
++
++import org.jetbrains.org.objectweb.asm.ClassWriter
++import org.jetbrains.org.objectweb.asm.Opcodes
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Rule
++import org.junit.Test
++import org.junit.rules.TemporaryFolder
++import java.util.zip.ZipEntry
++import java.util.zip.ZipOutputStream
++
++class ClasspathAnalyzerTest {
++    @Rule
++    @JvmField
++    var tmp = TemporaryFolder()
++
++    @Test
++    fun testDirectory() {
++        val classesDir = tmp.newFolder().also { dir ->
++            dir.resolve("test").mkdirs()
++            dir.resolve("test/A.class").writeBytes(emptyClass("test/A"))
++            dir.resolve("test/B.class").writeBytes(emptyClass("test/B"))
++            dir.resolve("ignore.txt").writeBytes(emptyClass("test/B"))
++            dir.resolve("META-INF/versions/9/A.class").also {
++                it.parentFile.mkdirs()
++                it.writeBytes(emptyClass("A"))
++            }
++        }
++        val transform = StructureArtifactTransform().also { it.outputDirectory = tmp.newFolder() }
++        val outputs = transform.transform(classesDir)
++
++        val lazyData = LazyClasspathEntryData.LazyClasspathEntrySerializer.loadFromFile(outputs.single())
++        assertEquals(classesDir, lazyData.classpathEntry)
++
++        val data = lazyData.getClasspathEntryData()
++        assertEquals(setOf("test/A", "test/B"), data.classAbiHash.keys)
++        assertEquals(setOf("test/A", "test/B"), data.classDependencies.keys)
++        assertEquals(emptySet<String>(), data.classDependencies["test/A"]!!.abiTypes)
++        assertEquals(emptySet<String>(), data.classDependencies["test/A"]!!.privateTypes)
++
++        assertEquals(emptySet<String>(), data.classDependencies["test/B"]!!.abiTypes)
++        assertEquals(emptySet<String>(), data.classDependencies["test/B"]!!.privateTypes)
++    }
++
++    @Test
++    fun testJar() {
++        val inputJar = tmp.newFile("input.jar").also { jar ->
++            ZipOutputStream(jar.outputStream()).use {
++                it.putNextEntry(ZipEntry("test/A.class"))
++                it.write(emptyClass("test/A"))
++                it.closeEntry()
++
++                it.putNextEntry(ZipEntry("test/B.class"))
++                it.write(emptyClass("test/B"))
++                it.closeEntry()
++
++                it.putNextEntry(ZipEntry("ignored.txt"))
++                it.closeEntry()
++
++                it.putNextEntry(ZipEntry("META-INF/versions/9/test/A.class"))
++                it.write(emptyClass("test/A"))
++                it.closeEntry()
++            }
++        }
++        val transform = StructureArtifactTransform().also { it.outputDirectory = tmp.newFolder() }
++        val outputs = transform.transform(inputJar)
++
++        val lazyData = LazyClasspathEntryData.LazyClasspathEntrySerializer.loadFromFile(outputs.single())
++        assertEquals(inputJar, lazyData.classpathEntry)
++
++        val data = lazyData.getClasspathEntryData()
++        assertEquals(setOf("test/A", "test/B"), data.classAbiHash.keys)
++        assertEquals(setOf("test/A", "test/B"), data.classDependencies.keys)
++        assertEquals(emptySet<String>(), data.classDependencies["test/A"]!!.abiTypes)
++        assertEquals(emptySet<String>(), data.classDependencies["test/A"]!!.privateTypes)
++
++        assertEquals(emptySet<String>(), data.classDependencies["test/B"]!!.abiTypes)
++        assertEquals(emptySet<String>(), data.classDependencies["test/B"]!!.privateTypes)
++    }
++
++    @Test
++    fun emptyInput() {
++        val inputDir = tmp.newFolder("input")
++        val transform = StructureArtifactTransform().also { it.outputDirectory = tmp.newFolder() }
++        val outputs = transform.transform(inputDir)
++
++        val lazyData = LazyClasspathEntryData.LazyClasspathEntrySerializer.loadFromFile(outputs.single())
++        assertEquals(inputDir, lazyData.classpathEntry)
++
++        val data = lazyData.getClasspathEntryData()
++        assertTrue(data.classAbiHash.isEmpty())
++        assertTrue(data.classDependencies.isEmpty())
++    }
++
++    private fun emptyClass(internalName: String): ByteArray {
++        val writer = ClassWriter(Opcodes.API_VERSION)
++        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, internalName, null, "java/lang/Object", emptyArray())
++        return writer.toByteArray()
++    }
++}
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin/src/test/kotlin/org/jetbrains/kotlin/gradle/internal/kapt/incremental/ClasspathSnapshotTest.kt
+@@ -0,0 +1,120 @@
++/*
++ * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.gradle.internal.kapt.incremental
++
++import org.junit.Assert.assertEquals
++import org.junit.Rule
++import org.junit.Test
++import org.junit.rules.TemporaryFolder
++import java.io.File
++
++class ClasspathSnapshotTest {
++    @Rule
++    @JvmField
++    var tmp = TemporaryFolder()
++
++    @Test
++    fun testSerialization() {
++        val (firstJar, lazyData) = generateLazyData(
++            ClassData("first/A"), ClassData("first/B")
++        )
++
++        val snapshotDir = tmp.newFolder()
++        val currentSnapshot = ClasspathSnapshot.ClasspathSnapshotFactory.createCurrent(snapshotDir, listOf(firstJar), setOf(lazyData))
++        assertEquals(KaptClasspathChanges.Unknown, currentSnapshot.diff(UnknownSnapshot, setOf(firstJar)))
++        currentSnapshot.writeToCache()
++
++        val loadedSnapshot = ClasspathSnapshot.ClasspathSnapshotFactory.loadFrom(snapshotDir)
++
++        val diff = loadedSnapshot.diff(currentSnapshot, setOf(firstJar)) as KaptClasspathChanges.Known
++        assertEquals(emptySet<String>(), diff.names)
++    }
++
++    @Test
++    fun testIncompatibleClasspaths() {
++        val firstSnapshot = ClasspathSnapshot.ClasspathSnapshotFactory.createCurrent(File(""), listOf(File("1.jar")), emptySet())
++        val secondSnapshot =
++            ClasspathSnapshot.ClasspathSnapshotFactory.createCurrent(File(""), listOf(File("1.jar"), File("added.jar")), emptySet())
++        assertEquals(KaptClasspathChanges.Unknown, firstSnapshot.diff(secondSnapshot, setOf(File("added.jar"))))
++    }
++
++    @Test
++    fun testChangedClassesFound() {
++        val (firstJar, firstLazyData) = generateLazyData(
++            ClassData("first/A"),
++            ClassData("first/B").also { it.withAbiDependencies("first/A") }
++        )
++        val firstSnapshot = ClasspathSnapshot.ClasspathSnapshotFactory.createCurrent(File(""), listOf(firstJar), setOf(firstLazyData))
++        firstSnapshot.diff(UnknownSnapshot, setOf(firstJar))
++
++        val (_, changedLazyData) = generateLazyData(
++            ClassData("first/A", ByteArray(1)),
++            ClassData("first/B").also { it.withAbiDependencies("first/A") },
++            jarInput = firstJar
++        )
++        val changedSnapshot = ClasspathSnapshot.ClasspathSnapshotFactory.createCurrent(File(""), listOf(firstJar), setOf(changedLazyData))
++
++        val diff = changedSnapshot.diff(firstSnapshot, setOf(firstJar)) as KaptClasspathChanges.Known
++        assertEquals(setOf("first/A", "first/B"), diff.names)
++    }
++
++    @Test
++    fun testChangedClassesAcrossEntries() {
++        val (firstJar, firstLazyData) = generateLazyData(
++            ClassData("first/A").also { it.withAbiDependencies("library/C") },
++            ClassData("first/B").also { it.withAbiDependencies("first/A") }
++        )
++
++        val (libraryJar, libraryLazyData) = generateLazyData(ClassData("library/C"))
++
++        val cacheDir = tmp.newFolder()
++        val firstSnapshot =
++            ClasspathSnapshot.ClasspathSnapshotFactory.createCurrent(
++                cacheDir,
++                listOf(firstJar, libraryJar),
++                setOf(firstLazyData, libraryLazyData)
++            )
++        firstSnapshot.diff(UnknownSnapshot, setOf(firstJar, libraryJar))
++        firstSnapshot.writeToCache()
++
++        val (_, changedLazyData) = generateLazyData(ClassData("library/C", ByteArray(1)), jarInput = libraryJar)
++        val changedSnapshot =
++            ClasspathSnapshot.ClasspathSnapshotFactory.createCurrent(
++                cacheDir,
++                listOf(firstJar, libraryJar),
++                setOf(firstLazyData, changedLazyData)
++            )
++
++        val diff = changedSnapshot.diff(firstSnapshot, setOf(libraryJar)) as KaptClasspathChanges.Known
++        assertEquals(setOf("library/C", "first/A", "first/B"), diff.names)
++    }
++
++    private fun generateLazyData(
++        vararg classData: ClassData,
++        jarInput: File = tmp.newFile()
++    ): Pair<File, File> {
++        val data = ClasspathEntryData()
++        classData.forEach {
++            data.classAbiHash[it.internalName] = it.hash
++            data.classDependencies[it.internalName] = ClassDependencies(it.abiDeps, it.privateDeps)
++        }
++        val serialized = tmp.newFile().also { data.saveTo(it) }
++        val lazyData = tmp.newFile().also { LazyClasspathEntryData(jarInput, serialized).saveToFile(it) }
++
++        return Pair(jarInput, lazyData)
++    }
++
++    private class ClassData(
++        val internalName: String,
++        val hash: ByteArray = ByteArray(0)
++    ) {
++        val abiDeps = mutableSetOf<String>()
++        val privateDeps = mutableSetOf<String>()
++        fun withAbiDependencies(vararg names: String) {
++            abiDeps.addAll(names)
++        }
++    }
++}
+\ No newline at end of file
+--- a/libraries/tools/kotlin-gradle-plugin/src/test/kotlin/org/jetbrains/kotlin/gradle/util/bytecodeUtils.kt
++++ b/libraries/tools/kotlin-gradle-plugin/src/test/kotlin/org/jetbrains/kotlin/gradle/util/bytecodeUtils.kt
+@@ -5,6 +5,7 @@
+ import java.io.File
+ import java.io.PrintWriter
+ import java.io.StringWriter
++import javax.tools.ToolProvider
+ 
+ fun classFileBytecodeString(classFile: File): String {
+     val out = StringWriter()
+@@ -29,4 +30,16 @@
+     for (string in strings) {
+         assert(!bytecode.contains(string)) { "Bytecode should NOT contain '$string':\n$bytecode" }
+     }
++}
++
++fun compileSources(sources: Collection<File>, outputDir: File) {
++    val compiler = ToolProvider.getSystemJavaCompiler()
++    compiler.getStandardFileManager(null, null, null).use { fileManager ->
++        val compilationTask =
++            compiler.getTask(
++                null, fileManager, null, listOf("-d", outputDir.absolutePath), null, fileManager.getJavaFileObjectsFromFiles(sources)
++            )
++
++        compilationTask.call()
++    }
+ }
+\ No newline at end of file
+--- a/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/kotlin/org/jetbrains/kotlin/gradle/AbstractKotlinAndroidGradleTests.kt
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/kotlin/org/jetbrains/kotlin/gradle/AbstractKotlinAndroidGradleTests.kt
+@@ -680,7 +680,7 @@
+ 
+         val kotlinJvmTarget18Regex = Regex("Kotlin compiler args: .* -jvm-target 1.8")
+ 
+-        build(":Lib:assemble") {
++        build(":Lib:assembleDebug", "-Pkotlin.setJvmTargetFromAndroidCompileOptions=true") {
+             assertSuccessful()
+             assertNotContains(kotlinJvmTarget18Regex)
+         }
+@@ -694,7 +694,12 @@
+             """.trimIndent()
+         )
+ 
+-        build(":Lib:assemble") {
++        build("clean", ":Lib:assembleDebug") {
++            assertSuccessful()
++            assertNotContains(kotlinJvmTarget18Regex)
++        }
++
++        build(":Lib:assembleDebug", "-Pkotlin.setJvmTargetFromAndroidCompileOptions=true") {
+             assertSuccessful()
+             assertContainsRegex(kotlinJvmTarget18Regex)
+         }
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/kotlin/org/jetbrains/kotlin/gradle/CocoaPodsIT.kt
+@@ -0,0 +1,213 @@
++/*
++ * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.gradle
++
++import org.jetbrains.kotlin.gradle.util.modify
++import org.jetbrains.kotlin.konan.target.HostManager
++import org.junit.Assume.assumeTrue
++import org.junit.Test
++import java.io.File
++import java.util.concurrent.TimeUnit
++import kotlin.test.assertEquals
++import kotlin.test.fail
++
++class CocoaPodsIT : BaseGradleIT() {
++
++    // We use Kotlin DSL. Earlier Gradle versions fail at accessors codegen.
++    val gradleVersion = GradleVersionRequired.AtLeast("4.9")
++
++    val PODFILE_IMPORT_DIRECTIVE_PLACEHOLDER = "<import_mode_directive>"
++
++    @Test
++    fun testPodspec() {
++        assumeTrue(HostManager.hostIsMac)
++        val gradleProject = transformProjectWithPluginsDsl("new-mpp-cocoapods", gradleVersion)
++
++        // Check that the podspec task fails if there is no Gradle wrapper in the project.
++        gradleProject.build(":kotlin-library:podspec") {
++            assertFailed()
++            assertContains("The Gradle wrapper is required to run the build from Xcode.")
++            assertContains("Please run the same command with `-Pkotlin.native.cocoapods.generate.wrapper=true` " +
++                                   "or run the `:wrapper` task to generate the wrapper manually.")
++        }
++
++        // Check that we can generate the wrapper along with the podspec if the corresponding property specified
++        gradleProject.build(":kotlin-library:podspec", "-Pkotlin.native.cocoapods.generate.wrapper=true") {
++            assertSuccessful()
++            assertTasksExecuted(":kotlin-library:podspec", ":wrapper")
++            assertFileExists("gradlew")
++
++            // Check that the podspec file is correctly generated.
++            val podspecFileName = "kotlin-library/kotlin_library.podspec"
++            val expectedPodspecContent = """
++                Pod::Spec.new do |spec|
++                    spec.name                     = 'kotlin_library'
++                    spec.version                  = '1.0'
++                    spec.homepage                 = 'https://github.com/JetBrains/kotlin'
++                    spec.source                   = { :git => "Not Published", :tag => "Cocoapods/#{spec.name}/#{spec.version}" }
++                    spec.authors                  = ''
++                    spec.license                  = ''
++                    spec.summary                  = 'CocoaPods test library'
++
++                    spec.static_framework         = true
++                    spec.vendored_frameworks      = "build/cocoapods/framework/#{spec.name}.framework"
++                    spec.libraries                = "c++"
++                    spec.module_name              = "#{spec.name}_umbrella"
++
++                    spec.dependency 'pod_dependency', '1.0'
++
++                    spec.pod_target_xcconfig = {
++                        'KOTLIN_TARGET[sdk=iphonesimulator*]' => 'ios_x64',
++                        'KOTLIN_TARGET[sdk=iphoneos*]' => 'ios_arm',
++                        'KOTLIN_TARGET[sdk=macosx*]' => 'macos_x64'
++                    }
++
++                    spec.script_phases = [
++                        {
++                            :name => 'Build kotlin_library',
++                            :execution_position => :before_compile,
++                            :shell_path => '/bin/sh',
++                            :script => <<-SCRIPT
++                                set -ev
++                                REPO_ROOT="${'$'}PODS_TARGET_SRCROOT"
++                                "${'$'}REPO_ROOT/../gradlew" -p "${'$'}REPO_ROOT" :kotlin-library:syncFramework \
++                                    -Pkotlin.native.cocoapods.target=${'$'}KOTLIN_TARGET \
++                                    -Pkotlin.native.cocoapods.configuration=${'$'}CONFIGURATION \
++                                    -Pkotlin.native.cocoapods.cflags="${'$'}OTHER_CFLAGS" \
++                                    -Pkotlin.native.cocoapods.paths.headers="${'$'}HEADER_SEARCH_PATHS" \
++                                    -Pkotlin.native.cocoapods.paths.frameworks="${'$'}FRAMEWORK_SEARCH_PATHS"
++                            SCRIPT
++                        }
++                    ]
++                end
++            """.trimIndent()
++
++            assertFileExists(podspecFileName)
++            assertEquals(expectedPodspecContent, fileInWorkingDir(podspecFileName).readText())
++        }
++    }
++
++    @Test
++    fun testInterop() {
++        assumeTrue(HostManager.hostIsMac)
++        val gradleProject = transformProjectWithPluginsDsl("new-mpp-cocoapods", gradleVersion)
++        with(gradleProject) {
++            // Check that a project with CocoaPods interop fails to be built from command line.
++            build(":kotlin-library:build") {
++                assertFailed()
++                assertContains("Cannot perform cinterop processing for pod_dependency: cannot determine headers location.")
++            }
++
++            // Check that a project without CocoaPods interop can be built from command line.
++            gradleBuildScript("kotlin-library").modify {
++                it.replace("""pod("pod_dependency", "1.0")""", "")
++            }
++            projectDir.resolve("kotlin-library/src/iosMain/kotlin/A.kt").modify {
++                it.replace("import cocoapods.pod_dependency.*", "").replace("println(foo())", "")
++            }
++            build(":kotlin-library:linkReleaseFrameworkIOS") {
++                assertSuccessful()
++            }
++        }
++    }
++
++    private enum class ImportMode(val directive: String) {
++        FRAMEWORKS("use_frameworks!"),
++        MODULAR_HEADERS("use_modular_headers!")
++    }
++
++    private data class CommandResult(
++        val exitCode: Int,
++        val stdOut: String,
++        val stdErr: String
++    )
++
++    private fun runCommand(
++        workingDir: File,
++        command: String,
++        vararg args: String,
++        timeoutSec: Long = 120,
++        inheritIO: Boolean = false,
++        block: CommandResult.() -> Unit
++    ) {
++        val process = ProcessBuilder(command, *args).apply {
++            directory(workingDir)
++            if (inheritIO) {
++                inheritIO()
++            }
++        }.start()
++
++        val isFinished = process.waitFor(timeoutSec, TimeUnit.SECONDS)
++        val stdOut = process.inputStream.bufferedReader().use { it.readText() }
++        val stdErr = process.errorStream.bufferedReader().use { it.readText() }
++
++        if (!isFinished) {
++            process.destroyForcibly()
++            println("Stdout:\n$stdOut")
++            println("Stderr:\n$stdErr")
++            fail("Command '$command ${args.joinToString(" ")}' killed by timeout.".trimIndent())
++        }
++        CommandResult(process.exitValue(), stdOut, stdErr).block()
++    }
++
++    private fun doTestXcode(mode: ImportMode) {
++        assumeTrue(HostManager.hostIsMac)
++        val gradleProject = transformProjectWithPluginsDsl("new-mpp-cocoapods", gradleVersion)
++
++        with(gradleProject) {
++            // Generate podspec.
++            gradleProject.build(":kotlin-library:podspec", "-Pkotlin.native.cocoapods.generate.wrapper=true") {
++                assertSuccessful()
++            }
++
++            val iosAppDir = projectDir.resolve("ios-app")
++
++            // Set import mode for Podfile.
++            iosAppDir.resolve("Podfile").modify {
++                it.replace(PODFILE_IMPORT_DIRECTIVE_PLACEHOLDER, mode.directive)
++            }
++
++            // Install pods.
++            runCommand(iosAppDir, "pod", "install") {
++                assertEquals(0, exitCode,  """
++                        |Exit code mismatch for `pod install`.
++                        |stdout:
++                        |$stdOut
++                        |
++                        |stderr:
++                        |$stdErr
++                    """.trimMargin()
++                )
++            }
++
++            // Run Xcode build.
++            runCommand(iosAppDir, "xcodebuild",
++                       "-sdk", "iphonesimulator",
++                       "-arch", "arm64",
++                       "-configuration", "Release",
++                       "-workspace", "ios-app.xcworkspace",
++                       "-scheme", "ios-app",
++                       inheritIO = true // Xcode doesn't finish the process if the PIPE redirect is used.
++            ) {
++                assertEquals(0, exitCode, """
++                        |Exit code mismatch for `xcodebuild`.
++                        |stdout:
++                        |$stdOut
++                        |
++                        |stderr:
++                        |$stdErr
++                    """.trimMargin()
++                )
++            }
++        }
++    }
++
++    @Test
++    fun testXcodeUseFrameworks() = doTestXcode(ImportMode.FRAMEWORKS)
++
++    @Test
++    fun testXcodeUseModularHeaders() = doTestXcode(ImportMode.MODULAR_HEADERS)
++}
+\ No newline at end of file
+--- a/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/kotlin/org/jetbrains/kotlin/gradle/KaptIncrementalWithAggregatingApt.kt
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/kotlin/org/jetbrains/kotlin/gradle/KaptIncrementalWithAggregatingApt.kt
+@@ -35,32 +35,20 @@
+     fun testIncrementalChanges() {
+         val project = getProject()
+ 
+-        var aptTimestamp = 0L
+-
+         project.build("clean", "build") {
+             assertSuccessful()
+-
+-            val classpathHistory =
+-                fileInWorkingDir("build/kotlin/kaptGenerateStubsKotlin/classpath-fq-history").listFiles().asList().single()
+-            val stubsTimestamp = classpathHistory.name.toLong()
+-
+-            aptTimestamp = fileInWorkingDir("build/tmp/kapt3/incApCache/main/last-build-ts.bin").readText().toLong()
+-            assertTrue(stubsTimestamp < aptTimestamp)
+         }
+ 
+         project.projectFile("useB.kt").modify { current -> "$current\nfun otherFunction() {}" }
+         project.build("build") {
+             assertSuccessful()
+ 
+-            val newAptTimestamp = fileInWorkingDir("build/tmp/kapt3/incApCache/main/last-build-ts.bin").readText().toLong()
+-            assertTrue(aptTimestamp < newAptTimestamp)
+-
+             assertEquals(
+                 setOf(
+-                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/UseBKt.java").absolutePath,
+-                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/B.java").absolutePath,
+-                    fileInWorkingDir("build/tmp/kapt3/stubs/main/baz/UtilKt.java").absolutePath,
+-                    fileInWorkingDir("build/tmp/kapt3/stubs/main/foo/A.java").absolutePath
++                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/UseBKt.java").canonicalPath,
++                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/B.java").canonicalPath,
++                    fileInWorkingDir("build/tmp/kapt3/stubs/main/baz/UtilKt.java").canonicalPath,
++                    fileInWorkingDir("build/tmp/kapt3/stubs/main/foo/A.java").canonicalPath
+                 ), getProcessedSources(output)
+             )
+         }
+@@ -73,14 +61,79 @@
+             assertSuccessful()
+             assertEquals(
+                 setOf(
+-                    project.projectFile("JavaClass.java").absolutePath,
+-                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/UseBKt.java").absolutePath,
+-                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/B.java").absolutePath,
+-                    fileInWorkingDir("build/tmp/kapt3/stubs/main/baz/UtilKt.java").absolutePath,
+-                    fileInWorkingDir("build/tmp/kapt3/stubs/main/foo/A.java").absolutePath
++                    project.projectFile("JavaClass.java").canonicalPath,
++                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/UseBKt.java").canonicalPath,
++                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/B.java").canonicalPath,
++                    fileInWorkingDir("build/tmp/kapt3/stubs/main/baz/UtilKt.java").canonicalPath,
++                    fileInWorkingDir("build/tmp/kapt3/stubs/main/foo/A.java").canonicalPath
+                 ),
+                 getProcessedSources(output)
+             )
+         }
+     }
++
++    @Test
++    fun testClasspathChanges() {
++        val project = Project(
++            "incrementalMultiproject",
++            GradleVersionRequired.None
++        ).apply {
++            setupWorkingDir()
++            val processorPath = generateProcessor("AGGREGATING")
++
++            projectDir.resolve("app/build.gradle").appendText(
++                """
++
++                    apply plugin: "kotlin-kapt"
++                dependencies {
++                  implementation "org.jetbrains.kotlin:kotlin-stdlib:${'$'}kotlin_version"
++                  kapt files("${processorPath.invariantSeparatorsPath}")
++                }
++            """.trimIndent()
++            )
++
++            projectDir.resolve("lib/build.gradle").appendText(
++                """
++
++                dependencies {
++                  implementation "org.jetbrains.kotlin:kotlin-stdlib:${'$'}kotlin_version"
++                }
++            """.trimIndent()
++            )
++        }
++
++        project.build("clean", ":app:build") {
++            assertSuccessful()
++        }
++
++        project.projectFile("A.kt").modify { current ->
++            val lastBrace = current.lastIndexOf("}")
++            current.substring(0, lastBrace) + "fun anotherFun() {}\n }"
++        }
++        project.build("build") {
++            assertSuccessful()
++
++            assertEquals(
++                setOf(
++                    fileInWorkingDir("app/build/tmp/kapt3/stubs/main/foo/AA.java").canonicalPath,
++                    fileInWorkingDir("app/build/tmp/kapt3/stubs/main/foo/AAA.java").canonicalPath,
++                    fileInWorkingDir("app/build/tmp/kapt3/stubs/main/foo/BB.java").canonicalPath,
++                    fileInWorkingDir("app/build/tmp/kapt3/stubs/main/foo/FooUseAKt.java").canonicalPath,
++                    fileInWorkingDir("app/build/tmp/kapt3/stubs/main/foo/FooUseBKt.java").canonicalPath,
++                    fileInWorkingDir("app/build/tmp/kapt3/stubs/main/foo/FooUseAAKt.java").canonicalPath,
++                    fileInWorkingDir("app/build/tmp/kapt3/stubs/main/foo/FooUseBBKt.java").canonicalPath
++
++                ), getProcessedSources(output)
++            )
++        }
++
++        project.projectFile("A.kt").modify { current ->
++            val lastBrace = current.lastIndexOf("}")
++            current.substring(0, lastBrace) + "private fun privateFunction() {}\n }"
++        }
++        project.build("build") {
++            assertSuccessful()
++            assertTrue(getProcessedSources(output).isEmpty())
++        }
++    }
+ }
+\ No newline at end of file
+--- a/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/kotlin/org/jetbrains/kotlin/gradle/KaptIncrementalWithIsolatingApt.kt
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/kotlin/org/jetbrains/kotlin/gradle/KaptIncrementalWithIsolatingApt.kt
+@@ -10,6 +10,7 @@
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertTrue
+ import org.junit.Test
++import java.io.File
+ import java.util.zip.ZipEntry
+ import java.util.zip.ZipOutputStream
+ 
+@@ -38,27 +39,15 @@
+     fun testIncrementalChanges() {
+         val project = getProject()
+ 
+-        var aptTimestamp = 0L
+-
+         project.build("clean", "build") {
+             assertSuccessful()
+-
+-            val classpathHistory =
+-                fileInWorkingDir("build/kotlin/kaptGenerateStubsKotlin/classpath-fq-history").listFiles().asList().single()
+-            val stubsTimestamp = classpathHistory.name.toLong()
+-
+-            aptTimestamp = fileInWorkingDir("build/tmp/kapt3/incApCache/main/last-build-ts.bin").readText().toLong()
+-            assertTrue(stubsTimestamp < aptTimestamp)
+         }
+ 
+         project.projectFile("useB.kt").modify { current -> "$current\nfun otherFunction() {}" }
+         project.build("build") {
+             assertSuccessful()
+ 
+-            val newAptTimestamp = fileInWorkingDir("build/tmp/kapt3/incApCache/main/last-build-ts.bin").readText().toLong()
+-            assertTrue(aptTimestamp < newAptTimestamp)
+-
+-            assertEquals(setOf(fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/UseBKt.java").absolutePath), getProcessedSources(output))
++            assertEquals(setOf(fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/UseBKt.java").canonicalPath), getProcessedSources(output))
+         }
+ 
+         project.projectFile("B.kt").modify { current ->
+@@ -69,8 +58,8 @@
+             assertSuccessful()
+             assertEquals(
+                 setOf(
+-                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/B.java").absolutePath,
+-                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/UseBKt.java").absolutePath
++                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/B.java").canonicalPath,
++                    fileInWorkingDir("build/tmp/kapt3/stubs/main/bar/UseBKt.java").canonicalPath
+                 ),
+                 getProcessedSources(output)
+             )
+@@ -82,13 +71,22 @@
+ fun getProcessedSources(output: String): Set<String> {
+     val logging = output.lines().single { it.contains(patternApt) }
+     val indexOf = logging.indexOf(patternApt) + patternApt.length
+-    return logging.drop(indexOf).split(",").map { it.trim() }.toSet()
++    return logging.drop(indexOf).split(",").map { it.trim() }.filter { !it.isEmpty() }.toSet()
+ }
+ 
+-fun BaseGradleIT.Project.setupIncrementalAptProject(procType: String) {
++fun BaseGradleIT.Project.setupIncrementalAptProject(procType: String, buildFile: File = projectDir.resolve("build.gradle")) {
+     setupWorkingDir()
+-    val buildFile = projectDir.resolve("build.gradle")
+     val content = buildFile.readText()
++    val processorPath = generateProcessor(procType)
++
++    val updatedContent = content.replace(
++        Regex("^\\s*kapt\\s\"org\\.jetbrain.*$", RegexOption.MULTILINE),
++        "    kapt files(\"${processorPath.invariantSeparatorsPath}\")"
++    )
++    buildFile.writeText(updatedContent)
++}
++
++fun BaseGradleIT.Project.generateProcessor(procType: String): File {
+     val processorPath = projectDir.resolve("incrementalProcessor.jar")
+ 
+     ZipOutputStream(processorPath.outputStream()).use {
+@@ -104,10 +102,5 @@
+         it.write(IncrementalProcessor::class.java.name.toByteArray())
+         it.closeEntry()
+     }
+-
+-    val updatedContent = content.replace(
+-        Regex("^\\s*kapt\\s\"org\\.jetbrain.*$", RegexOption.MULTILINE),
+-        "    kapt files(\"${processorPath.invariantSeparatorsPath}\")"
+-    )
+-    buildFile.writeText(updatedContent)
+-}
++    return processorPath
++}
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/.gitignore
+@@ -0,0 +1,8 @@
++ios-app/Pods
++Podfile.lock
++kotlin-library/kotlin_library.podspec
++ios-app/ios-app.xcodeproj/xcuserdata
++ios-app/ios-app.xcworkspace/xcuserdata
++ios-app/ios-app.xcodeproj/project.xcworkspace/xcuserdata
++ios-app/ios-app.xcworkspace/contents.xcworkspacedata
++ios-app/ios-app.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/Podfile
+@@ -0,0 +1,8 @@
++<import_mode_directive>
++
++platform :ios, '9.0'
++
++target 'ios-app' do
++    pod 'pod_dependency', :path => '../pod_dependency'
++    pod 'kotlin_library', :path => '../kotlin-library'
++end
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/ios-app/AppDelegate.swift
+@@ -0,0 +1,34 @@
++import UIKit
++
++@UIApplicationMain
++class AppDelegate: UIResponder, UIApplicationDelegate {
++
++    var window: UIWindow?
++
++    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
++        // Override point for customization after application launch.
++        return true
++    }
++
++    func applicationWillResignActive(_ application: UIApplication) {
++        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
++        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
++    }
++
++    func applicationDidEnterBackground(_ application: UIApplication) {
++        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
++        // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
++    }
++
++    func applicationWillEnterForeground(_ application: UIApplication) {
++        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
++    }
++
++    func applicationDidBecomeActive(_ application: UIApplication) {
++        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
++    }
++
++    func applicationWillTerminate(_ application: UIApplication) {
++        // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
++    }
++}
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/ios-app/Assets.xcassets/AppIcon.appiconset/Contents.json
+@@ -0,0 +1,98 @@
++{
++  "images" : [
++    {
++      "idiom" : "iphone",
++      "size" : "20x20",
++      "scale" : "2x"
++    },
++    {
++      "idiom" : "iphone",
++      "size" : "20x20",
++      "scale" : "3x"
++    },
++    {
++      "idiom" : "iphone",
++      "size" : "29x29",
++      "scale" : "2x"
++    },
++    {
++      "idiom" : "iphone",
++      "size" : "29x29",
++      "scale" : "3x"
++    },
++    {
++      "idiom" : "iphone",
++      "size" : "40x40",
++      "scale" : "2x"
++    },
++    {
++      "idiom" : "iphone",
++      "size" : "40x40",
++      "scale" : "3x"
++    },
++    {
++      "idiom" : "iphone",
++      "size" : "60x60",
++      "scale" : "2x"
++    },
++    {
++      "idiom" : "iphone",
++      "size" : "60x60",
++      "scale" : "3x"
++    },
++    {
++      "idiom" : "ipad",
++      "size" : "20x20",
++      "scale" : "1x"
++    },
++    {
++      "idiom" : "ipad",
++      "size" : "20x20",
++      "scale" : "2x"
++    },
++    {
++      "idiom" : "ipad",
++      "size" : "29x29",
++      "scale" : "1x"
++    },
++    {
++      "idiom" : "ipad",
++      "size" : "29x29",
++      "scale" : "2x"
++    },
++    {
++      "idiom" : "ipad",
++      "size" : "40x40",
++      "scale" : "1x"
++    },
++    {
++      "idiom" : "ipad",
++      "size" : "40x40",
++      "scale" : "2x"
++    },
++    {
++      "idiom" : "ipad",
++      "size" : "76x76",
++      "scale" : "1x"
++    },
++    {
++      "idiom" : "ipad",
++      "size" : "76x76",
++      "scale" : "2x"
++    },
++    {
++      "idiom" : "ipad",
++      "size" : "83.5x83.5",
++      "scale" : "2x"
++    },
++    {
++      "idiom" : "ios-marketing",
++      "size" : "1024x1024",
++      "scale" : "1x"
++    }
++  ],
++  "info" : {
++    "version" : 1,
++    "author" : "xcode"
++  }
++}
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/ios-app/Assets.xcassets/Contents.json
+@@ -0,0 +1,6 @@
++{
++  "info" : {
++    "version" : 1,
++    "author" : "xcode"
++  }
++}
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/ios-app/Base.lproj/LaunchScreen.storyboard
+@@ -0,0 +1,25 @@
++<?xml version="1.0" encoding="UTF-8" standalone="no"?>
++<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="13122.16" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
++    <dependencies>
++        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="13104.12"/>
++        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
++        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
++    </dependencies>
++    <scenes>
++        <!--View Controller-->
++        <scene sceneID="EHf-IW-A2E">
++            <objects>
++                <viewController id="01J-lp-oVM" sceneMemberID="viewController">
++                    <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
++                        <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
++                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
++                        <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
++                        <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
++                    </view>
++                </viewController>
++                <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
++            </objects>
++            <point key="canvasLocation" x="53" y="375"/>
++        </scene>
++    </scenes>
++</document>
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/ios-app/Base.lproj/Main.storyboard
+@@ -0,0 +1,24 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="13122.16" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="BYZ-38-t0r">
++    <dependencies>
++        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="13104.12"/>
++        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
++        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
++    </dependencies>
++    <scenes>
++        <!--View Controller-->
++        <scene sceneID="tne-QT-ifu">
++            <objects>
++                <viewController id="BYZ-38-t0r" customClass="ViewController" customModuleProvider="target" sceneMemberID="viewController">
++                    <view key="view" contentMode="scaleToFill" id="8bC-Xf-vdC">
++                        <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
++                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
++                        <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
++                        <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
++                    </view>
++                </viewController>
++                <placeholder placeholderIdentifier="IBFirstResponder" id="dkx-z0-nzr" sceneMemberID="firstResponder"/>
++            </objects>
++        </scene>
++    </scenes>
++</document>
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/ios-app/Info.plist
+@@ -0,0 +1,45 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++	<key>CFBundleDevelopmentRegion</key>
++	<string>$(DEVELOPMENT_LANGUAGE)</string>
++	<key>CFBundleExecutable</key>
++	<string>$(EXECUTABLE_NAME)</string>
++	<key>CFBundleIdentifier</key>
++	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
++	<key>CFBundleInfoDictionaryVersion</key>
++	<string>6.0</string>
++	<key>CFBundleName</key>
++	<string>$(PRODUCT_NAME)</string>
++	<key>CFBundlePackageType</key>
++	<string>APPL</string>
++	<key>CFBundleShortVersionString</key>
++	<string>1.0</string>
++	<key>CFBundleVersion</key>
++	<string>1</string>
++	<key>LSRequiresIPhoneOS</key>
++	<true/>
++	<key>UILaunchStoryboardName</key>
++	<string>LaunchScreen</string>
++	<key>UIMainStoryboardFile</key>
++	<string>Main</string>
++	<key>UIRequiredDeviceCapabilities</key>
++	<array>
++		<string>armv7</string>
++	</array>
++	<key>UISupportedInterfaceOrientations</key>
++	<array>
++		<string>UIInterfaceOrientationPortrait</string>
++		<string>UIInterfaceOrientationLandscapeLeft</string>
++		<string>UIInterfaceOrientationLandscapeRight</string>
++	</array>
++	<key>UISupportedInterfaceOrientations~ipad</key>
++	<array>
++		<string>UIInterfaceOrientationPortrait</string>
++		<string>UIInterfaceOrientationPortraitUpsideDown</string>
++		<string>UIInterfaceOrientationLandscapeLeft</string>
++		<string>UIInterfaceOrientationLandscapeRight</string>
++	</array>
++</dict>
++</plist>
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/ios-app/ViewController.swift
+@@ -0,0 +1,10 @@
++import UIKit
++import kotlin_library
++
++class ViewController: UIViewController {
++    override func viewDidLoad() {
++        super.viewDidLoad()
++        AKt.bar()
++        // Do any additional setup after loading the view.
++    }
++}
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/ios-app.xcodeproj/project.pbxproj
+@@ -0,0 +1,341 @@
++// !$*UTF8*$!
++{
++	archiveVersion = 1;
++	classes = {
++	};
++	objectVersion = 50;
++	objects = {
++
++/* Begin PBXBuildFile section */
++		2C4835762268863D00C928E6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4835752268863D00C928E6 /* AppDelegate.swift */; };
++		2C4835782268863D00C928E6 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4835772268863D00C928E6 /* ViewController.swift */; };
++		2C48357B2268863D00C928E6 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 2C4835792268863D00C928E6 /* Main.storyboard */; };
++		2C48357D2268863E00C928E6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2C48357C2268863E00C928E6 /* Assets.xcassets */; };
++		2C4835802268863E00C928E6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 2C48357E2268863E00C928E6 /* LaunchScreen.storyboard */; };
++/* End PBXBuildFile section */
++
++/* Begin PBXFileReference section */
++		2C4835722268863D00C928E6 /* ios-app.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ios-app.app"; sourceTree = BUILT_PRODUCTS_DIR; };
++		2C4835752268863D00C928E6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
++		2C4835772268863D00C928E6 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
++		2C48357A2268863D00C928E6 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
++		2C48357C2268863E00C928E6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
++		2C48357F2268863E00C928E6 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
++		2C4835812268863E00C928E6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
++/* End PBXFileReference section */
++
++/* Begin PBXFrameworksBuildPhase section */
++		2C48356F2268863D00C928E6 /* Frameworks */ = {
++			isa = PBXFrameworksBuildPhase;
++			buildActionMask = 2147483647;
++			files = (
++			);
++			runOnlyForDeploymentPostprocessing = 0;
++		};
++/* End PBXFrameworksBuildPhase section */
++
++/* Begin PBXGroup section */
++		2C4835692268863D00C928E6 = {
++			isa = PBXGroup;
++			children = (
++				2C4835742268863D00C928E6 /* ios-app */,
++				2C4835732268863D00C928E6 /* Products */,
++			);
++			sourceTree = "<group>";
++		};
++		2C4835732268863D00C928E6 /* Products */ = {
++			isa = PBXGroup;
++			children = (
++				2C4835722268863D00C928E6 /* ios-app.app */,
++			);
++			name = Products;
++			sourceTree = "<group>";
++		};
++		2C4835742268863D00C928E6 /* ios-app */ = {
++			isa = PBXGroup;
++			children = (
++				2C4835752268863D00C928E6 /* AppDelegate.swift */,
++				2C4835772268863D00C928E6 /* ViewController.swift */,
++				2C4835792268863D00C928E6 /* Main.storyboard */,
++				2C48357C2268863E00C928E6 /* Assets.xcassets */,
++				2C48357E2268863E00C928E6 /* LaunchScreen.storyboard */,
++				2C4835812268863E00C928E6 /* Info.plist */,
++			);
++			path = "ios-app";
++			sourceTree = "<group>";
++		};
++/* End PBXGroup section */
++
++/* Begin PBXNativeTarget section */
++		2C4835712268863D00C928E6 /* ios-app */ = {
++			isa = PBXNativeTarget;
++			buildConfigurationList = 2C4835842268863E00C928E6 /* Build configuration list for PBXNativeTarget "ios-app" */;
++			buildPhases = (
++				2C48356E2268863D00C928E6 /* Sources */,
++				2C48356F2268863D00C928E6 /* Frameworks */,
++				2C4835702268863D00C928E6 /* Resources */,
++			);
++			buildRules = (
++			);
++			dependencies = (
++			);
++			name = "ios-app";
++			productName = "ios-app";
++			productReference = 2C4835722268863D00C928E6 /* ios-app.app */;
++			productType = "com.apple.product-type.application";
++		};
++/* End PBXNativeTarget section */
++
++/* Begin PBXProject section */
++		2C48356A2268863D00C928E6 /* Project object */ = {
++			isa = PBXProject;
++			attributes = {
++				LastSwiftUpdateCheck = 1020;
++				LastUpgradeCheck = 1020;
++				ORGANIZATIONNAME = jetbrains;
++				TargetAttributes = {
++					2C4835712268863D00C928E6 = {
++						CreatedOnToolsVersion = 10.2;
++					};
++				};
++			};
++			buildConfigurationList = 2C48356D2268863D00C928E6 /* Build configuration list for PBXProject "ios-app" */;
++			compatibilityVersion = "Xcode 9.3";
++			developmentRegion = en;
++			hasScannedForEncodings = 0;
++			knownRegions = (
++				en,
++				Base,
++			);
++			mainGroup = 2C4835692268863D00C928E6;
++			productRefGroup = 2C4835732268863D00C928E6 /* Products */;
++			projectDirPath = "";
++			projectRoot = "";
++			targets = (
++				2C4835712268863D00C928E6 /* ios-app */,
++			);
++		};
++/* End PBXProject section */
++
++/* Begin PBXResourcesBuildPhase section */
++		2C4835702268863D00C928E6 /* Resources */ = {
++			isa = PBXResourcesBuildPhase;
++			buildActionMask = 2147483647;
++			files = (
++				2C4835802268863E00C928E6 /* LaunchScreen.storyboard in Resources */,
++				2C48357D2268863E00C928E6 /* Assets.xcassets in Resources */,
++				2C48357B2268863D00C928E6 /* Main.storyboard in Resources */,
++			);
++			runOnlyForDeploymentPostprocessing = 0;
++		};
++/* End PBXResourcesBuildPhase section */
++
++/* Begin PBXSourcesBuildPhase section */
++		2C48356E2268863D00C928E6 /* Sources */ = {
++			isa = PBXSourcesBuildPhase;
++			buildActionMask = 2147483647;
++			files = (
++				2C4835782268863D00C928E6 /* ViewController.swift in Sources */,
++				2C4835762268863D00C928E6 /* AppDelegate.swift in Sources */,
++			);
++			runOnlyForDeploymentPostprocessing = 0;
++		};
++/* End PBXSourcesBuildPhase section */
++
++/* Begin PBXVariantGroup section */
++		2C4835792268863D00C928E6 /* Main.storyboard */ = {
++			isa = PBXVariantGroup;
++			children = (
++				2C48357A2268863D00C928E6 /* Base */,
++			);
++			name = Main.storyboard;
++			sourceTree = "<group>";
++		};
++		2C48357E2268863E00C928E6 /* LaunchScreen.storyboard */ = {
++			isa = PBXVariantGroup;
++			children = (
++				2C48357F2268863E00C928E6 /* Base */,
++			);
++			name = LaunchScreen.storyboard;
++			sourceTree = "<group>";
++		};
++/* End PBXVariantGroup section */
++
++/* Begin XCBuildConfiguration section */
++		2C4835822268863E00C928E6 /* Debug */ = {
++			isa = XCBuildConfiguration;
++			buildSettings = {
++				ALWAYS_SEARCH_USER_PATHS = NO;
++				CLANG_ANALYZER_NONNULL = YES;
++				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
++				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
++				CLANG_CXX_LIBRARY = "libc++";
++				CLANG_ENABLE_MODULES = YES;
++				CLANG_ENABLE_OBJC_ARC = YES;
++				CLANG_ENABLE_OBJC_WEAK = YES;
++				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
++				CLANG_WARN_BOOL_CONVERSION = YES;
++				CLANG_WARN_COMMA = YES;
++				CLANG_WARN_CONSTANT_CONVERSION = YES;
++				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
++				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
++				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
++				CLANG_WARN_EMPTY_BODY = YES;
++				CLANG_WARN_ENUM_CONVERSION = YES;
++				CLANG_WARN_INFINITE_RECURSION = YES;
++				CLANG_WARN_INT_CONVERSION = YES;
++				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
++				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
++				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
++				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
++				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
++				CLANG_WARN_STRICT_PROTOTYPES = YES;
++				CLANG_WARN_SUSPICIOUS_MOVE = YES;
++				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
++				CLANG_WARN_UNREACHABLE_CODE = YES;
++				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
++				CODE_SIGN_IDENTITY = "iPhone Developer";
++				COPY_PHASE_STRIP = NO;
++				DEBUG_INFORMATION_FORMAT = dwarf;
++				ENABLE_STRICT_OBJC_MSGSEND = YES;
++				ENABLE_TESTABILITY = YES;
++				GCC_C_LANGUAGE_STANDARD = gnu11;
++				GCC_DYNAMIC_NO_PIC = NO;
++				GCC_NO_COMMON_BLOCKS = YES;
++				GCC_OPTIMIZATION_LEVEL = 0;
++				GCC_PREPROCESSOR_DEFINITIONS = (
++					"DEBUG=1",
++					"$(inherited)",
++				);
++				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
++				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
++				GCC_WARN_UNDECLARED_SELECTOR = YES;
++				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
++				GCC_WARN_UNUSED_FUNCTION = YES;
++				GCC_WARN_UNUSED_VARIABLE = YES;
++				IPHONEOS_DEPLOYMENT_TARGET = 12.2;
++				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
++				MTL_FAST_MATH = YES;
++				ONLY_ACTIVE_ARCH = YES;
++				SDKROOT = iphoneos;
++				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
++				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
++			};
++			name = Debug;
++		};
++		2C4835832268863E00C928E6 /* Release */ = {
++			isa = XCBuildConfiguration;
++			buildSettings = {
++				ALWAYS_SEARCH_USER_PATHS = NO;
++				CLANG_ANALYZER_NONNULL = YES;
++				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
++				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
++				CLANG_CXX_LIBRARY = "libc++";
++				CLANG_ENABLE_MODULES = YES;
++				CLANG_ENABLE_OBJC_ARC = YES;
++				CLANG_ENABLE_OBJC_WEAK = YES;
++				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
++				CLANG_WARN_BOOL_CONVERSION = YES;
++				CLANG_WARN_COMMA = YES;
++				CLANG_WARN_CONSTANT_CONVERSION = YES;
++				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
++				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
++				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
++				CLANG_WARN_EMPTY_BODY = YES;
++				CLANG_WARN_ENUM_CONVERSION = YES;
++				CLANG_WARN_INFINITE_RECURSION = YES;
++				CLANG_WARN_INT_CONVERSION = YES;
++				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
++				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
++				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
++				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
++				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
++				CLANG_WARN_STRICT_PROTOTYPES = YES;
++				CLANG_WARN_SUSPICIOUS_MOVE = YES;
++				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
++				CLANG_WARN_UNREACHABLE_CODE = YES;
++				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
++				CODE_SIGN_IDENTITY = "iPhone Developer";
++				COPY_PHASE_STRIP = NO;
++				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
++				ENABLE_NS_ASSERTIONS = NO;
++				ENABLE_STRICT_OBJC_MSGSEND = YES;
++				GCC_C_LANGUAGE_STANDARD = gnu11;
++				GCC_NO_COMMON_BLOCKS = YES;
++				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
++				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
++				GCC_WARN_UNDECLARED_SELECTOR = YES;
++				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
++				GCC_WARN_UNUSED_FUNCTION = YES;
++				GCC_WARN_UNUSED_VARIABLE = YES;
++				IPHONEOS_DEPLOYMENT_TARGET = 12.2;
++				MTL_ENABLE_DEBUG_INFO = NO;
++				MTL_FAST_MATH = YES;
++				SDKROOT = iphoneos;
++				SWIFT_COMPILATION_MODE = wholemodule;
++				SWIFT_OPTIMIZATION_LEVEL = "-O";
++				VALIDATE_PRODUCT = YES;
++			};
++			name = Release;
++		};
++		2C4835852268863E00C928E6 /* Debug */ = {
++			isa = XCBuildConfiguration;
++			buildSettings = {
++				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
++				CODE_SIGN_STYLE = Automatic;
++				DEVELOPMENT_TEAM = "";
++				INFOPLIST_FILE = "ios-app/Info.plist";
++				LD_RUNPATH_SEARCH_PATHS = (
++					"$(inherited)",
++					"@executable_path/Frameworks",
++				);
++				PRODUCT_BUNDLE_IDENTIFIER = "org.jetbrains.konan.ios-app";
++				PRODUCT_NAME = "$(TARGET_NAME)";
++				SWIFT_VERSION = 5.0;
++				TARGETED_DEVICE_FAMILY = "1,2";
++			};
++			name = Debug;
++		};
++		2C4835862268863E00C928E6 /* Release */ = {
++			isa = XCBuildConfiguration;
++			buildSettings = {
++				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
++				CODE_SIGN_STYLE = Automatic;
++				DEVELOPMENT_TEAM = "";
++				INFOPLIST_FILE = "ios-app/Info.plist";
++				LD_RUNPATH_SEARCH_PATHS = (
++					"$(inherited)",
++					"@executable_path/Frameworks",
++				);
++				PRODUCT_BUNDLE_IDENTIFIER = "org.jetbrains.konan.ios-app";
++				PRODUCT_NAME = "$(TARGET_NAME)";
++				SWIFT_VERSION = 5.0;
++				TARGETED_DEVICE_FAMILY = "1,2";
++			};
++			name = Release;
++		};
++/* End XCBuildConfiguration section */
++
++/* Begin XCConfigurationList section */
++		2C48356D2268863D00C928E6 /* Build configuration list for PBXProject "ios-app" */ = {
++			isa = XCConfigurationList;
++			buildConfigurations = (
++				2C4835822268863E00C928E6 /* Debug */,
++				2C4835832268863E00C928E6 /* Release */,
++			);
++			defaultConfigurationIsVisible = 0;
++			defaultConfigurationName = Release;
++		};
++		2C4835842268863E00C928E6 /* Build configuration list for PBXNativeTarget "ios-app" */ = {
++			isa = XCConfigurationList;
++			buildConfigurations = (
++				2C4835852268863E00C928E6 /* Debug */,
++				2C4835862268863E00C928E6 /* Release */,
++			);
++			defaultConfigurationIsVisible = 0;
++			defaultConfigurationName = Release;
++		};
++/* End XCConfigurationList section */
++	};
++	rootObject = 2C48356A2268863D00C928E6 /* Project object */;
++}
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/ios-app.xcodeproj/project.xcworkspace/contents.xcworkspacedata
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<Workspace
++   version = "1.0">
++   <FileRef
++      location = "self:ios-app.xcodeproj">
++   </FileRef>
++</Workspace>
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/ios-app/ios-app.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++	<key>IDEDidComputeMac32BitWarning</key>
++	<true/>
++</dict>
++</plist>
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/kotlin-library/build.gradle.kts
+@@ -0,0 +1,26 @@
++plugins {
++    id("org.jetbrains.kotlin.multiplatform").version("<pluginMarkerVersion>")
++    id("org.jetbrains.kotlin.native.cocoapods").version("<pluginMarkerVersion>")
++}
++
++group = "com.example"
++version = "1.0"
++
++repositories {
++    mavenLocal()
++    jcenter()
++    maven { setUrl("https://dl.bintray.com/kotlin/kotlinx.html/") }
++}
++
++group = "org.jetbrains.kotlin.sample.native"
++version = "1.0"
++
++kotlin {
++    iosX64("iOS")
++
++    cocoapods {
++        summary = "CocoaPods test library"
++        homepage = "https://github.com/JetBrains/kotlin"
++        pod("pod_dependency", "1.0")
++    }
++}
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/kotlin-library/src/iosMain/kotlin/A.kt
+@@ -0,0 +1,5 @@
++import cocoapods.pod_dependency.*
++
++fun bar() {
++    println(foo())
++}
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/pod_dependency/pod_dependency.podspec
+@@ -0,0 +1,11 @@
++Pod::Spec.new do |spec|
++    spec.name                     = 'pod_dependency'
++    spec.version                  = '1.0'
++    spec.homepage                 = 'foo'
++    spec.source                   = { :git => "Not Published", :tag => "Cocoapods/#{spec.name}/#{spec.version}" }
++    spec.authors                  = ''
++    spec.license                  = ''
++    spec.summary                  = 'foo'
++    spec.source_files             = 'src/*'
++    spec.public_header_files      = 'src/*.h'
++end
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/pod_dependency/src/foo.h
+@@ -0,0 +1,3 @@
++#import <Foundation/Foundation.h>
++
++NSString* foo(void);
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/pod_dependency/src/foo.m
+@@ -0,0 +1,5 @@
++#include "foo.h"
++
++NSString* foo() {
++    return @"Foo";
++}
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-gradle-plugin-integration-tests/src/test/resources/testProject/new-mpp-cocoapods/settings.gradle
+@@ -0,0 +1,13 @@
++pluginManagement {
++	repositories {
++		mavenLocal()
++		jcenter()
++		gradlePluginPortal()
++	}
++}
++
++enableFeaturePreview('GRADLE_METADATA')
++
++// We move the actual library in a subproject to test accessing gradle wrapper from Xcode.
++rootProject.name = "cocoapods"
++include 'kotlin-library'
+\ No newline at end of file
+--- /dev/null
++++ b/libraries/tools/kotlin-main-kts/build.gradle
+@@ -0,0 +1,109 @@
++import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
++import proguard.gradle.ProGuardTask
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin \"main\" script definition"
++
++// You can run Gradle with "-Pkotlin.build.proguard=true" to enable ProGuard run on the jar (on TeamCity, ProGuard always runs)
++ext.shrink =findProperty("kotlin.build.proguard")?.toString()?.toBoolean() ?: hasProperty("teamcity")
++
++ext.jarBaseName = property("archivesBaseName") as String
++
++configurations.create("fatJarContents")
++configurations.create("proguardLibraryJars")
++configurations.create("fatJar")
++configurations.create("runtimeJar")
++
++configurations.default.extendsFrom(configurations.runtimeJar)
++
++
++ext.projectsDependencies = [
++    ":kotlin-scripting-common",
++    ":kotlin-scripting-jvm",
++    ":kotlin-script-util",
++    ":kotlin-script-runtime"]
++
++dependencies {
++    projectsDependencies.each {
++        compileOnly(project(it))
++        fatJarContents(project(it)) { setTransitive(false) }
++        testCompile(project(it))
++    }
++    compileOnly("org.apache.ivy:ivy:2.4.0")
++    runtime(project(":kotlin-compiler"))
++    runtime(project(":kotlin-reflect"))
++    fatJarContents("org.apache.ivy:ivy:2.4.0")
++    fatJarContents(DependenciesKt.customCommonDep(project,"org.jetbrains.kotlinx", "kotlinx-coroutines-core",[])) { setTransitive(false) }
++    proguardLibraryJars(files(DependenciesKt.customFirstFromJavaHomeThatExists(project,["jre/lib/rt.jar", "../Classes/classes.jar"],new File(project.property("JDK_18") as String)),
++                              DependenciesKt.customFirstFromJavaHomeThatExists(project,["jre/lib/jsse.jar", "../Classes/jsse.jar"],new File(project.property("JDK_18") as String)),
++                              DependenciesKt.customToolsJar(project)))
++    proguardLibraryJars(DependenciesKt.customKotlinStdlib(project,null))
++    proguardLibraryJars(project(":kotlin-reflect"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" { }
++}
++
++//publish()
++
++ArtifactsKt.customNoDefaultJar(project)
++
++ext.mainKtsRootPackage = "org.jetbrains.kotlin.mainKts"
++ext.mainKtsRelocatedDepsRootPackage = "${mainKtsRootPackage}.relocatedDeps".toString()
++
++task("packJar",type:ShadowJar) {
++    configurations = [project.configurations.fatJar]
++    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
++    destinationDir = new File(buildDir, "libs")
++
++     ArtifactsKt.customSetupPublicJar(it,CommonUtilKt.customGetBaseConvention(project).archivesBaseName, "before-proguard")
++
++    from(SourceSetsKt.customMainSourceSet(project).output)
++    from(project.configurations.fatJarContents)
++
++    EmbeddableKt.packagesToRelocate.each {
++        relocate(it, "${mainKtsRelocatedDepsRootPackage}.${it}".toString())
++    }
++}
++
++task("proguard",type:ProGuardTask) {
++    dependsOn(packJar)
++    configuration("main-kts.pro")
++
++    injars(filter : "!META-INF/versions/**", packJar.outputs.files)
++
++    def outputJar = CommonUtilKt.customFileFrom(buildDir, ["libs", "${jarBaseName}-${version}-after-proguard.jar".toString()])
++
++    outjars(outputJar)
++
++    inputs.files(packJar.outputs.files.singleFile)
++    outputs.file(outputJar)
++
++    libraryjars(filter : "!META-INF/versions/**", project.configurations.proguardLibraryJars)
++}
++
++Task pack;
++if(shrink){
++	pack=proguard
++}else{
++	pack=packJar
++}
++
++ArtifactsKt.customRuntimeJarArtifactBy(project,pack, pack.outputs.files.getSingleFile()) {
++    it.name = jarBaseName
++    it.classifier = ""
++}
++
++ArtifactsKt.customDist(project,null,"${name}.jar".toString(),pack){}
++
++ArtifactsKt.customSourcesJar(project,"main") {}
++//javadocJar()
+--- a/libraries/tools/kotlin-main-kts/build.gradle.kts
++++ /dev/null
+@@ -1,108 +0,0 @@
+-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+-import proguard.gradle.ProGuardTask
+-
+-description = "Kotlin \"main\" script definition"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-// You can run Gradle with "-Pkotlin.build.proguard=true" to enable ProGuard run on the jar (on TeamCity, ProGuard always runs)
+-val shrink =
+-    findProperty("kotlin.build.proguard")?.toString()?.toBoolean()
+-        ?: hasProperty("teamcity")
+-
+-val jarBaseName = property("archivesBaseName") as String
+-
+-val fatJarContents by configurations.creating
+-val proguardLibraryJars by configurations.creating
+-val fatJar by configurations.creating
+-val default by configurations
+-val runtimeJar by configurations.creating
+-
+-default.apply {
+-    extendsFrom(runtimeJar)
+-}
+-
+-val projectsDependencies = listOf(
+-    ":kotlin-scripting-common",
+-    ":kotlin-scripting-jvm",
+-    ":kotlin-script-util",
+-    ":kotlin-script-runtime")
+-
+-dependencies {
+-    projectsDependencies.forEach {
+-        compileOnly(project(it))
+-        fatJarContents(project(it)) { isTransitive = false }
+-        testCompile(project(it))
+-    }
+-    compileOnly("org.apache.ivy:ivy:2.4.0")
+-    runtime(project(":kotlin-compiler"))
+-    runtime(project(":kotlin-reflect"))
+-    fatJarContents("org.apache.ivy:ivy:2.4.0")
+-    fatJarContents(commonDep("org.jetbrains.kotlinx", "kotlinx-coroutines-core")) { isTransitive = false }
+-    proguardLibraryJars(files(firstFromJavaHomeThatExists("jre/lib/rt.jar", "../Classes/classes.jar"),
+-                              firstFromJavaHomeThatExists("jre/lib/jsse.jar", "../Classes/jsse.jar"),
+-                              toolsJar()))
+-    proguardLibraryJars(kotlinStdlib())
+-    proguardLibraryJars(project(":kotlin-reflect"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { }
+-}
+-
+-publish()
+-
+-noDefaultJar()
+-
+-val mainKtsRootPackage = "org.jetbrains.kotlin.mainKts"
+-val mainKtsRelocatedDepsRootPackage = "$mainKtsRootPackage.relocatedDeps"
+-
+-val packJar by task<ShadowJar> {
+-    configurations = listOf(fatJar)
+-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+-    destinationDir = File(buildDir, "libs")
+-
+-    setupPublicJar(project.the<BasePluginConvention>().archivesBaseName, "before-proguard")
+-
+-    from(mainSourceSet.output)
+-    from(fatJarContents)
+-
+-    packagesToRelocate.forEach {
+-        relocate(it, "$mainKtsRelocatedDepsRootPackage.$it")
+-    }
+-}
+-
+-val proguard by task<ProGuardTask> {
+-    dependsOn(packJar)
+-    configuration("main-kts.pro")
+-
+-    injars(mapOf("filter" to "!META-INF/versions/**"), packJar.outputs.files)
+-
+-    val outputJar = fileFrom(buildDir, "libs", "$jarBaseName-$version-after-proguard.jar")
+-
+-    outjars(outputJar)
+-
+-    inputs.files(packJar.outputs.files.singleFile)
+-    outputs.file(outputJar)
+-
+-    libraryjars(mapOf("filter" to "!META-INF/versions/**"), proguardLibraryJars)
+-}
+-
+-val pack = if (shrink) proguard else packJar
+-
+-runtimeJarArtifactBy(pack, pack.outputs.files.singleFile) {
+-    name = jarBaseName
+-    classifier = ""
+-}
+-
+-dist(
+-    targetName = "$name.jar",
+-    fromTask = pack
+-)
+-
+-sourcesJar()
+-javadocJar()
+--- /dev/null
++++ b/libraries/tools/kotlin-script-util/build.gradle
+@@ -0,0 +1,49 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin scripting support utilities"
++
++repositories {
++    maven({url("https://oss.sonatype.org/content/repositories/snapshots")}) // for jcabi-aether:1.0-SNAPSHOT
++}
++
++dependencies {
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++    compile(project(":kotlin-script-runtime"))
++    compile(project(":kotlin-scripting-jvm"))
++    compile(DependenciesKt.customCommonDep(project,"org.jetbrains.intellij.deps", "trove4j",[]))
++    compileOnly(project(":compiler:cli"))
++    compileOnly(project(":compiler:daemon-common"))
++    compileOnly(project(":kotlin-scripting-compiler"))
++    compile(DependenciesKt.customProjectRuntimeJar(it,":kotlin-daemon-client"))
++    //compileOnly("org.sonatype.aether:aether-api:1.13.1")
++    compileOnly("org.apache.maven:maven-core:3.0.3")
++    testCompileOnly(project(":compiler:cli"))
++    //testCompile(project(":kotlin-test:kotlin-test-junit"))
++    testRuntime(project(":kotlin-reflect"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++    testCompile(project(":kotlin-scripting-compiler"))
++    testRuntimeOnly(DependenciesKt.customProjectRuntimeJar(it,":kotlin-compiler"))
++    //testRuntime("com.jcabi:jcabi-aether:1.0-SNAPSHOT")
++    //testRuntime("org.sonatype.aether:aether-api:1.13.1")
++    testRuntime("org.apache.maven:maven-core:3.0.3")
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["util"],null) } //this origianlly had openapi
++    testCompile(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["platform-api", "util"],null) } //this origianlly had openapi
++
++}
++
++TasksKt.customProjectTest(project,"test"){
++    it.workingDir = rootDir
++}
++
++//publish()
++
++ArtifactsKt.customRuntimeJar(project){}
++ArtifactsKt.customSourcesJar(project,"main"){}
++//javadocJar()
++
++
++ArtifactsKt.customIdeaPlugin(project)
+--- a/libraries/tools/kotlin-script-util/build.gradle.kts
++++ /dev/null
+@@ -1,50 +0,0 @@
+-
+-description = "Kotlin scripting support utilities"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-repositories {
+-    maven(url = "https://oss.sonatype.org/content/repositories/snapshots") // for jcabi-aether:1.0-SNAPSHOT
+-}
+-
+-dependencies {
+-    compile(kotlinStdlib())
+-    compile(project(":kotlin-script-runtime"))
+-    compile(project(":kotlin-scripting-jvm"))
+-    compile(commonDep("org.jetbrains.intellij.deps", "trove4j"))
+-    compileOnly(project(":compiler:cli"))
+-    compileOnly(project(":compiler:daemon-common"))
+-    compileOnly(project(":kotlin-scripting-compiler"))
+-    compile(projectRuntimeJar(":kotlin-daemon-client"))
+-    compileOnly("com.jcabi:jcabi-aether:1.0-SNAPSHOT")
+-    compileOnly("org.sonatype.aether:aether-api:1.13.1")
+-    compileOnly("org.apache.maven:maven-core:3.0.3")
+-    testCompileOnly(project(":compiler:cli"))
+-    testCompile(project(":kotlin-test:kotlin-test-junit"))
+-    testRuntime(project(":kotlin-reflect"))
+-    testCompile(commonDep("junit:junit"))
+-    testCompile(project(":kotlin-scripting-compiler"))
+-    testRuntimeOnly(projectRuntimeJar(":kotlin-compiler"))
+-    testRuntime("com.jcabi:jcabi-aether:1.0-SNAPSHOT")
+-    testRuntime("org.sonatype.aether:aether-api:1.13.1")
+-    testRuntime("org.apache.maven:maven-core:3.0.3")
+-    compileOnly(intellijDep()) { includeJars("openapi", "util") }
+-    testCompile(intellijDep()) { includeJars("openapi", "platform-api", "util") }
+-
+-}
+-
+-projectTest {
+-    workingDir = rootDir
+-}
+-
+-publish()
+-
+-runtimeJar()
+-sourcesJar()
+-javadocJar()
+-
+-
+-ideaPlugin()
+--- a/libraries/tools/kotlin-script-util/src/main/kotlin/org/jetbrains/kotlin/script/util/resolve.kt
++++ b/libraries/tools/kotlin-script-util/src/main/kotlin/org/jetbrains/kotlin/script/util/resolve.kt
+@@ -76,5 +76,5 @@
+         KotlinAnnotatedScriptDependenciesResolver(emptyList(), arrayListOf(DirectResolver()))
+ 
+ class FilesAndMavenResolver :
+-        KotlinAnnotatedScriptDependenciesResolver(emptyList(), arrayListOf(DirectResolver(), MavenResolver()))
++        KotlinAnnotatedScriptDependenciesResolver(emptyList(), arrayListOf(DirectResolver()))
+ 
+--- a/libraries/tools/kotlin-script-util/src/main/kotlin/org/jetbrains/kotlin/script/util/resolvers/maven.kt
++++ b/libraries/tools/kotlin-script-util/src/main/kotlin/org/jetbrains/kotlin/script/util/resolvers/maven.kt
+@@ -12,7 +12,7 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+- */
++ *
+ 
+ @file:DependsOn("org.funktionale:funktionale:0.9.6")
+ 
+@@ -98,4 +98,4 @@
+         }
+         return false
+     }
+-}
++}*/
+--- a/libraries/tools/mutability-annotations-compat/build.gradle.kts
++++ b/libraries/tools/mutability-annotations-compat/build.gradle.kts
+@@ -1,20 +1,24 @@
+-description = "Compatibility artifact with Mutable and ReadOnly annotations"
+ 
+ plugins {
+-    java
++    id("java")
+     id("jps-compatible")
+ }
+ 
++description = "Compatibility artifact with Mutable and ReadOnly annotations"
++
+ jvmTarget = "1.6"
+ 
+-tasks.withType<JavaCompile> {
++tasks.withType(JavaCompile) {
+     sourceCompatibility = "1.6"
+     targetCompatibility = "1.6"
+ }
+ 
+ sourceSets {
+-    "main" { projectDefault() }
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
+     "test" {}
+ }
+ 
+-dist()
++ArtifactsKt.customDist(project,null,null,null){}
