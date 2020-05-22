@@ -1,0 +1,65 @@
+Description: Update ant dir to make compatible to build with gradle
+ This patch adds build.gradle and remove kts file.
+ Added an intermediatory method for protobufFUll() called customProtobufFull().
+ Finished converting files to groovy and added an intemediatory method for protobugFUll()
+Author: Saif Abdul Casim
+---
+
+--- /dev/null
++++ b/ant/build.gradle
+@@ -0,0 +1,28 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++}
++
++description = "Kotlin Ant Tools"
++
++dependencies {
++    compile(DependenciesKt.customCommonDep(project,"org.apache.ant", "ant",[]))
++    compile(project(":kotlin-preloader"))
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++println("woopah")
++println("${DependenciesKt.compilerManifestClassPath} kotlin-preloader.jar")
++ArtifactsKt.customRuntimeJar(project) {
++    it.manifest.attributes.put("Class-Path", "${DependenciesKt.compilerManifestClassPath} kotlin-preloader.jar")
++}
++
++ArtifactsKt.customDist(project,null,null,null,{})
++
+--- a/ant/build.gradle.kts
++++ /dev/null
+@@ -1,24 +0,0 @@
+-
+-description = "Kotlin Ant Tools"
+-
+-plugins {
+-    kotlin("jvm")
+-}
+-
+-dependencies {
+-    compile(commonDep("org.apache.ant", "ant"))
+-    compile(project(":kotlin-preloader"))
+-    compile(kotlinStdlib())
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-runtimeJar {
+-    manifest.attributes.put("Class-Path", "$compilerManifestClassPath kotlin-preloader.jar")
+-}
+-
+-dist()
+-
