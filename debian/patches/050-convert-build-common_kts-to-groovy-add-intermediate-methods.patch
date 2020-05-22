@@ -1,0 +1,137 @@
+Description: Update build-common dir to make compatible to build with gradle
+ This patch adds build.gradle and remove kts file.
+ Added an intermediatory method for protobufFUll() called customProtobufFull().
+ Finished converting files to groovy and added an intemediatory method for protobugFUll()
+Author: Saif Abdul Casim
+
+---
+
+--- /dev/null
++++ b/build-common/build.gradle
+@@ -0,0 +1,48 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++description = "Kotlin Build Common"
++
++dependencies {
++    compileOnly(project(":core:util.runtime"))
++    compileOnly(project(":compiler:util"))
++    compileOnly(project(":compiler:cli-common"))
++    compileOnly(project(":compiler:frontend.java"))
++    compileOnly(project(":js:js.serializer"))
++    compileOnly(project(":js:js.frontend"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["asm-all", "trove4j", "util"], rootProject) }
++    compileOnly(project(":kotlin-reflect-api"))
++
++    testCompileOnly(project(":compiler:cli-common"))
++    //testCompile(DependenciesKt.customProjectTests(it,":compiler:tests-common"))
++    testCompile(DependenciesKt.customCommonDep(project,"junit:junit"))
++    testCompile(DependenciesKt.customProtobufFull(project))
++    testCompile(DependenciesKt.customKotlinStdlib(project,null))
++    testCompileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["openapi"],null) }
++
++    testRuntime(project(":kotlin-reflect"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {
++        java.srcDirs("test", "tests")
++    }
++}
++
++//publish()
++
++ArtifactsKt.customRuntimeJar(project){}
++//sourcesJar()
++//javadocJar()
++
++ArtifactsKt.customTestsJar(project){}
++
++TasksKt.customProjectTest(project,"test"){}
+--- a/build-common/build.gradle.kts
++++ /dev/null
+@@ -1,43 +0,0 @@
+-
+-description = "Kotlin Build Common"
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compileOnly(project(":core:util.runtime"))
+-    compileOnly(project(":compiler:util"))
+-    compileOnly(project(":compiler:cli-common"))
+-    compileOnly(project(":compiler:frontend.java"))
+-    compileOnly(project(":js:js.serializer"))
+-    compileOnly(project(":js:js.frontend"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("asm-all", "trove4j", "util", rootProject = rootProject) }
+-    compileOnly(project(":kotlin-reflect-api"))
+-
+-    testCompileOnly(project(":compiler:cli-common"))
+-    testCompile(projectTests(":compiler:tests-common"))
+-    testCompile(commonDep("junit:junit"))
+-    testCompile(protobufFull())
+-    testCompile(kotlinStdlib())
+-    testCompileOnly(intellijDep()) { includeJars("openapi") }
+-
+-    testRuntime(project(":kotlin-reflect"))
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" { projectDefault() }
+-}
+-
+-publish()
+-
+-runtimeJar()
+-sourcesJar()
+-javadocJar()
+-
+-testsJar()
+-
+-projectTest()
+--- a/build-common/src/org/jetbrains/kotlin/incremental/IncrementalJvmCache.kt
++++ b/build-common/src/org/jetbrains/kotlin/incremental/IncrementalJvmCache.kt
+@@ -350,7 +350,7 @@
+         private fun getConstantsMap(bytes: ByteArray): Map<String, Any> {
+             val result = HashMap<String, Any>()
+ 
+-            ClassReader(bytes).accept(object : ClassVisitor(Opcodes.API_VERSION) {
++            ClassReader(bytes).accept(object : ClassVisitor(458752) {
+                 override fun visitField(access: Int, name: String, desc: String, signature: String?, value: Any?): FieldVisitor? {
+                     val staticFinal = Opcodes.ACC_STATIC or Opcodes.ACC_FINAL or Opcodes.ACC_PRIVATE
+                     if (value != null && access and staticFinal == Opcodes.ACC_STATIC or Opcodes.ACC_FINAL) {
+@@ -470,7 +470,7 @@
+ 
+             val result = HashMap<String, Long>()
+ 
+-            ClassReader(bytes).accept(object : ClassVisitor(Opcodes.API_VERSION) {
++            ClassReader(bytes).accept(object : ClassVisitor(458752) {
+                 override fun visitMethod(
+                     access: Int,
+                     name: String,
+@@ -478,9 +478,9 @@
+                     signature: String?,
+                     exceptions: Array<out String>?
+                 ): MethodVisitor? {
+-                    val dummyClassWriter = ClassWriter(Opcodes.API_VERSION)
++                    val dummyClassWriter = ClassWriter(458752)
+ 
+-                    return object : MethodVisitor(Opcodes.API_VERSION, dummyClassWriter.visitMethod(0, name, desc, null, exceptions)) {
++                    return object : MethodVisitor(458752, dummyClassWriter.visitMethod(0, name, desc, null, exceptions)) {
+                         override fun visitEnd() {
+                             val jvmName = name + desc
+                             if (jvmName !in inlineFunctions) return
