@@ -1,0 +1,347 @@
+Descriptions: Convert from kts to groovy and add noDefaultJar() method
+Author: Saif Abdul Casim
+
+---
+
+--- /dev/null
++++ b/prepare/compiler/build.gradle
+@@ -0,0 +1,159 @@
++import java.io.File
++import proguard.gradle.ProGuardTask
++import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
++import org.gradle.api.artifacts.maven.Conf2ScopeMappingContainer
++import org.gradle.api.file.DuplicatesStrategy
++
++plugins {
++    // HACK: java plugin makes idea import dependencies on this project as source (with empty sources however),
++    // this prevents reindexing of kotlin-compiler.jar after build on every change in compiler modules
++    id("java")
++}
++
++description = "Kotlin Compiler"
++
++// You can run Gradle with "-Pkotlin.build.proguard=true" to enable ProGuard run on kotlin-compiler.jar (on TeamCity, ProGuard always runs)
++ext.shrink =findProperty("kotlin.build.proguard")?.toString()?.toBoolean() ?: hasProperty("teamcity")
++
++configurations.create("fatJarContents")
++
++configurations.create("fatJarContentsStripMetadata")
++configurations.create("fatJarContentsStripServices")
++configurations.create("fatSourcesJarContents")
++configurations.create("fatJar")
++configurations.create("compilerJar")
++configurations.create("runtimeJar")
++
++configurations.create("libraries") {
++    extendsFrom(configurations.compile)
++}
++configurations.create("trove4jJar")
++
++configurations.default.extendsFrom(configurations.runtimeJar)
++
++ext.compilerBaseName = name
++ext.outputJar = CommonUtilKt.customFileFrom(buildDir, ["libs", "${compilerBaseName}.jar".toString()])
++
++ext.compilerModules = rootProject.ext.compilerModules
++
++compilerModules.each { evaluationDependsOn(it) }
++ext.compiledModulesSources = compilerModules.collect {
++    it=SourceSetsKt.customMainSourceSet(project(it)).allSource
++}
++
++dependencies {
++    compile(DependenciesKt.customKotlinStdlib(project,null))
++    compile(project(":kotlin-script-runtime"))
++    compile(project(":kotlin-reflect"))
++    compile(DependenciesKt.customCommonDep(project,"org.jetbrains.intellij.deps", "trove4j",[]))
++
++    libraries(project(":kotlin-annotations-jvm"))
++    libraries(
++        files(
++            DependenciesKt.customFirstFromJavaHomeThatExists(project,["jre/lib/rt.jar", "../Classes/classes.jar"],new File(project.property("JDK_18") as String)),
++            DependenciesKt.customFirstFromJavaHomeThatExists(project,["jre/lib/jsse.jar", "../Classes/jsse.jar"],new File(project.property("JDK_18") as String)),
++            DependenciesKt.customToolsJar(project)
++        )
++    )
++
++    compilerModules.each {
++        fatJarContents(project(it)) { setTransitive(false) }
++    }
++
++    compiledModulesSources.each {
++        fatSourcesJarContents(it)
++    }
++
++    trove4jJar(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeIntellijCoreJarDependencies(it,project) { it.startsWith("trove4j") } }
++
++    fatJarContents(project(":core:builtins"))
++    fatJarContents(DependenciesKt.customCommonDep(project,"javax.inject"))
++    fatJarContents(DependenciesKt.customCommonDep(project,"org.jline", "jline",[]))
++    fatJarContents(DependenciesKt.customCommonDep(project,"org.fusesource.jansi", "jansi",[]))
++    fatJarContents(DependenciesKt.customProtobufFull(project))
++    fatJarContents(DependenciesKt.customCommonDep(project,"com.google.code.findbugs", "jsr305",[]))
++    fatJarContents(DependenciesKt.customCommonDep(project,"io.javaslang", "javaslang",[]))
++    fatJarContents(DependenciesKt.customCommonDep(project,"org.jetbrains.kotlinx", "kotlinx-coroutines-core",[])) { setTransitive(false) }
++
++    fatJarContents(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core", "java-compatibility-1.0.1"],null) }
++    fatJarContents(IntellijDependenciesKt.getIntellijDep(project,"intellij")) {
++        IntellijDependenciesKt.customIncludeIntellijCoreJarDependencies(it,project) {
++            !(it.startsWith("jdom") || it.startsWith("log4j") || it.startsWith("trove4j"))
++        }
++    }
++    fatJarContents(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["jna-platform", "lz4-1.3.0"],null) }
++    fatJarContentsStripServices(IntellijDependenciesKt.getIntellijDep(project,"jps-standalone")) { IntellijDependenciesKt.customIncludeJars(it,["jps-model"],null) }
++    fatJarContentsStripMetadata(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["oro-2.0.8", "jdom", "log4j"],null ) }
++}
++
++//publish()
++
++ArtifactsKt.customNoDefaultJar(project)
++
++task("packCompiler",type:ShadowJar) {
++    configurations = [project.configurations.fatJar]
++    setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
++    destinationDir =new File(buildDir, "libs")
++
++    ArtifactsKt.customSetupPublicJar(it,compilerBaseName, "before-proguard")
++
++    from(project.configurations.fatJarContents)
++
++    dependsOn(project.configurations.fatJarContentsStripServices)
++    from {
++        project.configurations.fatJarContentsStripServices.files.collect {
++            zipTree(it).matching { exclude("META-INF/services/**") }
++        }
++    }
++    dependsOn(project.configurations.fatJarContentsStripMetadata)
++    from {
++        project.configurations.fatJarContentsStripMetadata.files.collect {
++            zipTree(it).matching { exclude("META-INF/jb/**", "META-INF/LICENSE") }
++        }
++    }
++
++    manifest.attributes["Class-Path"] = DependenciesKt.compilerManifestClassPath
++    manifest.attributes["Main-Class"] = "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler"
++}
++
++task("proguard",type:ProGuardTask) {
++    dependsOn(packCompiler)
++    configuration("${rootDir}/compiler/compiler.pro".toString())
++
++    def outputJar = CommonUtilKt.customFileFrom(buildDir, ["libs", "${compilerBaseName}-after-proguard.jar".toString()])
++
++    inputs.files(packCompiler.outputs.files.getSingleFile())
++    outputs.file(outputJar)
++
++    // TODO: remove after dropping compatibility with ant build
++    doFirst {
++        System.setProperty("kotlin-compiler-jar-before-shrink", packCompiler.outputs.files.singleFile.canonicalPath)
++        System.setProperty("kotlin-compiler-jar", outputJar.canonicalPath)
++    }
++
++    libraryjars(filter : "!META-INF/versions/**",project.configurations.libraries)
++
++    printconfiguration("$buildDir/compiler.pro.dump")
++}
++
++Task pack;
++if(shrink){
++	pack=proguard
++}else{
++	pack=packCompiler
++}
++
++ArtifactsKt.customDist(project,null,"${compilerBaseName}.jar".toString(),pack){
++    it.from(configurations.trove4jJar)
++}
++
++ArtifactsKt.customRuntimeJarArtifactBy(project,pack, pack.outputs.files.singleFile) {
++    it.name = compilerBaseName
++    it.classifier = ""
++}
++
++ArtifactsKt.customSourcesJar(project,"main") {
++    it.from(configurations.fatSourcesJarContents)
++}
++
++//javadocJar()
+--- a/prepare/compiler/build.gradle.kts
++++ /dev/null
+@@ -1,160 +0,0 @@
+-import java.io.File
+-import proguard.gradle.ProGuardTask
+-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+-import org.gradle.api.artifacts.maven.Conf2ScopeMappingContainer.COMPILE
+-import org.gradle.api.file.DuplicatesStrategy
+-
+-description = "Kotlin Compiler"
+-
+-plugins {
+-    // HACK: java plugin makes idea import dependencies on this project as source (with empty sources however),
+-    // this prevents reindexing of kotlin-compiler.jar after build on every change in compiler modules
+-    java
+-}
+-
+-// You can run Gradle with "-Pkotlin.build.proguard=true" to enable ProGuard run on kotlin-compiler.jar (on TeamCity, ProGuard always runs)
+-val shrink =
+-    findProperty("kotlin.build.proguard")?.toString()?.toBoolean()
+-    ?: hasProperty("teamcity")
+-
+-val fatJarContents by configurations.creating
+-
+-val fatJarContentsStripMetadata by configurations.creating
+-val fatJarContentsStripServices by configurations.creating
+-val fatSourcesJarContents by configurations.creating
+-val fatJar by configurations.creating
+-val compilerJar by configurations.creating
+-val runtimeJar by configurations.creating
+-val compile by configurations  // maven plugin writes pom compile scope from compile configuration by default
+-val libraries by configurations.creating {
+-    extendsFrom(compile)
+-}
+-val trove4jJar by configurations.creating
+-
+-val default by configurations
+-default.extendsFrom(runtimeJar)
+-
+-val compilerBaseName = name
+-
+-val outputJar = fileFrom(buildDir, "libs", "$compilerBaseName.jar")
+-
+-val compilerModules: Array<String> by rootProject.extra
+-
+-compilerModules.forEach { evaluationDependsOn(it) }
+-
+-val compiledModulesSources = compilerModules.map {
+-    project(it).mainSourceSet.allSource
+-}
+-
+-dependencies {
+-    compile(kotlinStdlib())
+-    compile(project(":kotlin-script-runtime"))
+-    compile(project(":kotlin-reflect"))
+-    compile(commonDep("org.jetbrains.intellij.deps", "trove4j"))
+-
+-    libraries(project(":kotlin-annotations-jvm"))
+-    libraries(
+-        files(
+-            firstFromJavaHomeThatExists("jre/lib/rt.jar", "../Classes/classes.jar"),
+-            firstFromJavaHomeThatExists("jre/lib/jsse.jar", "../Classes/jsse.jar"),
+-            toolsJar()
+-        )
+-    )
+-
+-    compilerModules.forEach {
+-        fatJarContents(project(it)) { isTransitive = false }
+-    }
+-
+-    compiledModulesSources.forEach {
+-        fatSourcesJarContents(it)
+-    }
+-
+-    trove4jJar(intellijDep()) { includeIntellijCoreJarDependencies(project) { it.startsWith("trove4j") } }
+-
+-    fatJarContents(project(":core:builtins"))
+-    fatJarContents(commonDep("javax.inject"))
+-    fatJarContents(commonDep("org.jline", "jline"))
+-    fatJarContents(commonDep("org.fusesource.jansi", "jansi"))
+-    fatJarContents(protobufFull())
+-    fatJarContents(commonDep("com.google.code.findbugs", "jsr305"))
+-    fatJarContents(commonDep("io.javaslang", "javaslang"))
+-    fatJarContents(commonDep("org.jetbrains.kotlinx", "kotlinx-coroutines-core")) { isTransitive = false }
+-
+-    fatJarContents(intellijCoreDep()) { includeJars("intellij-core", "java-compatibility-1.0.1") }
+-    fatJarContents(intellijDep()) {
+-        includeIntellijCoreJarDependencies(project) {
+-            !(it.startsWith("jdom") || it.startsWith("log4j") || it.startsWith("trove4j"))
+-        }
+-    }
+-    fatJarContents(intellijDep()) { includeJars("jna-platform", "lz4-1.3.0") }
+-    fatJarContentsStripServices(intellijDep("jps-standalone")) { includeJars("jps-model") }
+-    fatJarContentsStripMetadata(intellijDep()) { includeJars("oro-2.0.8", "jdom", "log4j" ) }
+-}
+-
+-publish()
+-
+-noDefaultJar()
+-
+-val packCompiler by task<ShadowJar> {
+-    configurations = listOf(fatJar)
+-    setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+-    destinationDir = File(buildDir, "libs")
+-
+-    setupPublicJar(compilerBaseName, "before-proguard")
+-
+-    from(fatJarContents)
+-
+-    dependsOn(fatJarContentsStripServices)
+-    from {
+-        fatJarContentsStripServices.files.map {
+-            zipTree(it).matching { exclude("META-INF/services/**") }
+-        }
+-    }
+-
+-    dependsOn(fatJarContentsStripMetadata)
+-    from {
+-        fatJarContentsStripMetadata.files.map {
+-            zipTree(it).matching { exclude("META-INF/jb/**", "META-INF/LICENSE") }
+-        }
+-    }
+-
+-    manifest.attributes["Class-Path"] = compilerManifestClassPath
+-    manifest.attributes["Main-Class"] = "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler"
+-}
+-
+-val proguard by task<ProGuardTask> {
+-    dependsOn(packCompiler)
+-    configuration("$rootDir/compiler/compiler.pro")
+-
+-    val outputJar = fileFrom(buildDir, "libs", "$compilerBaseName-after-proguard.jar")
+-
+-    inputs.files(packCompiler.outputs.files.singleFile)
+-    outputs.file(outputJar)
+-
+-    // TODO: remove after dropping compatibility with ant build
+-    doFirst {
+-        System.setProperty("kotlin-compiler-jar-before-shrink", packCompiler.outputs.files.singleFile.canonicalPath)
+-        System.setProperty("kotlin-compiler-jar", outputJar.canonicalPath)
+-    }
+-
+-    libraryjars(mapOf("filter" to "!META-INF/versions/**"), libraries)
+-
+-    printconfiguration("$buildDir/compiler.pro.dump")
+-}
+-
+-val pack = if (shrink) proguard else packCompiler
+-
+-dist(targetName = "$compilerBaseName.jar", fromTask = pack) {
+-    from(trove4jJar)
+-}
+-
+-runtimeJarArtifactBy(pack, pack.outputs.files.singleFile) {
+-    name = compilerBaseName
+-    classifier = ""
+-}
+-
+-sourcesJar {
+-    from(fatSourcesJarContents)
+-}
+-
+-javadocJar()
+--- a/prepare/kotlin-annotation-processing-embeddable/build.gradle.kts
++++ b/prepare/kotlin-annotation-processing-embeddable/build.gradle.kts
+@@ -16,6 +16,8 @@
+ 
+ publish()
+ 
++noDefaultJar()
++
+ runtimeJar(rewriteDepsToShadedCompiler(
+         task<ShadowJar>("shadowJar")  {
+             from(packedJars)
+@@ -23,4 +25,5 @@
+ ))
+ 
+ sourcesJar()
++
+ javadocJar()
