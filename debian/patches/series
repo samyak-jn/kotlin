@@ -56,3 +56,5 @@
 057-convert-kts-to-groovy-in-js-and-add-intermediatory-methods.patch
 058-update-BuiltSrc-files--to-groovy-add-intermediatory-methods.patch
 059-final-changes-build.gradle.patch
+060-reemove-android-studio.patch
+061-update-gradle.properties-to-use-open8jdk.patch

@@ -1,0 +1,24 @@
+Description: Updates gradle.properties to use java-8 as java-home
+ This patch do the following:
+ Forced the project to use java-8 as its java_home.
+ Translated the buildSrc:prepare-deps:intellij-sdk.
+Author: Saif Abdul Casim
+
+---
+
+--- a/gradle.properties
++++ b/gradle.properties
+@@ -1,7 +1,6 @@
+-org.gradle.jvmargs=-Duser.country=US -Dkotlin.daemon.jvm.options=-Xmx1600m -Dfile.encoding=UTF-8
+ 
++org.gradle.java.home=/usr/lib/jvm/java-8-openjdk-amd64
+ cacheRedirectorEnabled=true
+-
+ kotlin.compiler.effectSystemEnabled=true
+ kotlin.compiler.newInferenceEnabled=true
+ #maven.repository.mirror=http://repository.jetbrains.com/remote-repos/
+@@ -12,3 +11,4 @@
+ #jpsBuild=true
+ 
+ #cidrPluginsEnabled=true
++
