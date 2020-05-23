@@ -55,3 +55,4 @@
 056-update-idea-kt-files-to-update-xml-files.patch
 057-convert-kts-to-groovy-in-js-and-add-intermediatory-methods.patch
 058-update-BuiltSrc-files--to-groovy-add-intermediatory-methods.patch
+059-final-changes-build.gradle.patch

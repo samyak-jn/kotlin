@@ -1,0 +1,544 @@
+Description: Covert build.gradle.kts to build.gradle
+ This patch adds final changes to build.gradle.
+ Change the version of snapshot to 1.3.30.
+ Converted a build script configurations file to groovy.
+ Hardcoded the javahome and jdk paths, downgraded the project to gradle 4.4.1.
+ Removed dependency on dokka, plugin-publish-plugin and added dependency on
+ jflex and libproguard-java.
+ kotlin stdlib 1.3.30-eap-28 instaed of kotlin-stdlib 1.2.50.
+ Added debian/maven-repo-cache as a maven repo.
+Author: Saif Abdul Casim
+---
+
+--- a/build.gradle
++++ b/build.gradle
+@@ -5,31 +5,28 @@
+ import org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompile
+ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+ import proguard.gradle.ProGuardTask
+-
+ buildscript {
+-    ext.defaultSnapshotVersion = "1.3-SNAPSHOT"
++    ext.defaultSnapshotVersion = "1.3.30"
+     BootstrapKt.kotlinBootstrapFrom(project,new TeamCity("1.3.30-eap-28","1.3.30-eap-28", "Kotlin_1330_Compiler", false)) // method defined in ./buildSrc/src/main/kotlin/Bootstrap.kt
+ 	ext.bootstrapKotlinRepo = bootstrapKotlinRepo
+-
+ 	repositories {
+-	        maven({url(bootstrapKotlinRepo.toString())})
+-	        maven({url("https://plugins.gradle.org/m2")})
+-		}
++        maven({url(bootstrapKotlinRepo.toString())})
++        maven({url("https://plugins.gradle.org/m2")})
++    }
+     JbCacheRedirectorKt.repositoriesWithRedirector(repositories,project)
+ 
+     // a workaround for kotlin compiler classpath in kotlin project: sometimes gradle substitutes
+     // kotlin-stdlib external dependency with local project :kotlin-stdlib in kotlinCompilerClasspath configuration.
+     // see also configureCompilerClasspath@
+-	configurations.create("bootstrapCompilerClasspath")
+-
++    configurations.create("bootstrapCompilerClasspath")
+     dependencies {
+-		bootstrapCompilerClasspath DependenciesKt.kotlinDep("compiler-embeddable", bootstrapKotlinVersion)
++        bootstrapCompilerClasspath DependenciesKt.kotlinDep("compiler-embeddable", bootstrapKotlinVersion)
+ 
+-        classpath("com.gradle.publish:plugin-publish-plugin:0.9.7")
++        //classpath("com.gradle.publish:plugin-publish-plugin:0.9.7")
+         classpath(DependenciesKt.kotlinDep("gradle-plugin", bootstrapKotlinVersion))
+         classpath("net.sf.proguard:proguard-gradle:6.0.3")
+-        classpath("org.jetbrains.dokka:dokka-gradle-plugin:0.9.17")
+-
++        //classpath("org.jetbrains.dokka:dokka-gradle-plugin:0.9.17")
++		classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$bootstrapKotlinVersion")
+         // a workaround to add another one buildSrc with Cidr-specific tools to Gradle classpath
+         if (findProperty("cidrPluginsEnabled")?.toString()?.toBoolean() == true) {
+             classpath("org.jetbrains.kotlin.ultimate:buildSrc:1.0")
+@@ -38,10 +35,10 @@
+ }
+ 
+ plugins {
+-	//`build-scan` // not needed
++    //`build-scan` // not needed
+     id("idea")
+     id("jps-compatible")
+-    id("org.jetbrains.gradle.plugin.idea-ext")
++    //id("org.jetbrains.gradle.plugin.idea-ext")
+ }
+ 
+ pill {
+@@ -61,9 +58,8 @@
+ //val configuredJdks: List<JdkId> =
+ List<JdkId> configuredJdks = JdksFinderKt.getConfiguredJdks(project)
+ configuredJdks.each {
+-                logger.info("Using ${it.majorVersion} home: ${it.homeDir}")
++    logger.info("Using ${it.majorVersion} home: ${it.homeDir}")
+ }
+-
+ ext.configuredJdks =configuredJdks
+ 
+ ext {
+@@ -108,35 +104,36 @@
+ // Work-around necessary to avoid setting null javaHome. Will be removed after support of lazy task configuration
+ def jdkNotFoundConst = "JDK NOT FOUND"
+ ext.jdkNotFoundConst =jdkNotFoundConst
+-
+-ext.JDK_16 = jdkPath("1.6")
+-ext.JDK_17 = jdkPath("1.7")
+-ext.JDK_18 = jdkPath("1.8")
+-ext.JDK_9 = jdkPath("9")
++ext.JDK_16 = "/usr/lib/jvm/java-8-openjdk-amd64"
++ext.JDK_17 = "/usr/lib/jvm/java-8-openjdk-amd64"
++ext.JDK_18 = "/usr/lib/jvm/java-8-openjdk-amd64"
++ext.JDK_9 = "/usr/lib/jvm/java-11-openjdk-amd64"
+ ext.JDK_10 = jdkPath("10")
+ ext.JDK_11 = jdkPath("11")
+-
+ gradle.taskGraph.beforeTask() {
+     checkJDK()
+ }
+ 
+-Boolean jdkChecked  = false
++ext.jdkChecked  = false
+ def checkJDK() {
+     if (jdkChecked) {
+         return
+     }
+-    var unpresentJdks = JdkMajorVersion.values().filter { it.isMandatory() }.map { it -> it.name }.filter { it == null || ext[it] == jdkNotFoundConst }.toList()
++    def mandatoryUnpresentJdks = (JdkMajorVersion.values().collect { if(it.isMandatory()){return it} })
++    mandatoryUnpresentJdks.removeAll([null])
++    def unpresentJdks = mandatoryUnpresentJdks.collect { if(it == null || project.ext[it.toString()] == jdkNotFoundConst){return it} }
++    unpresentJdks.removeAll([null])
+     if (!unpresentJdks.isEmpty()) {
+-        throw GradleException("Please set environment variable${if (unpresentJdks.size > 1) "s" else ""}: ${unpresentJdks.joinToString()} to point to corresponding JDK installation.")
++        throw GradleException("Please set environment variable${if (unpresentJdks.size > 1) "s" else ""}: ${unpresentJdks.join(", ")} to point to corresponding JDK installation.")
+     }
+     jdkChecked = true
+ }
+ 
+ rootProject.apply {
+-    from(rootProject.file("gradle/versions.gradle.kts"))
+-    from(rootProject.file("gradle/report.gradle.kts"))
+-    from(rootProject.file("gradle/javaInstrumentation.gradle.kts"))
+-    from(rootProject.file("gradle/jps.gradle.kts"))
++    from(rootProject.file("gradle/versions.gradle"))
++    //from(rootProject.file("gradle/report.gradle.kts"))
++    //from(rootProject.file("gradle/javaInstrumentation.gradle.kts"))
++    //from(rootProject.file("gradle/jps.gradle.kts"))
+ }
+ 
+ IdeCompatibilityDslKt.setCurrentIde(project)
+@@ -191,8 +188,8 @@
+         ":compiler:resolution",
+         ":compiler:serialization",
+         ":compiler:psi",
+-		*{if (project.findProperty("fir.enabled") == "true") {
+-			return [
++        *{if (project.findProperty("fir.enabled") == "true") {
++            return [
+                 ":compiler:fir:cones",
+                 ":compiler:fir:resolve",
+                 ":compiler:fir:tree",
+@@ -265,11 +262,11 @@
+ 
+ apply {
+     from("libraries/commonConfiguration.gradle")
+-    from("libraries/configureGradleTools.gradle")
++    //from("libraries/configureGradleTools.gradle")
+ }
+ 
+ apply {
+-	if (ext.isSonatypeRelease.toBoolean() == true) {
++    if (ext.isSonatypeRelease.toBoolean() == true) {
+         logger.info("Applying configuration for sonatype release")
+         from("libraries/prepareSonatypeStaging.gradle")
+     }
+@@ -284,13 +281,16 @@
+ }
+ 
+ def defaultJvmTarget = "1.8"
++ext.defaultJvmTarget =defaultJvmTarget
+ def defaultJavaHome = jdkPath(defaultJvmTarget)
++ext.defaultJavaHome =defaultJavaHome
++
+ ext {
+ 	ignoreTestFailures = project.findProperty("ignoreTestFailures")?.toString()?.toBoolean() ?: project.hasProperty("teamcity")
+ }
+ 
+-ext.configureJvmProjectRoot = { String javaHome, String javaVersion ->
+-    tasks.withType(JavaCompile) {
++ext.configureJvmProjectRoot = { Project project,String javaHome, String javaVersion ->
++    project.tasks.withType(JavaCompile) {
+         if (name != "compileJava9Java") {
+             options.fork = true
+             options.forkOptions.javaHome = file(javaHome)
+@@ -299,22 +299,23 @@
+         }
+     }
+ 
+-    tasks.withType(KotlinCompile) {
++    project.tasks.withType(KotlinCompile) {
+         kotlinOptions.jdkHome = javaHome
+         kotlinOptions.jvmTarget = javaVersion
+         kotlinOptions.freeCompilerArgs += "-Xjvm-default=compatibility"
+     }
+ 
+-    tasks.withType(Test) {
++    project.tasks.withType(Test) {
+         executable = new File(javaHome, "bin/java").canonicalPath
+     }
+ }
+ 
+ allprojects {
+-
+-	ext.jvmTarget = defaultJvmTarget
++	//println("${project.getName()}")
++	//println("${project.getBuildFile()}")
++    ext.jvmTarget = defaultJvmTarget
+     if (defaultJavaHome != null) {
+-		ext.javaHome = defaultJavaHome
++        ext.javaHome = defaultJavaHome
+     } else {
+         logger.error("Could not find default java home. Please set environment variable JDK_${defaultJavaHome} to point to JDK ${defaultJavaHome} installation.")
+     }
+@@ -326,36 +327,38 @@
+     // therefore it is disabled by default
+     // buildDir = File(commonBuildDir, project.name)
+ 
+-	def mirrorRepo = findProperty("maven.repository.mirror")?.toString()
++    def mirrorRepo = findProperty("maven.repository.mirror")?.toString()
+ 
+     repositories {
+-	IntellijDependenciesKt.intellijSdkRepo(repositories,project)
+-	AndroidSdkDependenciesKt.androidDxJarRepo(repositories,project)
+-	if(mirrorRepo!=null){
++        IntellijDependenciesKt.intellijSdkRepo(repositories,project)
++        AndroidSdkDependenciesKt.androidDxJarRepo(repositories,project)
++        maven{
++        	url("file://"+new File("debian/maven-repo-cache").absolutePath)
++        }
++        if(mirrorRepo!=null){
+ 	        maven({url(mirrorRepo.toString())})
+         }
+         if(bootstrapKotlinRepo!=null){
+-       		maven({url(bootstrapKotlinRepo.toString())})
++        	maven({url(bootstrapKotlinRepo.toString())})
+         }
+         jcenter()
+         maven({url(DependenciesKt.getProtobufRepoFun(project))})
+     }
+-	
+-	if(javaHome && jvmTarget){
+-		configureJvmProjectRoot(javaHome, jvmTarget)
+-		 }else{
+-		throw new GradleScriptException('javaHome, jvmTarget might be null')
+-	     }
+     
+-	def commonCompilerArgs = [
++	if(javaHome && jvmTarget){
++    	configureJvmProjectRoot(project,javaHome, jvmTarget)
++    }else{
++    	throw new GradleScriptException('javaHome, jvmTarget might be null')
++    }
++
++    def commonCompilerArgs = [
+         "-Xallow-kotlin-package",
+         "-Xread-deserialized-contracts",
+         "-Xjvm-default=compatibility",
+         {if(project.hasProperty("test.progressive.mode")){return "-Xprogressive"}}.call()
+     ]
+     commonCompilerArgs.removeAll([null])
+-
+-	tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinCompile) {
++    tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinCompile) {
+         kotlinOptions {
+             languageVersion = kotlinLanguageVersion
+             apiVersion = kotlinLanguageVersion
+@@ -363,14 +366,14 @@
+         }
+     }
+ 
+-	tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile) {
++    tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile) {
+         kotlinOptions {
+-		freeCompilerArgs = commonCompilerArgs + ["-Xnormalize-constructor-calls=enable"]
++            freeCompilerArgs = commonCompilerArgs + ["-Xnormalize-constructor-calls=enable"]
+         }
+     }
+ 
+-	//tasks.withType(VerificationTask::class.java as Class<Task>) { //could be wrong
+-	    tasks.withType(VerificationTask) {
++    //tasks.withType(VerificationTask::class.java as Class<Task>) { //could be wrong
++    tasks.withType(VerificationTask) {
+         ignoreFailures = ignoreTestFailures
+     }
+ 
+@@ -382,52 +385,70 @@
+         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+     }
+ 
+-	task("listArchives") { listConfigurationContents(it,"archives") }
+-	task("listRuntimeJar") { listConfigurationContents(it,"runtimeJar") }
+-	task("listDistJar") { listConfigurationContents(it,"distJar") }
++    task("listArchives") { listConfigurationContents(it,"archives") }
++
++    task("listRuntimeJar") { listConfigurationContents(it,"runtimeJar") }
++
++    task("listDistJar") { listConfigurationContents(it,"distJar") }
+ 
+     afterEvaluate {
+         if (javaHome != defaultJavaHome || jvmTarget != defaultJvmTarget) {
+             logger.info("configuring project $name to compile to the target jvm version $jvmTarget using jdk: $javaHome")
+             if(javaHome && jvmTarget){
+-				configureJvmProjectRoot(javaHome, jvmTarget)
+-			}else{
+-				throw new GradleScriptException('javaHome, jvmTarget might be null')
+-			}
++    			configureJvmProjectRoot(project,javaHome, jvmTarget)
++    		}else{
++    			throw new GradleScriptException('javaHome, jvmTarget might be null')
++    		}
+         } // else we will actually fail during the first task execution. We could not fail before configuration is done due to impact on import in IDE
+ 
+         ext.toProjectRootRelativePathOrSelf = { File f ->
+-			if(f.relativeToOrNull(rootDir).startsWith("..")){
+-        return f.path
+-        }else{
+-        return f.relativeToOrNull(rootDir).path
+-        }
++        	if(f.relativeToOrNull(rootDir).startsWith("..")){
++        		return f.path
++        	}else{
++        		return f.relativeToOrNull(rootDir).path
++        	}
+         }
+ 
+         ext.printClassPath = {String role, FileCollection f  ->
+-	                println("${project.path} $role classpath:\n  ${f.collect({fi -> toProjectRootRelativePathOrSelf(fi)}).join("\n  ")}")
++                println("${project.path} $role classpath:\n  ${f.collect({fi -> toProjectRootRelativePathOrSelf(fi)}).join("\n  ")}")
+         }
+ 
+         try { 
+-			def javaConvention = (JavaPluginConvention) project.getConvention().getPlugins().get("java")
++        	def javaConvention = (JavaPluginConvention) project.getConvention().getPlugins().get("java")
+         	task("printCompileClasspath") { doFirst { ext.printClassPath("compile",javaConvention.sourceSets["main"].compileClasspath) } }
+             task("printRuntimeClasspath") { doFirst { ext.printClassPath("runtime",javaConvention.sourceSets["main"].runtimeClasspath) } }
+             task("printTestCompileClasspath") { doFirst { ext.printClassPath("test compile",javaConvention.sourceSets["test"].compileClasspath) } }
+             task("printTestRuntimeClasspath") { doFirst { ext.printClassPath("test runtime",javaConvention.sourceSets["test"].runtimeClasspath) } } 
+         } catch (UnknownDomainObjectException e) {
+-				null
++        	null
+         } finally {
++
+         }
++
+         //configureCompilerClasspath:
+         def bootstrapCompilerClasspath = rootProject.buildscript.configurations.bootstrapCompilerClasspath
+         def confIt =configurations.findByName("kotlinCompilerClasspath")
+         if(confIt) {
+             dependencies.add(confIt.name, files(bootstrapCompilerClasspath))
+         }
++
+     }
+ }
+ 
+ gradle.taskGraph.whenReady { taskGraph ->
++//	def ultimatedepes = taskGraph.getDependencies(rootProject.getTasksByName("dist",false)[0])
++	def ultimatedepes = taskGraph.getAllTasks()
++	println("creeweeb")
++	def paths=[]
++	ultimatedepes.each{
++		if(!paths.contains(it.getProject().getBuildFile())){
++			//println(it.getProject().getName())
++			println(/"${it.getProject().getPath()}",/)
++//			println(it.getProject().getBuildFile())
++			paths.add(it.getProject().getBuildFile())
++		}
++		println(it)
++	}
+     if (isTeamcityBuild) {
+         logger.warn("CI build profile is active (IC is off, proguard is on). Use -Pteamcity=false to reproduce local build")
+         for (task in taskGraph.allTasks) {
+@@ -439,7 +460,7 @@
+     } else {
+         logger.warn("Local build profile is active (IC is on, proguard is off). Use -Pteamcity=true to reproduce TC build")
+         for (task in taskGraph.allTasks) {
+-		if (task) {
++        	if (task) {
+                 if(task instanceof JavaCompile){ task.options.setIncremental(true)}
+                 if(task instanceof org.gradle.jvm.tasks.Jar){ task.entryCompression = ZipEntryCompression.STORED}
+             }
+@@ -450,7 +471,10 @@
+ task('dist', type: Copy) {
+ 	def childDistTasks = getTasksByName("dist", true) - it
+     dependsOn(childDistTasks)
+-
++    /*println("Weeber")
++	childDistTasks.each{
++		println(it.getPath())
++	}*/
+     into(distDir)
+     from(files("compiler/cli/bin")) { into("kotlinc/bin") }
+     from(files("license")) { into("kotlinc/license") }
+@@ -468,11 +492,11 @@
+     dependsOn(childIdeaPluginTasks)
+ }
+ 
+-	tasks.create("clean") {
+-	    doLast {
+-	        delete("$buildDir/repo")
+-	        delete(distDir)
+-	}
++tasks.create("clean") {
++    doLast {
++        delete("$buildDir/repo")
++        delete(distDir)
++    }
+ }
+ 
+ tasks.create("cleanupArtifacts") {
+@@ -484,7 +508,7 @@
+ ["clean", "assemble", "install", "dist"].each { taskName ->
+     tasks.create("coreLibs${taskName.capitalize()}") {
+         coreLibProjects.each { projectName -> dependsOn("$projectName:$taskName") }
+-	}
++    }
+ }
+ 
+ tasks.create("coreLibsTest") {
+@@ -501,7 +525,7 @@
+ tasks.create("gradlePluginTest") {
+     gradlePluginProjects.each {
+         dependsOn(it + ":check")
+-	}
++    }
+ }
+ 
+ tasks.create("gradlePluginIntegrationTest") {
+@@ -531,6 +555,7 @@
+ tasks.create("compilerTest") {
+     dependsOn("jvmCompilerTest")
+     dependsOn("jsCompilerTest")
++
+     dependsOn("scriptingTest")
+     dependsOn(":kotlin-build-common:test")
+     dependsOn(":compiler:incremental-compilation-impl:test")
+@@ -541,11 +566,12 @@
+     dependsOn(":tools:kotlinp:test")
+ }
+ 
+-tasks.create("examplesTest") {
++/*tasks.create("examplesTest") {
+     dependsOn("dist")
+     (project(":examples").subprojects + project(":kotlin-gradle-subplugin-example")).each { p ->
+         dependsOn("${p.path}:check")
+-}
++    }
++}*/
+ 
+ tasks.create("distTest") {
+     dependsOn("compilerTest")
+@@ -607,6 +633,7 @@
+               ":kotlinx-serialization-ide-plugin:test")
+ }
+ 
++
+ tasks.create("ideaPluginTest") {
+     dependsOn(
+             "idea-plugin-tests",
+@@ -617,6 +644,7 @@
+     )
+ }
+ 
++
+ tasks.create("test") {
+     doLast {
+         throw GradleException("Don't use directly, use aggregate tasks *-check instead")
+@@ -627,6 +655,7 @@
+     dependsOn("test")
+ }
+ 
++
+ ext.setExecutablePermissions = {CopySpec copySpec ->
+     copySpec.filesMatching("**/bin/*") { mode = 0b111101101 }
+     copySpec.filesMatching("**/bin/*.bat") { mode = 0b110100100 }
+@@ -636,10 +665,9 @@
+     dependsOn(dist)
+     destinationDir = file(distDir)
+     archiveName = "kotlin-compiler-${kotlinVersion}.zip"
+-
+     from(distKotlinHomeDir)
+     into("kotlinc")
+-	setExecutablePermissions(it)
++    setExecutablePermissions(it)
+ 
+     doLast {
+         logger.lifecycle("Compiler artifacts packed to $archivePath")
+@@ -662,23 +690,22 @@
+ task('zipPlugin', type: Zip) {
+     def src
+     if(project.findProperty("pluginArtifactDir")){
+-		String pluginArtifactDir_String = project.findProperty("pluginArtifactDir").toString()
+-		switch(pluginArtifactDir_String){
+-			case "Kotlin":
+-				src = ideaPluginDir
++    	String pluginArtifactDir_String = project.findProperty("pluginArtifactDir").toString()
++ 		switch(pluginArtifactDir_String){
++	 		case "Kotlin":
++	 			src = ideaPluginDir
+ 			case "KotlinUltimate":
+ 				src = ideaUltimatePluginDir
+ 			default:
+ 				throw new GradleScriptException("Unsupported plugin artifact dir")
+ 		}
+     }else{
+-		if (project.hasProperty("ultimate")){
++    	if (project.hasProperty("ultimate")){
+ 			src=ideaUltimatePluginDir
+ 		} else {
+ 			src=ideaPluginDir
+ 		}
+-
+-    }else{}
++    }
+     def destPath = project.findProperty("pluginZipPath") as String
+     def dest = new File(destPath ?: "$buildDir/kotlin-plugin.zip")
+     destinationDir = dest.parentFile
+@@ -686,10 +713,9 @@
+     doFirst {
+         if (destPath == null) throw GradleException("Specify target zip path with 'pluginZipPath' property")
+     }
+-
+     from(src)
+     into("Kotlin")
+-    setExecutablePermissions()
++    setExecutablePermissions(it)
+ 
+     doLast {
+         logger.lifecycle("Plugin artifacts packed to $archivePath")
+@@ -711,7 +737,7 @@
+ def String jdkPath(String version) {
+     def jdkName = "JDK_${version.replace(".", "")}"
+     def jdkMajorVersion = JdkMajorVersion.valueOf(jdkName)
+-	return ((configuredJdks.find { it.majorVersion == jdkMajorVersion }?.homeDir?.canonicalPath?:jdkNotFoundConst).toString())
++    return ((configuredJdks.find { it.majorVersion == jdkMajorVersion }?.homeDir?.canonicalPath?:jdkNotFoundConst).toString())
+ }
+ 
+ 
+@@ -720,7 +746,7 @@
+         sortedBy { shadowJars.path }.each { println(indent + shadowJars.relativeTo(rootProject.projectDir)) }
+     }
+ 
+-	def shadowJars = new HashSet<File>()
++    def shadowJars = new HashSet<File>()
+     for (project in rootProject.allprojects) {
+         for (task in project.tasks) {
+             if(task instanceof ShadowJar){shadowJars.add(fileFrom(task.archivePath))}
+@@ -733,7 +759,7 @@
+ 
+     ext.checkConfig={ String configName ->
+         if(configurations.findByName(configName) == null){
+-		return
++        	return
+         }else{
+ 		    def config = configurations.findByName(configName)
+ 		    def shadowJarsInConfig = config.resolvedConfiguration.files.filter { it in shadowJars }
