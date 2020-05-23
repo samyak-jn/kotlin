@@ -52,3 +52,4 @@
 053-convert-libraries-from-kts-to-groovy-add-intermediate-methods.patch
 054-correct-methods-in-core.patch
 055-convert-versions.gradle.kts-to-groovy-and-update-zip.patch
+056-update-idea-kt-files-to-update-xml-files.patch

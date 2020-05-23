@@ -1,0 +1,435 @@
+Description: Update idea dir
+ Removes idea/idea-analysis/idea-analysis.iml and various intermediatory methods.
+Author: Saif Abdul Casim
+---
+
+--- a/idea/idea-analysis/idea-analysis.iml
++++ /dev/null
+@@ -1,38 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<module type="JAVA_MODULE" version="4">
+-  <component name="NewModuleRootManager" inherit-compiler-output="true">
+-    <exclude-output />
+-    <content url="file://$MODULE_DIR$">
+-      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+-    </content>
+-    <orderEntry type="jdk" jdkName="1.8" jdkType="JavaSDK" />
+-    <orderEntry type="sourceFolder" forTests="false" />
+-    <orderEntry type="module" module-name="backend" />
+-    <orderEntry type="module" module-name="frontend" />
+-    <orderEntry type="module" module-name="frontend.java" />
+-    <orderEntry type="module" module-name="light-classes" />
+-    <orderEntry type="module" module-name="eval4j" />
+-    <orderEntry type="module-library">
+-      <library>
+-        <CLASSES>
+-          <root url="jar://$MODULE_DIR$/../../ideaSDK/core/annotations.jar!/" />
+-        </CLASSES>
+-        <JAVADOC />
+-        <SOURCES />
+-      </library>
+-    </orderEntry>
+-    <orderEntry type="library" name="guava" level="project" />
+-    <orderEntry type="module" module-name="js.frontend" />
+-    <orderEntry type="module" module-name="js.serializer" />
+-    <orderEntry type="library" name="trove4j" level="project" />
+-    <orderEntry type="module" module-name="ide-common" exported="" />
+-    <orderEntry type="module" module-name="util" />
+-    <orderEntry type="module" module-name="idea-core" />
+-    <orderEntry type="module" module-name="idea-jps-common" />
+-    <orderEntry type="module" module-name="cli-common" />
+-    <orderEntry type="module" module-name="descriptors" />
+-    <orderEntry type="library" exported="" name="idea-full" level="project" />
+-    <orderEntry type="library" name="uast-java" level="project" />
+-    <orderEntry type="module" module-name="frontend.script" />
+-  </component>
+-</module>
+\ No newline at end of file
+--- a/idea/idea-gradle/src/org/jetbrains/kotlin/idea/configuration/KotlinGradleMobileMultiplatformModuleBuilder.kt
++++ b/idea/idea-gradle/src/org/jetbrains/kotlin/idea/configuration/KotlinGradleMobileMultiplatformModuleBuilder.kt
+@@ -56,6 +56,7 @@
+         val androidMain = src.createKotlinSampleFileWriter(mainSourceName, jvmTargetName, languageName = "java")
+         val androidTest = src.createKotlinSampleFileWriter(mainTestName, languageName = "java", fileName = "SampleTestsAndroid.kt")
+ 
++        val appInfo = appDir.createChildData(appDir,"Info.plist").bufferedWriter()
+         val androidLocalProperties = rootDir.createChildData(this, "local.properties").bufferedWriter()
+         val androidRoot = src.findChild(mainSourceName)!!
+         val androidManifest = androidRoot.createChildData(this, "AndroidManifest.xml").bufferedWriter()
+@@ -69,6 +70,8 @@
+         val nativeMain = src.createKotlinSampleFileWriter(nativeSourceName, nativeTargetName)
+         val nativeTest = src.createKotlinSampleFileWriter(nativeTestName, fileName = "SampleTestsIOS.kt")
+ 
++        val xcodeConfigurator = XcodeProjectConfigurator()
++
+         try {
+             commonMain.write(
+                 """
+@@ -269,14 +272,18 @@
+ </android.support.constraint.ConstraintLayout>
+             """.trimIndent()
+             )
++
++            appInfo.write(xcodeConfigurator.templatePlist("""<key>CFBundlePackageType</key>
++<string>FMWK</string>"""))
++
+         } finally {
+             listOf(
+-                commonMain, commonTest, androidMain, androidTest, nativeMain, nativeTest,
++                commonMain, commonTest, androidMain, androidTest, nativeMain, nativeTest, appInfo,
+                 androidLocalProperties, androidManifest, androidStrings, androidStyles, androidActivityMain
+             ).forEach(BufferedWriter::close)
+         }
+ 
+-        XcodeProjectConfigurator().createSkeleton(rootDir)
++        xcodeConfigurator.createSkeleton(rootDir)
+     }
+ 
+ 
+--- a/idea/idea-gradle/src/org/jetbrains/kotlin/idea/configuration/xcode/XcodeProjectConfigurator.kt
++++ b/idea/idea-gradle/src/org/jetbrains/kotlin/idea/configuration/xcode/XcodeProjectConfigurator.kt
+@@ -14,6 +14,30 @@
+ 
+     private val mppDirName = "app"
+ 
++    fun templatePlist(varyingProperties: String = ""): String {
++        return """<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++	<key>CFBundleDevelopmentRegion</key>
++	<string>${'$'}(DEVELOPMENT_LANGUAGE)</string>
++	<key>CFBundleExecutable</key>
++	<string>${'$'}(EXECUTABLE_NAME)</string>
++	<key>CFBundleIdentifier</key>
++	<string>${'$'}(PRODUCT_BUNDLE_IDENTIFIER)</string>
++	<key>CFBundleInfoDictionaryVersion</key>
++	<string>6.0</string>
++	<key>CFBundleName</key>
++	<string>${'$'}(PRODUCT_NAME)</string>
++	<key>CFBundleShortVersionString</key>
++	<string>1.0</string>
++	<key>CFBundleVersion</key>
++	<string>1</string>
++${varyingProperties.trimIndent().prependIndent("\t")}
++</dict>
++</plist>"""
++    }
++
+     fun createSkeleton(rootDir: VirtualFile) {
+         val iosDir = rootDir.createChildDirectory(this, "iosApp")
+         val sourceDir = iosDir.createChildDirectory(this, "iosApp")
+@@ -85,81 +109,44 @@
+ }
+                 """.trimIndent()
+             )
++
+             testInfo.write(
+-                """
+-<?xml version="1.0" encoding="UTF-8"?>
+-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+-<plist version="1.0">
+-<dict>
+-	<key>CFBundleDevelopmentRegion</key>
+-	<string>${'$'}(DEVELOPMENT_LANGUAGE)</string>
+-	<key>CFBundleExecutable</key>
+-	<string>${'$'}(EXECUTABLE_NAME)</string>
+-	<key>CFBundleIdentifier</key>
+-	<string>${'$'}(PRODUCT_BUNDLE_IDENTIFIER)</string>
+-	<key>CFBundleInfoDictionaryVersion</key>
+-	<string>6.0</string>
+-	<key>CFBundleName</key>
+-	<string>${'$'}(PRODUCT_NAME)</string>
+-	<key>CFBundlePackageType</key>
+-	<string>BNDL</string>
+-	<key>CFBundleShortVersionString</key>
+-	<string>1.0</string>
+-	<key>CFBundleVersion</key>
+-	<string>1</string>
+-</dict>
+-</plist>
+-                """.trimIndent()
++                templatePlist(
++                    """<key>CFBundlePackageType</key>
++<string>BNDL</string>"""
++                )
+             )
++
+             sourceInfo.write(
+-                """
+-<?xml version="1.0" encoding="UTF-8"?>
+-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+-<plist version="1.0">
+-<dict>
+-	<key>CFBundleDevelopmentRegion</key>
+-	<string>${'$'}(DEVELOPMENT_LANGUAGE)</string>
+-	<key>CFBundleExecutable</key>
+-	<string>${'$'}(EXECUTABLE_NAME)</string>
+-	<key>CFBundleIdentifier</key>
+-	<string>${'$'}(PRODUCT_BUNDLE_IDENTIFIER)</string>
+-	<key>CFBundleInfoDictionaryVersion</key>
+-	<string>6.0</string>
+-	<key>CFBundleName</key>
+-	<string>${'$'}(PRODUCT_NAME)</string>
+-	<key>CFBundlePackageType</key>
+-	<string>APPL</string>
+-	<key>CFBundleShortVersionString</key>
+-	<string>1.0</string>
+-	<key>CFBundleVersion</key>
+-	<string>1</string>
+-	<key>LSRequiresIPhoneOS</key>
+-	<true/>
+-	<key>UILaunchStoryboardName</key>
+-	<string>LaunchScreen</string>
+-	<key>UIMainStoryboardFile</key>
+-	<string>Main</string>
+-	<key>UIRequiredDeviceCapabilities</key>
+-	<array>
+-		<string>armv7</string>
+-	</array>
+-	<key>UISupportedInterfaceOrientations</key>
+-	<array>
+-		<string>UIInterfaceOrientationPortrait</string>
+-		<string>UIInterfaceOrientationLandscapeLeft</string>
+-		<string>UIInterfaceOrientationLandscapeRight</string>
+-	</array>
+-	<key>UISupportedInterfaceOrientations~ipad</key>
+-	<array>
+-		<string>UIInterfaceOrientationPortrait</string>
+-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+-		<string>UIInterfaceOrientationLandscapeLeft</string>
+-		<string>UIInterfaceOrientationLandscapeRight</string>
+-	</array>
+-</dict>
+-</plist>
+-                """.trimIndent()
++                templatePlist(
++                    """<key>CFBundlePackageType</key>
++<string>APPL</string>
++<key>LSRequiresIPhoneOS</key>
++<true/>
++<key>UILaunchStoryboardName</key>
++<string>LaunchScreen</string>
++<key>UIMainStoryboardFile</key>
++<string>Main</string>
++<key>UIRequiredDeviceCapabilities</key>
++<array>
++	<string>armv7</string>
++</array>
++<key>UISupportedInterfaceOrientations</key>
++<array>
++	<string>UIInterfaceOrientationPortrait</string>
++	<string>UIInterfaceOrientationLandscapeLeft</string>
++	<string>UIInterfaceOrientationLandscapeRight</string>
++</array>
++<key>UISupportedInterfaceOrientations~ipad</key>
++<array>
++	<string>UIInterfaceOrientationPortrait</string>
++	<string>UIInterfaceOrientationPortraitUpsideDown</string>
++	<string>UIInterfaceOrientationLandscapeLeft</string>
++	<string>UIInterfaceOrientationLandscapeRight</string>
++</array>"""
++                )
+             )
++
+             launchScreen.write(
+                 """
+ <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+@@ -761,6 +748,7 @@
+ 				DYLIB_CURRENT_VERSION = 1;
+ 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+ 				ENABLE_BITCODE = NO;
++				INFOPLIST_FILE = "${'$'}(SRCROOT)/../$mppDirName/Info.plist";
+ 				INSTALL_PATH = "${'$'}(LOCAL_LIBRARY_DIR)/Frameworks";
+ 				KOTLIN_BUILD_TYPE = DEBUG;
+ 				KOTLIN_TARGET = "";
+@@ -792,6 +780,7 @@
+ 				DYLIB_CURRENT_VERSION = 1;
+ 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+ 				ENABLE_BITCODE = NO;
++				INFOPLIST_FILE = "${'$'}(SRCROOT)/../$mppDirName/Info.plist";
+ 				INSTALL_PATH = "${'$'}(LOCAL_LIBRARY_DIR)/Frameworks";
+ 				KOTLIN_BUILD_TYPE = RELEASE;
+ 				KOTLIN_TARGET = "";
+--- a/idea/src/org/jetbrains/kotlin/idea/conversion/copy/RangeUtils.kt
++++ b/idea/src/org/jetbrains/kotlin/idea/conversion/copy/RangeUtils.kt
+@@ -39,10 +39,7 @@
+         if (start in 0..end) {
+             TextRange(start, end)
+         } else {
+-            // Probably a race condition had happened
+-            LOG.error("Invalid range [$start, $end] for range marker (valid = $isValid)")
++            // Probably a race condition had happened and range marker is invalidated
+             null
+         }
+     } else null
+-
+-private val LOG = Logger.getInstance("RangeUtils")
+--- a/idea/src/org/jetbrains/kotlin/idea/inspections/RemoveRedundantQualifierNameInspection.kt
++++ b/idea/src/org/jetbrains/kotlin/idea/inspections/RemoveRedundantQualifierNameInspection.kt
+@@ -30,14 +30,15 @@
+         object : KtVisitorVoid() {
+             override fun visitDotQualifiedExpression(expression: KtDotQualifiedExpression) {
+                 if (expression.parent is KtDotQualifiedExpression? || expression.isInImportDirective()) return
++                val expressionForAnalyze = expression.firstExpressionWithoutReceiver() ?: return
+ 
+-                val context = expression.analyze()
+-                val importableFqName = expression.getQualifiedElementSelector()
+-                    ?.getResolvedCall(context)?.resultingDescriptor
++                val context = expressionForAnalyze.analyze()
++                val importableFqName = expressionForAnalyze.getQualifiedElementSelector()
++                    ?.mainReference?.resolveToDescriptors(context)?.firstOrNull()
+                     ?.importableFqName ?: return
+ 
+-                val applicableExpression = expression.firstApplicableExpression(validator = {
+-                    applicableExpression(expression, context, importableFqName)
++                val applicableExpression = expressionForAnalyze.firstApplicableExpression(validator = {
++                    applicableExpression(expressionForAnalyze, context, importableFqName)
+                 }) {
+                     firstChild as? KtDotQualifiedExpression
+                 } ?: return
+@@ -57,6 +58,10 @@
+         }
+ }
+ 
++private tailrec fun KtDotQualifiedExpression.firstExpressionWithoutReceiver(): KtDotQualifiedExpression? =
++    if ((getQualifiedElementSelector()?.mainReference?.resolve() as? KtCallableDeclaration)?.receiverTypeReference == null) this
++    else (receiverExpression as? KtDotQualifiedExpression)?.firstExpressionWithoutReceiver()
++
+ private tailrec fun <T : KtElement> T.firstApplicableExpression(validator: T.() -> T?, generator: T.() -> T?): T? =
+     validator() ?: generator()?.firstApplicableExpression(validator, generator)
+ 
+--- /dev/null
++++ b/idea/testData/inspectionsLocal/removeRedundantQualifierName/asReceiver.kt
+@@ -0,0 +1,15 @@
++// WITH_RUNTIME
++
++import B.G
++
++fun test() {
++    <caret>B.G.let { it }
++}
++
++class B {
++    object G
++}
++
++class C {
++    object G
++}
+--- /dev/null
++++ b/idea/testData/inspectionsLocal/removeRedundantQualifierName/asReceiver.kt.after
+@@ -0,0 +1,15 @@
++// WITH_RUNTIME
++
++import B.G
++
++fun test() {
++    G.let { it }
++}
++
++class B {
++    object G
++}
++
++class C {
++    object G
++}
+--- /dev/null
++++ b/idea/testData/inspectionsLocal/removeRedundantQualifierName/asReceiverProperty.kt
+@@ -0,0 +1,11 @@
++package inspector.p30879
++import inspector.p30879.C.G
++
++val <T> T.letVar: Int; get() = 0
++
++fun test() {
++    C<caret>.G.letVar
++}
++
++class B { object G }
++class C { object G }
+--- /dev/null
++++ b/idea/testData/inspectionsLocal/removeRedundantQualifierName/asReceiverProperty.kt.after
+@@ -0,0 +1,11 @@
++package inspector.p30879
++import inspector.p30879.C.G
++
++val <T> T.letVar: Int; get() = 0
++
++fun test() {
++    G.letVar
++}
++
++class B { object G }
++class C { object G }
+--- /dev/null
++++ b/idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableAsReceiver.kt
+@@ -0,0 +1,16 @@
++// PROBLEM: none
++// WITH_RUNTIME
++
++import C.G
++
++fun test() {
++    <caret>B.G.let { it }
++}
++
++class B {
++    object G
++}
++
++class C {
++    object G
++}
+--- /dev/null
++++ b/idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableAsReceiverProperty.kt
+@@ -0,0 +1,13 @@
++// PROBLEM: none
++
++package inspector.p30879
++import inspector.p30879.B.G
++
++val <T> T.letVar: Int; get() = 0
++
++fun test() {
++    C<caret>.G.letVar
++}
++
++class B { object G }
++class C { object G }
+--- a/idea/tests/org/jetbrains/kotlin/idea/inspections/LocalInspectionTestGenerated.java
++++ b/idea/tests/org/jetbrains/kotlin/idea/inspections/LocalInspectionTestGenerated.java
+@@ -6032,6 +6032,16 @@
+             KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/inspectionsLocal/removeRedundantQualifierName"), Pattern.compile("^([\\w\\-_]+)\\.(kt|kts)$"), TargetBackend.ANY, true);
+         }
+ 
++        @TestMetadata("asReceiver.kt")
++        public void testAsReceiver() throws Exception {
++            runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/asReceiver.kt");
++        }
++
++        @TestMetadata("asReceiverProperty.kt")
++        public void testAsReceiverProperty() throws Exception {
++            runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/asReceiverProperty.kt");
++        }
++
+         @TestMetadata("companionCollision.kt")
+         public void testCompanionCollision() throws Exception {
+             runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/companionCollision.kt");
+@@ -6152,6 +6162,16 @@
+             runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/localFun2.kt");
+         }
+ 
++        @TestMetadata("notApplicableAsReceiver.kt")
++        public void testNotApplicableAsReceiver() throws Exception {
++            runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableAsReceiver.kt");
++        }
++
++        @TestMetadata("notApplicableAsReceiverProperty.kt")
++        public void testNotApplicableAsReceiverProperty() throws Exception {
++            runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableAsReceiverProperty.kt");
++        }
++
+         @TestMetadata("notApplicableCollisionTopLevelClass.kt")
+         public void testNotApplicableCollisionTopLevelClass() throws Exception {
+             runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableCollisionTopLevelClass.kt");
