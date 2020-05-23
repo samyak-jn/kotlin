@@ -1,0 +1,1587 @@
+Description: Update builtSrc dir to make compatible to build with gradle
+ This patch adds build.gradle and remove kts file.
+ Added an intermediatory method for pill configuration.
+ Add various dependencies org.jdom:jdom2:2.0.6.
+ Update from jengelmanshow to vavr.
+ Removes org.gradle.kotlin.dsl.task, and xml files.
+Author: Saif Abdul Casim
+---
+
+--- a/buildSrc/build.gradle
++++ b/buildSrc/build.gradle
+@@ -37,7 +37,6 @@
+ logger.info("buildSrcKotlinVersion: " + ext["buildSrcKotlinVersion"])
+ logger.info("buildSrc kotlin compiler version: " + org.jetbrains.kotlin.config.KotlinCompilerVersion.VERSION)
+ logger.info("buildSrc stdlib version: " + buildSrcKotlinVersion)
+-
+ apply {
+     plugin("kotlin")
+     plugin("kotlin-sam-with-receiver")
+@@ -45,11 +44,11 @@
+ 
+ gradlePlugin {
+     plugins {
+-        register("pill-configurable") {
++        create("pill-configurable") {
+             id = "pill-configurable"
+             implementationClass = "org.jetbrains.kotlin.pill.PillConfigurablePlugin"
+         }
+-        register("jps-compatible") {
++        create("jps-compatible") {
+             id = "jps-compatible"
+             implementationClass = "org.jetbrains.kotlin.pill.JpsCompatiblePlugin"
+         }
+@@ -67,7 +66,7 @@
+ }
+ 
+ rootProject.apply {
+-    from(rootProject.file("../gradle/versions.gradle.kts"))
++    from(rootProject.file("../gradle/versions.gradle"))
+ }
+ 
+ ext.isTeamcityBuild = project.hasProperty("teamcity") || System.getenv("TEAMCITY_VERSION") != null
+@@ -77,7 +76,7 @@
+ if (ext["versions.intellijSdk"]?.toString()?.endsWith("SNAPSHOT") == true)
+     ext["intellijReleaseType"] ="snapshots"
+ else
+-	ext["intellijReleaseType"] ="releases"
++    ext["intellijReleaseType"] ="releases"
+ 
+ ext["versions.androidDxSources"] = "5.0.0_r2"
+ 
+@@ -89,8 +88,9 @@
+         maven({url("https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-third-party-dependencies/")})
+     }
+ 
+-	if(project.ext["buildSrcKotlinRepo"]) {
+-		maven({url("${ext["buildSrcKotlinRepo"]}".toString())})    }
++    if(project.ext["buildSrcKotlinRepo"]) {
++        maven({url("${ext["buildSrcKotlinRepo"]}".toString())})
++    }
+ 
+     jcenter()
+     maven({url("https://jetbrains.bintray.com/intellij-third-party-dependencies/")})
+@@ -98,19 +98,21 @@
+ }
+ 
+ dependencies {
++	compile 'org.jdom:jdom2:2.0.6'
+     compile("net.rubygrapefruit:native-platform:${property("versions.native-platform")}")
+-    compile("net.rubygrapefruit:native-platform-windows-amd64:${property("versions.native-platform")}")
+-    compile("net.rubygrapefruit:native-platform-windows-i386:${property("versions.native-platform")}")
+-    compile("com.jakewharton.dex:dex-method-list:3.0.0")
+-
++    //compile("net.rubygrapefruit:native-platform-windows-amd64:${property("versions.native-platform")}")
++    //compile("net.rubygrapefruit:native-platform-windows-i386:${property("versions.native-platform")}")
++    //compile("com.jakewharton.dex:dex-method-list:3.0.0")
++	compile("org.jetbrains.kotlin:kotlin-stdlib:$buildSrcKotlinVersion")
+     compile("com.github.jengelman.gradle.plugins:shadow:${property("versions.shadow")}")
+-    compile("org.jetbrains.intellij.deps:asm-all:7.0")
+ 
+-    compile("gradle.plugin.org.jetbrains.gradle.plugin.idea-ext:gradle-idea-ext:0.4.2")
++	compile("org.jetbrains.intellij.deps:asm-all:7.0")
++
++    //compile("gradle.plugin.org.jetbrains.gradle.plugin.idea-ext:gradle-idea-ext:0.4.2")
+ }
+ 
+ extensions.configure("samWithReceiver"){
+     it.annotation("org.gradle.api.HasImplicitReceiver")
+ }
+ 
+-tasks["build"].dependsOn(":prepare-deps:android-dx:build", ":prepare-deps:intellij-sdk:build")
++//tasks["build"].dependsOn(":prepare-deps:intellij-sdk:build")
+--- a/buildSrc/gradle.properties
++++ b/buildSrc/gradle.properties
+@@ -1,4 +1,4 @@
+-org.gradle.jvmargs=-Duser.country=US -Dkotlin.daemon.jvm.options=-Xmx1600m -Dfile.encoding=UTF-8
++
+ 
+ cacheRedirectorEnabled=true
+ 
+--- /dev/null
++++ b/buildSrc/prepare-deps/intellij-sdk/build.gradle
+@@ -0,0 +1,288 @@
++
++import org.gradle.api.publish.ivy.internal.artifact.FileBasedIvyArtifact
++import org.gradle.api.publish.ivy.internal.publication.DefaultIvyConfiguration
++import org.gradle.api.publish.ivy.internal.publication.DefaultIvyPublicationIdentity
++import org.gradle.api.publish.ivy.internal.publisher.IvyDescriptorFileGenerator
++import java.io.File
++import org.gradle.internal.os.OperatingSystem
++
++ext.cacheRedirectorEnabled = findProperty("cacheRedirectorEnabled")?.toString()?.toBoolean() == true
++
++ext.intellijUltimateEnabled= rootProject.ext.intellijUltimateEnabled
++ext.intellijReleaseType= rootProject.ext.intellijReleaseType
++ext.intellijVersion = rootProject.ext["versions.intellijSdk"] as String
++ext.asmVersion = rootProject.findProperty("versions.jar.asm-all") as String
++ext.androidStudioRelease = rootProject.findProperty("versions.androidStudioRelease") as String
++ext.androidStudioBuild = rootProject.findProperty("versions.androidStudioBuild") as String
++ext.intellijSeparateSdks = rootProject.ext.intellijSeparateSdks as boolean
++ext.installIntellijCommunity = !intellijUltimateEnabled || intellijSeparateSdks
++ext.installIntellijUltimate = intellijUltimateEnabled
++
++ext.intellijVersionDelimiterIndex = intellijVersion.indexOf('.')
++if(intellijVersionDelimiterIndex==-1){
++	ext.intellijVersionDelimiterIndex = intellijVersion.indexOf('-')
++}
++if (intellijVersionDelimiterIndex == -1) {
++    throw new GradleException("Invalid IDEA version $intellijVersion")
++}
++
++ext.platformBaseVersion = intellijVersion.substring(0, intellijVersionDelimiterIndex)
++
++logger.info("intellijUltimateEnabled: $intellijUltimateEnabled")
++
++logger.info("intellijVersion: $intellijVersion")
++logger.info("androidStudioRelease: $androidStudioRelease")
++logger.info("androidStudioBuild: $androidStudioBuild")
++
++logger.info("intellijSeparateSdks: $intellijSeparateSdks")
++logger.info("installIntellijCommunity: $installIntellijCommunity")
++logger.info("installIntellijUltimate: $installIntellijUltimate")
++
++ext.studioOs = "linux"
++
++repositories {
++    if (androidStudioRelease != null) {
++        ivy {
++            if (cacheRedirectorEnabled) {
++                artifactPattern("https://cache-redirector.jetbrains.com/dl.google.com/dl/android/studio/ide-zips/$androidStudioRelease/[artifact]-[revision]-$studioOs.zip")
++            }
++
++            artifactPattern("https://dl.google.com/dl/android/studio/ide-zips/$androidStudioRelease/[artifact]-[revision]-$studioOs.zip")
++            metadataSources {
++                artifact()
++            }
++        }
++    }
++
++    if (cacheRedirectorEnabled) {
++        maven({url("https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/$intellijReleaseType")})
++        maven({url("https://cache-redirector.jetbrains.com/plugins.jetbrains.com/maven")})
++        maven({url("https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-third-party-dependencies/")})
++    }
++
++    maven({url("https://www.jetbrains.com/intellij-repository/$intellijReleaseType")})
++    maven({url("https://plugins.jetbrains.com/maven")})
++    maven({url("https://jetbrains.bintray.com/intellij-third-party-dependencies/")})
++}
++
++configurations.create("intellij")
++configurations.create("intellijUltimate")
++configurations.create("sources")
++configurations.create("jps-standalone")
++configurations.create("jps-build-test")
++configurations.create("intellij-core")
++configurations.create("plugins-NodeJS")
++
++ext.customDepsRepoDir = new File(buildDir, "repo")
++ext.customDepsOrg=rootProject.ext.customDepsOrg
++ext.customDepsRevision = intellijVersion
++ext.customDepsRepoModulesDir = new File(customDepsRepoDir, "$customDepsOrg/$customDepsRevision")
++ext.repoDir = customDepsRepoModulesDir
++
++dependencies {
++    if (androidStudioRelease != null) {
++        intellij("google:android-studio-ide:$androidStudioBuild")
++    } else {
++       /* if (installIntellijCommunity) {
++            intellij("com.jetbrains.intellij.idea:ideaIC:$intellijVersion")
++        }*/
++
++        if (installIntellijUltimate) {
++            intellijUltimate("com.jetbrains.intellij.idea:ideaIU:$intellijVersion")
++        }
++    }
++
++    /*if (asmVersion != null) {
++        sources("org.jetbrains.intellij.deps:asm-all:$asmVersion:sources@jar")
++    }*/
++
++    //sources("com.jetbrains.intellij.idea:ideaIC:$intellijVersion:sources@jar")
++    "jps-standalone"("com.jetbrains.intellij.idea:jps-standalone:$intellijVersion")
++    "jps-build-test"("com.jetbrains.intellij.idea:jps-build-test:$intellijVersion")
++    "intellij-core"("com.jetbrains.intellij.idea:intellij-core:$intellijVersion")
++    if (intellijUltimateEnabled) {
++        "plugins-NodeJS"("com.jetbrains.plugins:NodeJS:${rootProject.ext["versions.idea.NodeJS"]}@zip")
++    }
++}
++//pathRemap: (String) -> String = { it }
++ext.configureExtractFromConfigurationTask={Task task, Configuration sourceConfig, Closure pathRemap,Closure extractor ->
++    task.dependsOn(sourceConfig)
++    task.inputs.files(sourceConfig)
++    def targetDir =new File(repoDir, sourceConfig.name)
++    task.outputs.dirs(targetDir)
++    task.doFirst {
++        project.copy {
++            from(extractor(sourceConfig))
++            into(targetDir)
++            eachFile {
++                path = pathRemap(path)
++            }
++        }
++    }
++}
++
++ext.removePathPrefix={ String path ->
++    if (androidStudioRelease == null) return path
++    def slashes
++    if (studioOs == "mac") slashes= 2 else slashes= 1
++    def result = path
++    1.upto(slashes) {
++        result = result.substring(a.indexOf("/")+1,result.length())
++    }
++    return result
++}
++
++tasks.create("unzipIntellijSdk") {
++    configureExtractFromConfigurationTask(it,project.configurations.intellij, {removePathPrefix(it)}) {
++        zipTree(it.getSingleFile()).matching {
++            exclude("**/plugins/Kotlin/**")
++        }
++    }
++}
++
++tasks.create("unzipIntellijUltimateSdk") {
++    configureExtractFromConfigurationTask(it,project.configurations.intellijUltimate,{String name -> return name}) {
++        zipTree(it.singleFile).matching {
++            exclude("plugins/Kotlin/**")
++        }
++    }
++}
++
++tasks.create("unzipIntellijCore") { configureExtractFromConfigurationTask(it,configurations."intellij-core",{String name -> return name}) { zipTree(it.singleFile) } }
++
++tasks.create("unzipJpsStandalone") { configureExtractFromConfigurationTask(it,configurations."jps-standalone",{String name -> return name}) { zipTree(it.singleFile) } }
++
++task("mergeSources",type:Jar) {
++    dependsOn(project.configurations.sources)
++    from( project.configurations.sources.collect {zipTree(it)} )
++    destinationDir = new File(repoDir, project.configurations.sources.name)
++    baseName = "intellij"
++    classifier = "sources"
++    version = intellijVersion
++}
++
++tasks.create("copyJpsBuildTest") { configureExtractFromConfigurationTask(it,configurations."jps-build-test",{String name -> return name}) { it.singleFile } }
++
++tasks.create("unzipNodeJSPlugin") { configureExtractFromConfigurationTask(it,configurations."plugins-NodeJS",{String name -> return name}) { zipTree(it.singleFile) } }
++
++ext.writeIvyXml={ String moduleName, String fileName, FileCollection jarFiles, File baseDir, List<File> sourcesJar->
++    println(customDepsOrg)
++    println(moduleName)
++    println(intellijVersion)
++    def descriptor=new IvyDescriptorFileGenerator(new DefaultIvyPublicationIdentity(customDepsOrg, moduleName, intellijVersion))
++
++    descriptor.addConfiguration(new DefaultIvyConfiguration("default"))
++    descriptor.addConfiguration(new DefaultIvyConfiguration("sources"))
++    jarFiles.getAsFileTree().getFiles().each { jarFile ->
++        if (jarFile.isFile() && jarFile.getAbsolutePath().substring(jarFile.getAbsolutePath().lastIndexOf(".")+1,jarFile.getAbsolutePath().length()) == "jar") {
++            def temp=jarFile.getAbsolutePath()-baseDir.getAbsolutePath()
++            def relativeName = temp.substring(1,temp.lastIndexOf("."))
++            def tempivy=new FileBasedIvyArtifact(jarFile,new DefaultIvyPublicationIdentity(customDepsOrg, relativeName, intellijVersion))
++            tempivy.conf = "default"
++            descriptor.addArtifact(tempivy)
++        }
++    }
++    sourcesJar.each {
++        def sourcesArtifactName = it.name.substring(0,it.name.lastIndexOf("-"))
++        sourcesArtifactName=sourcesArtifactName.substring(0,sourcesArtifactName.lastIndexOf("-"))
++        def tempivy=new FileBasedIvyArtifact(it,new DefaultIvyPublicationIdentity(customDepsOrg, sourcesArtifactName, intellijVersion))
++        tempivy.conf = "sources"
++        tempivy.classifier = "sources"
++        descriptor.addArtifact(tempivy)
++    }
++    descriptor.writeTo(new File(customDepsRepoModulesDir, "${fileName}.ivy.xml"))
++
++}
++ext.heylo={String moduleName, String fileName, FileCollection jarFiles, File baseDir, List<File> sourcesJar-> return "hey"}
++tasks.create("prepareIvyXmls") {
++    dependsOn(unzipIntellijCore, unzipJpsStandalone, mergeSources, copyJpsBuildTest)
++
++    def intellijSdkDir = new File(repoDir, project.configurations.intellij.name)
++    def intellijUltimateSdkDir =new File(repoDir, project.configurations.intellijUltimate.name)
++
++    if (installIntellijCommunity) {
++        dependsOn(unzipIntellijSdk)
++        inputs.dir(intellijSdkDir)
++        outputs.file(new File(repoDir, "${project.configurations.intellij.name}.ivy.xml"))
++    }
++
++    if (installIntellijUltimate) {
++        dependsOn(unzipIntellijUltimateSdk)
++        inputs.dir(intellijUltimateSdkDir)
++        outputs.file(new File(repoDir, "${project.configurations.intellijUltimate.name}.ivy.xml"))
++    }
++
++    def flatDeps = [configurations."intellij-core", configurations."jps-standalone", configurations."jps-build-test"]
++    flatDeps.each {
++        inputs.dir(new File(repoDir, it.name))
++        outputs.file(new File(repoDir, "${it.name}.ivy.xml"))
++    }
++    inputs.dir(new File(repoDir, project.configurations.sources.name))
++
++    if (intellijUltimateEnabled) {
++        dependsOn(unzipNodeJSPlugin)
++        inputs.dir(new File(repoDir, configurations."plugins-NodeJS".name))
++        outputs.file(new File(repoDir, "${configurations."plugins-NodeJS".name}.ivy.xml"))
++    }
++
++    doFirst {
++        def sources =new File(repoDir, project.configurations.sources.name).listFiles() as List<File>
++
++        if (installIntellijCommunity) {
++            def libDir =new File(intellijSdkDir, "lib")
++            project.writeIvyXml(project.configurations.intellij.name,
++                        project.configurations.intellij.name,
++                        fileTree(libDir).filter {
++                            it.parentFile == libDir && !it.name.startsWith("kotlin-")
++                        },
++                        libDir,
++                        sources)
++			println("wombocombo")
++			(new File(intellijSdkDir, "plugins").listFiles().collect { File file -> println(file.isDirectory()) })
++            (new File(intellijSdkDir, "plugins").listFiles().collect { File file -> if(file.isDirectory()){return file} }).each {
++                project.writeIvyXml(it.name, "intellij.plugin.${it.name}", files("$it/lib/"), new File(it, "lib"), sources)
++            }
++        }
++
++        if (installIntellijUltimate) {
++            def libDir =new File(intellijUltimateSdkDir, "lib")
++            project.heylo(project.configurations.intellij.name, // important! the module name should be "intellij"
++                        project.configurations.intellijUltimate.name,
++                        fileTree(libDir).filter {it.parentFile == libDir && !it.name.startsWith("kotlin-")},
++                        libDir,
++                        sources)
++            project.writeIvyXml(project.configurations.intellij.name, // important! the module name should be "intellij"
++                        project.configurations.intellijUltimate.name,
++                        fileTree(libDir).filter {
++                            it.parentFile == libDir && !it.name.startsWith("kotlin-")
++                        },
++                        libDir,
++                        sources)
++
++            new File(intellijUltimateSdkDir, "plugins").listFiles().each {
++            	if(it.isDirectory()){
++                	project.writeIvyXml(it.name, "intellijUltimate.plugin.${it.name}", files("$it/lib/"),new File(it, "lib"), sources)
++                }
++            }
++        }
++
++        flatDeps.each {
++            project.writeIvyXml(it.name, it.name, files("$repoDir/${it.name}"), new File(repoDir, it.name), sources)
++        }
++
++        if (intellijUltimateEnabled) {
++            def nodeJsBaseDir = "${configurations."plugins-NodeJS".name}/NodeJS/lib"
++            project.writeIvyXml("NodeJS", configurations."plugins-NodeJS".name, files("$repoDir/$nodeJsBaseDir"), new File(repoDir, nodeJsBaseDir), sources)
++        }
++    }
++}
++
++//pretty much the heart of this entire packaging is to rebuild this one build
++/*tasks.create("build") {
++    dependsOn(prepareIvyXmls)
++}*/
++
++task("clean",type:Delete) {
++    delete(customDepsRepoModulesDir)
++    delete(buildDir)
++}
+--- a/buildSrc/prepare-deps/intellij-sdk/build.gradle.kts
++++ /dev/null
+@@ -1,285 +0,0 @@
+-@file:Suppress("PropertyName")
+-
+-import org.gradle.api.publish.ivy.internal.artifact.FileBasedIvyArtifact
+-import org.gradle.api.publish.ivy.internal.publication.DefaultIvyConfiguration
+-import org.gradle.api.publish.ivy.internal.publication.DefaultIvyPublicationIdentity
+-import org.gradle.api.publish.ivy.internal.publisher.IvyDescriptorFileGenerator
+-import java.io.File
+-import org.gradle.internal.os.OperatingSystem
+-
+-val cacheRedirectorEnabled = findProperty("cacheRedirectorEnabled")?.toString()?.toBoolean() == true
+-
+-val intellijUltimateEnabled: Boolean by rootProject.extra
+-val intellijReleaseType: String by rootProject.extra
+-val intellijVersion = rootProject.extra["versions.intellijSdk"] as String
+-val asmVersion = rootProject.findProperty("versions.jar.asm-all") as String?
+-val androidStudioRelease = rootProject.findProperty("versions.androidStudioRelease") as String?
+-val androidStudioBuild = rootProject.findProperty("versions.androidStudioBuild") as String?
+-val intellijSeparateSdks: Boolean by rootProject.extra
+-val installIntellijCommunity = !intellijUltimateEnabled || intellijSeparateSdks
+-val installIntellijUltimate = intellijUltimateEnabled
+-
+-val intellijVersionDelimiterIndex = intellijVersion.indexOfAny(charArrayOf('.', '-'))
+-if (intellijVersionDelimiterIndex == -1) {
+-    error("Invalid IDEA version $intellijVersion")
+-}
+-
+-val platformBaseVersion = intellijVersion.substring(0, intellijVersionDelimiterIndex)
+-
+-logger.info("intellijUltimateEnabled: $intellijUltimateEnabled")
+-
+-logger.info("intellijVersion: $intellijVersion")
+-logger.info("androidStudioRelease: $androidStudioRelease")
+-logger.info("androidStudioBuild: $androidStudioBuild")
+-
+-logger.info("intellijSeparateSdks: $intellijSeparateSdks")
+-logger.info("installIntellijCommunity: $installIntellijCommunity")
+-logger.info("installIntellijUltimate: $installIntellijUltimate")
+-
+-val studioOs by lazy {
+-    when {
+-        OperatingSystem.current().isWindows -> "windows"
+-        OperatingSystem.current().isMacOsX -> "mac"
+-        OperatingSystem.current().isLinux -> "linux"
+-        else -> {
+-            logger.error("Unknown operating system for android tools: ${OperatingSystem.current().name}")
+-            ""
+-        }
+-    }
+-}
+-
+-repositories {
+-    if (androidStudioRelease != null) {
+-        ivy {
+-            if (cacheRedirectorEnabled) {
+-                artifactPattern("https://cache-redirector.jetbrains.com/dl.google.com/dl/android/studio/ide-zips/$androidStudioRelease/[artifact]-[revision]-$studioOs.zip")
+-            }
+-
+-            artifactPattern("https://dl.google.com/dl/android/studio/ide-zips/$androidStudioRelease/[artifact]-[revision]-$studioOs.zip")
+-            metadataSources {
+-                artifact()
+-            }
+-        }
+-    }
+-
+-    if (cacheRedirectorEnabled) {
+-        maven("https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/$intellijReleaseType")
+-        maven("https://cache-redirector.jetbrains.com/plugins.jetbrains.com/maven")
+-        maven("https://cache-redirector.jetbrains.com/jetbrains.bintray.com/intellij-third-party-dependencies/")
+-    }
+-
+-    maven("https://www.jetbrains.com/intellij-repository/$intellijReleaseType")
+-    maven("https://plugins.jetbrains.com/maven")
+-    maven("https://jetbrains.bintray.com/intellij-third-party-dependencies/")
+-}
+-
+-val intellij by configurations.creating
+-val intellijUltimate by configurations.creating
+-val sources by configurations.creating
+-val `jps-standalone` by configurations.creating
+-val `jps-build-test` by configurations.creating
+-val `intellij-core` by configurations.creating
+-val `plugins-NodeJS` by configurations.creating
+-
+-val customDepsRepoDir = File(buildDir, "repo")
+-val customDepsOrg: String by rootProject.extra
+-val customDepsRevision = intellijVersion
+-val customDepsRepoModulesDir = File(customDepsRepoDir, "$customDepsOrg/$customDepsRevision")
+-val repoDir = customDepsRepoModulesDir
+-
+-dependencies {
+-    if (androidStudioRelease != null) {
+-        intellij("google:android-studio-ide:$androidStudioBuild")
+-    } else {
+-        if (installIntellijCommunity) {
+-            intellij("com.jetbrains.intellij.idea:ideaIC:$intellijVersion")
+-        }
+-        if (installIntellijUltimate) {
+-            intellijUltimate("com.jetbrains.intellij.idea:ideaIU:$intellijVersion")
+-        }
+-    }
+-
+-    if (asmVersion != null) {
+-        sources("org.jetbrains.intellij.deps:asm-all:$asmVersion:sources@jar")
+-    }
+-
+-    sources("com.jetbrains.intellij.idea:ideaIC:$intellijVersion:sources@jar")
+-    `jps-standalone`("com.jetbrains.intellij.idea:jps-standalone:$intellijVersion")
+-    `jps-build-test`("com.jetbrains.intellij.idea:jps-build-test:$intellijVersion")
+-    `intellij-core`("com.jetbrains.intellij.idea:intellij-core:$intellijVersion")
+-    if (intellijUltimateEnabled) {
+-        `plugins-NodeJS`("com.jetbrains.plugins:NodeJS:${rootProject.extra["versions.idea.NodeJS"]}@zip")
+-    }
+-}
+-
+-fun Task.configureExtractFromConfigurationTask(sourceConfig: Configuration,
+-                                               pathRemap: (String) -> String = { it },
+-                                               extractor: (Configuration) -> Any) {
+-    dependsOn(sourceConfig)
+-    inputs.files(sourceConfig)
+-    val targetDir = File(repoDir, sourceConfig.name)
+-    outputs.dirs(targetDir)
+-    doFirst {
+-        project.copy {
+-            from(extractor(sourceConfig))
+-            into(targetDir)
+-            eachFile {
+-                path = pathRemap(path)
+-            }
+-        }
+-    }
+-}
+-
+-fun removePathPrefix(path: String): String {
+-    if (androidStudioRelease == null) return path
+-    val slashes = if (studioOs == "mac") 2 else 1
+-    var result = path
+-    repeat(slashes) {
+-        result = result.substringAfter('/')
+-    }
+-    return result
+-}
+-
+-val unzipIntellijSdk by tasks.creating {
+-    configureExtractFromConfigurationTask(intellij, pathRemap = { removePathPrefix(it) }) {
+-        zipTree(it.singleFile).matching {
+-            exclude("**/plugins/Kotlin/**")
+-        }
+-    }
+-}
+-
+-val unzipIntellijUltimateSdk by tasks.creating {
+-    configureExtractFromConfigurationTask(intellijUltimate) {
+-        zipTree(it.singleFile).matching {
+-            exclude("plugins/Kotlin/**")
+-        }
+-    }
+-}
+-
+-val unzipIntellijCore by tasks.creating { configureExtractFromConfigurationTask(`intellij-core`) { zipTree(it.singleFile) } }
+-
+-val unzipJpsStandalone by tasks.creating { configureExtractFromConfigurationTask(`jps-standalone`) { zipTree(it.singleFile) } }
+-
+-val mergeSources by tasks.creating(Jar::class.java) {
+-    dependsOn(sources)
+-    from(provider { sources.map(::zipTree) })
+-    destinationDir = File(repoDir, sources.name)
+-    baseName = "intellij"
+-    classifier = "sources"
+-    version = intellijVersion
+-}
+-
+-val copyJpsBuildTest by tasks.creating { configureExtractFromConfigurationTask(`jps-build-test`) { it.singleFile } }
+-
+-val unzipNodeJSPlugin by tasks.creating { configureExtractFromConfigurationTask(`plugins-NodeJS`) { zipTree(it.singleFile) } }
+-
+-fun writeIvyXml(moduleName: String, fileName: String, jarFiles: FileCollection, baseDir: File, vararg sourcesJar: File) {
+-    with(IvyDescriptorFileGenerator(DefaultIvyPublicationIdentity(customDepsOrg, moduleName, intellijVersion))) {
+-        addConfiguration(DefaultIvyConfiguration("default"))
+-        addConfiguration(DefaultIvyConfiguration("sources"))
+-        jarFiles.asFileTree.files.forEach { jarFile ->
+-            if (jarFile.isFile && jarFile.extension == "jar") {
+-                val relativeName = jarFile.toRelativeString(baseDir).removeSuffix(".jar")
+-                addArtifact(
+-                    FileBasedIvyArtifact(jarFile, DefaultIvyPublicationIdentity(customDepsOrg, relativeName, intellijVersion)).also {
+-                        it.conf = "default"
+-                    }
+-                )
+-            }
+-        }
+-        sourcesJar.forEach {
+-            val sourcesArtifactName = it.name.substringBeforeLast("-").substringBeforeLast("-")
+-            addArtifact(
+-                FileBasedIvyArtifact(it, DefaultIvyPublicationIdentity(customDepsOrg, sourcesArtifactName, intellijVersion)).also { artifact ->
+-                    artifact.conf = "sources"
+-                    artifact.classifier = "sources"
+-                }
+-            )
+-        }
+-        writeTo(File(customDepsRepoModulesDir, "$fileName.ivy.xml"))
+-    }
+-}
+-
+-val prepareIvyXmls by tasks.creating {
+-    dependsOn(unzipIntellijCore, unzipJpsStandalone, mergeSources, copyJpsBuildTest)
+-
+-    val intellijSdkDir = File(repoDir, intellij.name)
+-    val intellijUltimateSdkDir = File(repoDir, intellijUltimate.name)
+-
+-    if (installIntellijCommunity) {
+-        dependsOn(unzipIntellijSdk)
+-        inputs.dir(intellijSdkDir)
+-        outputs.file(File(repoDir, "${intellij.name}.ivy.xml"))
+-    }
+-
+-    if (installIntellijUltimate) {
+-        dependsOn(unzipIntellijUltimateSdk)
+-        inputs.dir(intellijUltimateSdkDir)
+-        outputs.file(File(repoDir, "${intellijUltimate.name}.ivy.xml"))
+-    }
+-
+-    val flatDeps = listOf(`intellij-core`, `jps-standalone`, `jps-build-test`)
+-    flatDeps.forEach {
+-        inputs.dir(File(repoDir, it.name))
+-        outputs.file(File(repoDir, "${it.name}.ivy.xml"))
+-    }
+-    inputs.dir(File(repoDir, sources.name))
+-
+-    if (intellijUltimateEnabled) {
+-        dependsOn(unzipNodeJSPlugin)
+-        inputs.dir(File(repoDir, `plugins-NodeJS`.name))
+-        outputs.file(File(repoDir, "${`plugins-NodeJS`.name}.ivy.xml"))
+-    }
+-
+-    doFirst {
+-        val sources = File(repoDir, sources.name).listFiles()
+-
+-        if (installIntellijCommunity) {
+-            val libDir = File(intellijSdkDir, "lib")
+-            writeIvyXml(intellij.name,
+-                        intellij.name,
+-                        fileTree(libDir).filter {
+-                            it.parentFile == libDir && !it.name.startsWith("kotlin-")
+-                        },
+-                        libDir,
+-                        *sources)
+-
+-            File(intellijSdkDir, "plugins").listFiles { file: File -> file.isDirectory }.forEach {
+-                writeIvyXml(it.name, "intellij.plugin.${it.name}", files("$it/lib/"), File(it, "lib"), *sources)
+-            }
+-        }
+-
+-        if (installIntellijUltimate) {
+-            val libDir = File(intellijUltimateSdkDir, "lib")
+-            writeIvyXml(intellij.name, // important! the module name should be "intellij"
+-                        intellijUltimate.name,
+-                        fileTree(libDir).filter {
+-                            it.parentFile == libDir && !it.name.startsWith("kotlin-")
+-                        },
+-                        libDir,
+-                        *sources)
+-
+-            File(intellijUltimateSdkDir, "plugins").listFiles { it: File -> it.isDirectory }.forEach {
+-                writeIvyXml(it.name, "intellijUltimate.plugin.${it.name}", files("$it/lib/"), File(it, "lib"), *sources)
+-            }
+-        }
+-
+-        flatDeps.forEach {
+-            writeIvyXml(it.name, it.name, files("$repoDir/${it.name}"), File(repoDir, it.name), *sources)
+-        }
+-
+-        if (intellijUltimateEnabled) {
+-            val nodeJsBaseDir = "${`plugins-NodeJS`.name}/NodeJS/lib"
+-            writeIvyXml("NodeJS", `plugins-NodeJS`.name, files("$repoDir/$nodeJsBaseDir"), File(repoDir, nodeJsBaseDir), *sources)
+-        }
+-    }
+-}
+-
+-val build by tasks.creating {
+-    dependsOn(prepareIvyXmls)
+-}
+-
+-val clean by tasks.creating(Delete::class) {
+-    delete(customDepsRepoModulesDir)
+-    delete(buildDir)
+-}
+--- /dev/null
++++ b/buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellij-core.ivy.xml
+@@ -0,0 +1,31 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
++  <info organisation="kotlin.build.custom.deps" module="intellij-core" revision="183.5153.4" publication="20190701090057"/>
++  <configurations>
++    <conf name="default" visibility="public"/>
++    <conf name="sources" visibility="public"/>
++  </configurations>
++  <publications>
++    <artifact name="java-compatibility-1.0.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="jna-4.5.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="guava-25.1-jre" type="jar" ext="jar" conf="default"/>
++    <artifact name="imgscalr-lib-4.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="streamex-0.6.7" type="jar" ext="jar" conf="default"/>
++    <artifact name="annotations" type="jar" ext="jar" conf="default"/>
++    <artifact name="cli-parser-1.1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="intellij-core-analysis" type="jar" ext="jar" conf="default"/>
++    <artifact name="picocontainer-1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="batik-all-1.10" type="jar" ext="jar" conf="default"/>
++    <artifact name="jna-platform-4.5.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="log4j-1.2.17" type="jar" ext="jar" conf="default"/>
++    <artifact name="lz4-1.3.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="asm-all-7.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="jdom" type="jar" ext="jar" conf="default"/>
++    <artifact name="intellij-core" type="jar" ext="jar" conf="default"/>
++    <artifact name="trove4j-1.0.20160824" type="jar" ext="jar" conf="default"/>
++    <artifact name="xmlgraphics-commons-2.3" type="jar" ext="jar" conf="default"/>
++    <artifact name="oro-2.0.8" type="jar" ext="jar" conf="default"/>
++    <artifact name="intellij" type="jar" ext="jar" conf="sources" m:classifier="sources"/>
++  </publications>
++  <dependencies/>
++</ivy-module>
+--- /dev/null
++++ b/buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/intellijUltimate.ivy.xml
+@@ -0,0 +1,206 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
++  <info organisation="kotlin.build.custom.deps" module="intellij" revision="183.5153.4" publication="20190701090057"/>
++  <configurations>
++    <conf name="default" visibility="public"/>
++    <conf name="sources" visibility="public"/>
++  </configurations>
++  <publications>
++    <artifact name="external-system-rt" type="jar" ext="jar" conf="default"/>
++    <artifact name="extensions" type="jar" ext="jar" conf="default"/>
++    <artifact name="xpp3_min-1.1.4c" type="jar" ext="jar" conf="default"/>
++    <artifact name="common-lang-3.3.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-model-builder-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="yjp-controller-api-redist" type="jar" ext="jar" conf="default"/>
++    <artifact name="openapi" type="jar" ext="jar" conf="default"/>
++    <artifact name="jackson-databind-2.9.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="java-compatibility-1.0.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="ecj-4.7.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="stax-api-1.0.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="gson-2.8.5" type="jar" ext="jar" conf="default"/>
++    <artifact name="bcprov-jdk15on-1.60" type="jar" ext="jar" conf="default"/>
++    <artifact name="plexus-utils-3.0.22" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-imaging-1.0-RC-1" type="jar" ext="jar" conf="default"/>
++    <artifact name="swingx-core-1.6.2-2" type="jar" ext="jar" conf="default"/>
++    <artifact name="constraint-layout" type="jar" ext="jar" conf="default"/>
++    <artifact name="serviceMessages" type="jar" ext="jar" conf="default"/>
++    <artifact name="kotlinx-coroutines-jdk8-0.26.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="xml-apis-ext-1.3.04" type="jar" ext="jar" conf="default"/>
++    <artifact name="trove4j" type="jar" ext="jar" conf="default"/>
++    <artifact name="jps-builders" type="jar" ext="jar" conf="default"/>
++    <artifact name="wadl-core" type="jar" ext="jar" conf="default"/>
++    <artifact name="cloud-config-client" type="jar" ext="jar" conf="default"/>
++    <artifact name="jasper2_rt" type="jar" ext="jar" conf="default"/>
++    <artifact name="java-impl" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-artifact-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="javac2" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-codec-1.10" type="jar" ext="jar" conf="default"/>
++    <artifact name="xz-1.8" type="jar" ext="jar" conf="default"/>
++    <artifact name="guava-25.1-jre" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-lang-2.4" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-util-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="velocity-1.7" type="jar" ext="jar" conf="default"/>
++    <artifact name="jackson-core-2.9.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="xstream-1.4.10" type="jar" ext="jar" conf="default"/>
++    <artifact name="external-system-impl" type="jar" ext="jar" conf="default"/>
++    <artifact name="fst-2.57" type="jar" ext="jar" conf="default"/>
++    <artifact name="jsch.agentproxy.pageant" type="jar" ext="jar" conf="default"/>
++    <artifact name="winp-1.27" type="jar" ext="jar" conf="default"/>
++    <artifact name="purejavacomm-0.0.11.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="icons" type="jar" ext="jar" conf="default"/>
++    <artifact name="trilead-ssh2-build-217-jenkins-11" type="jar" ext="jar" conf="default"/>
++    <artifact name="java_resources_en" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-collections-3.2.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="idea-jsp-openapi" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-compress-1.17" type="jar" ext="jar" conf="default"/>
++    <artifact name="pty4j-0.8.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-common-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-httpclient-3.1-patched" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-model-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="plexus-component-annotations-1.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="libthrift-0.11.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-aether-provider-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="dexlib2-2.2.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="jsch.agentproxy.sshagent" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-impl-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="forms-1.1-preview" type="jar" ext="jar" conf="default"/>
++    <artifact name="kxml2-2.3.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="imgscalr-lib-4.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="groovy-all-2.4.15" type="jar" ext="jar" conf="default"/>
++    <artifact name="xml-resolver-1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-api-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="idea" type="jar" ext="jar" conf="default"/>
++    <artifact name="log4j" type="jar" ext="jar" conf="default"/>
++    <artifact name="microba" type="jar" ext="jar" conf="default"/>
++    <artifact name="javax.inject-1" type="jar" ext="jar" conf="default"/>
++    <artifact name="asm-analysis-5.0.3" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-lang3-3.4" type="jar" ext="jar" conf="default"/>
++    <artifact name="fluent-hc-4.5.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="streamex-0.6.7" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-handler-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="xmlbeans-2.6.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="nanoxml-2.2.3" type="jar" ext="jar" conf="default"/>
++    <artifact name="cucumber-java-1.2.5" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-transport-http-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-codec-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="snakeyaml-1.22" type="jar" ext="jar" conf="default"/>
++    <artifact name="jshell-frontend" type="jar" ext="jar" conf="default"/>
++    <artifact name="miglayout-swing-5.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-connector-basic-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="asm-5.0.3" type="jar" ext="jar" conf="default"/>
++    <artifact name="servlet-api" type="jar" ext="jar" conf="default"/>
++    <artifact name="junit-4.12" type="jar" ext="jar" conf="default"/>
++    <artifact name="ideax" type="jar" ext="jar" conf="default"/>
++    <artifact name="annotations" type="jar" ext="jar" conf="default"/>
++    <artifact name="markdown4j-2.2-cj-1.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="rd-text-0.183.68" type="jar" ext="jar" conf="default"/>
++    <artifact name="junit" type="jar" ext="jar" conf="default"/>
++    <artifact name="plexus-interpolation-1.21" type="jar" ext="jar" conf="default"/>
++    <artifact name="proxy-vole-1.0.5" type="jar" ext="jar" conf="default"/>
++    <artifact name="jsch.agentproxy.jsch" type="jar" ext="jar" conf="default"/>
++    <artifact name="trang-core" type="jar" ext="jar" conf="default"/>
++    <artifact name="cli-parser-1.1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="httpclient-4.5.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-spi-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="jasper21_rt" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-repository-metadata-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="javassist-3.22.0-GA" type="jar" ext="jar" conf="default"/>
++    <artifact name="rd-framework-0.183.68" type="jar" ext="jar" conf="default"/>
++    <artifact name="jps-launcher" type="jar" ext="jar" conf="default"/>
++    <artifact name="automaton-1.12-1" type="jar" ext="jar" conf="default"/>
++    <artifact name="picocontainer-1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="objenesis-2.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="asm-tree-5.0.3" type="jar" ext="jar" conf="default"/>
++    <artifact name="slf4j-api-1.7.25" type="jar" ext="jar" conf="default"/>
++    <artifact name="isorelax-20030108" type="jar" ext="jar" conf="default"/>
++    <artifact name="batik-all-1.10" type="jar" ext="jar" conf="default"/>
++    <artifact name="platform-impl" type="jar" ext="jar" conf="default"/>
++    <artifact name="httpcore-4.4.10" type="jar" ext="jar" conf="default"/>
++    <artifact name="rngom-20051226-patched" type="jar" ext="jar" conf="default"/>
++    <artifact name="jetCheck-0.2.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-dependency-resolver" type="jar" ext="jar" conf="default"/>
++    <artifact name="imageio-metadata-3.3.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="common-io-3.3.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="imageio-tiff-3.3.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="delight-nashorn-sandbox-0.1.16" type="jar" ext="jar" conf="default"/>
++    <artifact name="jackson-annotations-2.9.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="markdownj-core-0.4.2-SNAPSHOT" type="jar" ext="jar" conf="default"/>
++    <artifact name="jzlib-1.1.3" type="jar" ext="jar" conf="default"/>
++    <artifact name="slf4j-log4j12-1.7.25" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-net-3.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="cglib-nodep-3.2.4" type="jar" ext="jar" conf="default"/>
++    <artifact name="xmlrpc-2.0.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="jcip-annotations-1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="idea_rt" type="jar" ext="jar" conf="default"/>
++    <artifact name="jshell-protocol" type="jar" ext="jar" conf="default"/>
++    <artifact name="jettison-1.4.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="bootstrap" type="jar" ext="jar" conf="default"/>
++    <artifact name="nekohtml-1.9.22" type="jar" ext="jar" conf="default"/>
++    <artifact name="lz4-1.3.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="xercesImpl-2.12.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="asm-all-7.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="jdom" type="jar" ext="jar" conf="default"/>
++    <artifact name="org.eclipse.lsp4j-0.3.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="intellij-test-discovery-agent-1.0.495" type="jar" ext="jar" conf="default"/>
++    <artifact name="httpmime-4.5.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="rdserver" type="jar" ext="jar" conf="default"/>
++    <artifact name="async-profiler-1.5-ea" type="jar" ext="jar" conf="default"/>
++    <artifact name="platform-api" type="jar" ext="jar" conf="default"/>
++    <artifact name="xmlpull-1.1.3.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="jna-platform" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-builder-support-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="baksmali-2.2.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="protobuf-java-3.4.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-transport-file-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="jsp-api" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-buffer-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="jps-builders-6" type="jar" ext="jar" conf="default"/>
++    <artifact name="jaxen-1.1.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="sqlite-jdbc-3.21.0.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="jsch.agentproxy.usocket-jna" type="jar" ext="jar" conf="default"/>
++    <artifact name="jps-model" type="jar" ext="jar" conf="default"/>
++    <artifact name="java-api" type="jar" ext="jar" conf="default"/>
++    <artifact name="imageio-core-3.3.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="jsch.agentproxy.core" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-transport-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="jbcrypt-1.0.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="resources_en" type="jar" ext="jar" conf="default"/>
++    <artifact name="util-2.2.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="util" type="jar" ext="jar" conf="default"/>
++    <artifact name="javahelp-2.0.02" type="jar" ext="jar" conf="default"/>
++    <artifact name="forms_rt" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-resolver-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="mutability-annotations-compat" type="jar" ext="jar" conf="default"/>
++    <artifact name="common-image-3.3.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-io-2.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="jgoodies-common-1.4.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="jdkAnnotations" type="jar" ext="jar" conf="default"/>
++    <artifact name="optimizedFileManager" type="jar" ext="jar" conf="default"/>
++    <artifact name="error_prone_annotations-2.3.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="kotlinx-coroutines-core-0.26.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="org.eclipse.lsp4j.jsonrpc-0.3.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="jediterm-pty-2.14" type="jar" ext="jar" conf="default"/>
++    <artifact name="rd-core-0.183.68" type="jar" ext="jar" conf="default"/>
++    <artifact name="intellij-coverage-agent-1.0.495" type="jar" ext="jar" conf="default"/>
++    <artifact name="jsch.agentproxy.connector-factory" type="jar" ext="jar" conf="default"/>
++    <artifact name="resources" type="jar" ext="jar" conf="default"/>
++    <artifact name="jsch-0.1.54" type="jar" ext="jar" conf="default"/>
++    <artifact name="jing-20030619" type="jar" ext="jar" conf="default"/>
++    <artifact name="rhino-1.7.10" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-codec-http-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="xmlgraphics-commons-2.3" type="jar" ext="jar" conf="default"/>
++    <artifact name="oro-2.0.8" type="jar" ext="jar" conf="default"/>
++    <artifact name="ini4j-0.5.5-2" type="jar" ext="jar" conf="default"/>
++    <artifact name="miglayout-core-5.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="jsch.agentproxy.usocket-nc" type="jar" ext="jar" conf="default"/>
++    <artifact name="ide-model-0.183.43" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-logging-1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="jfr-reader-0.1.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="hamcrest-core-1.3" type="jar" ext="jar" conf="default"/>
++    <artifact name="jna" type="jar" ext="jar" conf="default"/>
++    <artifact name="sa-jdwp-1.12" type="jar" ext="jar" conf="default"/>
++    <artifact name="eddsa-0.2.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="intellij" type="jar" ext="jar" conf="sources" m:classifier="sources"/>
++  </publications>
++  <dependencies/>
++</ivy-module>
+--- /dev/null
++++ b/buildSrc/prepare-deps/intellij-sdk/repo/kotlin.build.custom.deps/183.5153.4/jps-standalone.ivy.xml
+@@ -0,0 +1,105 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
++  <info organisation="kotlin.build.custom.deps" module="jps-standalone" revision="183.5153.4" publication="20190701090057"/>
++  <configurations>
++    <conf name="default" visibility="public"/>
++    <conf name="sources" visibility="public"/>
++  </configurations>
++  <publications>
++    <artifact name="groovy-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-model-builder-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="ecj-4.7.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="gson-2.8.5" type="jar" ext="jar" conf="default"/>
++    <artifact name="common-26.1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="plexus-utils-3.0.22" type="jar" ext="jar" conf="default"/>
++    <artifact name="jna-4.5.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="android-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="jps-builders" type="jar" ext="jar" conf="default"/>
++    <artifact name="gwt-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="sdk-common-26.1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-artifact-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-codec-1.10" type="jar" ext="jar" conf="default"/>
++    <artifact name="google-app-engine-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="guava-25.1-jre" type="jar" ext="jar" conf="default"/>
++    <artifact name="bundlor-all" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-util-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="grails-compiler-patch" type="jar" ext="jar" conf="default"/>
++    <artifact name="sdklib" type="jar" ext="jar" conf="default"/>
++    <artifact name="groovy_rt" type="jar" ext="jar" conf="default"/>
++    <artifact name="groovy-rt-constants" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-common-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-model-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="plexus-component-annotations-1.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-aether-provider-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="webSphere-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-impl-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="forms-1.1-preview" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-api-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-lang3-3.4" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-handler-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="flex-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="nanoxml-2.2.3" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-transport-http-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-codec-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="org.osgi.namespace.implementation-1.0.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-connector-basic-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="repository-26.1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="intellilang-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="dmServer-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="org.osgi.namespace.contract-1.0.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="osmorc-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="plexus-interpolation-1.21" type="jar" ext="jar" conf="default"/>
++    <artifact name="jpa-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="cli-parser-1.1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="httpclient-4.5.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="biz.aQute.bndlib-4.0.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-spi-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="javaee-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="grails-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-repository-metadata-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="jps-launcher" type="jar" ext="jar" conf="default"/>
++    <artifact name="gradle-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="slf4j-api-1.7.25" type="jar" ext="jar" conf="default"/>
++    <artifact name="eclipse-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="jna-platform-4.5.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="httpcore-4.4.10" type="jar" ext="jar" conf="default"/>
++    <artifact name="biz.aQute.resolve-4.0.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-dependency-resolver" type="jar" ext="jar" conf="default"/>
++    <artifact name="org.osgi.namespace.service-1.0.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="jarutils" type="jar" ext="jar" conf="default"/>
++    <artifact name="slf4j-log4j12-1.7.25" type="jar" ext="jar" conf="default"/>
++    <artifact name="manifest-merger-26.1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="log4j-1.2.17" type="jar" ext="jar" conf="default"/>
++    <artifact name="idea_rt" type="jar" ext="jar" conf="default"/>
++    <artifact name="devkit-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="lz4-1.3.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="asm-all-7.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="httpmime-4.5.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="maven-builder-support-3.3.9" type="jar" ext="jar" conf="default"/>
++    <artifact name="aspectj-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="protobuf-java-3.4.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="aether-transport-file-1.1.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="ui-designer-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-buffer-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="jps-builders-6" type="jar" ext="jar" conf="default"/>
++    <artifact name="jps-model" type="jar" ext="jar" conf="default"/>
++    <artifact name="layoutlib-api" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-transport-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="biz.aQute.repository-4.0.0" type="jar" ext="jar" conf="default"/>
++    <artifact name="util" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-resolver-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="ant-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="jdom-2.0.6" type="jar" ext="jar" conf="default"/>
++    <artifact name="org.osgi.namespace.extender-1.0.1" type="jar" ext="jar" conf="default"/>
++    <artifact name="trove4j-1.0.20160824" type="jar" ext="jar" conf="default"/>
++    <artifact name="optimizedFileManager" type="jar" ext="jar" conf="default"/>
++    <artifact name="annotations-java5-16.0.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="netty-codec-http-4.1.30.Final" type="jar" ext="jar" conf="default"/>
++    <artifact name="oro-2.0.8" type="jar" ext="jar" conf="default"/>
++    <artifact name="weblogic-jps-plugin" type="jar" ext="jar" conf="default"/>
++    <artifact name="commons-logging-1.2" type="jar" ext="jar" conf="default"/>
++    <artifact name="intellij" type="jar" ext="jar" conf="sources" m:classifier="sources"/>
++  </publications>
++  <dependencies/>
++</ivy-module>
+--- a/buildSrc/settings.gradle
++++ b/buildSrc/settings.gradle
+@@ -11,5 +11,3 @@
+     }
+ }
+ 
+-include "prepare-deps:android-dx",
+-        "prepare-deps:intellij-sdk"
+--- a/buildSrc/src/main/kotlin/AndroidSdkDependencies.kt
++++ b/buildSrc/src/main/kotlin/AndroidSdkDependencies.kt
+@@ -16,3 +16,4 @@
+ 	return "kotlin.build.custom.deps:android-dx".toString()
+ }
+ fun customAndroidDxJar(project:Project) =project.androidDxJar()
++
+--- a/buildSrc/src/main/kotlin/Bootstrap.kt
++++ b/buildSrc/src/main/kotlin/Bootstrap.kt
+@@ -37,8 +37,8 @@
+      */
+     open class Custom(val kotlinVersion: String, val repo: String?) : BootstrapOption() {
+         override fun applyToProject(project: Project) {
+-			bootstrapKotlinVersion(project,kotlinVersion)
+-			bootstrapKotlinRepo(project,repo)
++        	bootstrapKotlinVersion(project,kotlinVersion)
++        	bootstrapKotlinRepo(project,repo)
+         }
+     }
+ 
+@@ -53,6 +53,7 @@
+      * [onlySuccessBootstrap] allow artifacts only from success builds of the default branch tagged with 'bootstrap' tag
+      */
+ 
++
+     /**
+      * Use previously published local artifacts from the build/repo maven repository
+      *
+@@ -68,13 +69,13 @@
+ 
+             bootstrapKotlinRepo(project,repoPath.toURI().toString())
+             bootstrapKotlinVersion(project,kotlinVersion ?: project.property("defaultSnapshotVersion") as String)
+-	        }
+         }
+     }
++}
+ public class TeamCity(val kotlinVersion: String, val buildNumber: String? = null, val projectExtId: String? = null, val onlySuccessBootstrap: Boolean = true) : BootstrapOption() {
+         override fun applyToProject(project: Project) {
+             val query = if (onlySuccessBootstrap) "status:SUCCESS,tag:bootstrap,pinned:true" else "branch:default:any"
+             bootstrapKotlinRepo(project,"https://teamcity.jetbrains.com/guestAuth/app/rest/builds/buildType:(id:${projectExtId ?: "Kotlin_dev_Compiler"}),number:${buildNumber ?: kotlinVersion},$query/artifacts/content/maven/")
+             bootstrapKotlinVersion(project,kotlinVersion)
+-		}
++        }
+ }
+--- a/buildSrc/src/main/kotlin/CommonUtil.kt
++++ b/buildSrc/src/main/kotlin/CommonUtil.kt
+@@ -7,21 +7,19 @@
+ import org.gradle.api.file.CopySourceSpec
+ import org.gradle.api.file.SourceDirectorySet
+ import org.gradle.api.plugins.JavaPluginConvention
++import org.gradle.api.plugins.BasePluginConvention
+ import org.gradle.api.tasks.SourceSet
+ import org.gradle.api.tasks.SourceSetContainer
+ import org.gradle.api.tasks.SourceSetOutput
+-import org.gradle.kotlin.dsl.creating
+-import org.gradle.kotlin.dsl.extra
+-import org.gradle.kotlin.dsl.the
+ import java.io.File
+ import java.util.concurrent.Callable
+ 
+-inline fun <reified T : Task> Project.task(noinline configuration: T.() -> Unit) = tasks.creating(T::class, configuration)
++//inline fun <reified T : Task> Project.task(noinline configuration: T.() -> Unit) = tasks.create(T::class, configuration)
+ 
+ fun Project.callGroovy(name: String, vararg args: Any?): Any? {
+     return (property(name) as Closure<*>).call(*args)
+ }
+-
++fun customCallGroovy(project:Project,name: String,args:List<Any>):Any?{return project.callGroovy(name,*args.toTypedArray())}
+ inline fun <T : Any> Project.withJavaPlugin(crossinline body: () -> T?): T? {
+     var res: T? = null
+     pluginManager.withPlugin("java") {
+@@ -39,26 +37,27 @@
+ fun fileFrom(root: File, vararg children: String): File = children.fold(root) { f, c -> File(f, c) }
+ 
+ fun fileFrom(root: String, vararg children: String): File = children.fold(File(root)) { f, c -> File(f, c) }
+-
++fun customFileFrom(root: String, children: List<String>): File {return fileFrom(root,*children.toTypedArray())}
++fun customFileFrom(root: File, children: List<String>): File {return fileFrom(root,*children.toTypedArray())}
+ var Project.jvmTarget: String?
+-    get() = extra.takeIf { it.has("jvmTarget") }?.get("jvmTarget") as? String
++    get() = getExtensions().getExtraProperties().takeIf { it.has("jvmTarget") }?.get("jvmTarget") as? String
+     set(v) {
+-        extra["jvmTarget"] = v
++        getExtensions().getExtraProperties().set("jvmTarget", v)
+     }
+ 
+ var Project.javaHome: String?
+-    get() = extra.takeIf { it.has("javaHome") }?.get("javaHome") as? String
++    get() = getExtensions().getExtraProperties().takeIf { it.has("javaHome") }?.get("javaHome") as? String
+     set(v) {
+-        extra["javaHome"] = v
++        getExtensions().getExtraProperties().set("javaHome", v)
+     }
+ 
+-fun Project.generator(fqName: String, sourceSet: SourceSet? = null) = smartJavaExec {
++/*fun Project.generator(fqName: String, sourceSet: SourceSet? = null) = smartJavaExec {
+     classpath = (sourceSet ?: testSourceSet).runtimeClasspath
+     main = fqName
+     workingDir = rootDir
+ }
+ 
+-fun customGenerator(project:Project,fqName: String, sourceSet: SourceSet? = null) = project.generator(fqName,sourceSet)
++fun customGenerator(project:Project,fqName: String, sourceSet: SourceSet? = null) = project.generator(fqName,sourceSet)*/
+ 
+ fun Project.getBooleanProperty(name: String): Boolean? = this.findProperty(name)?.let {
+     val v = it.toString()
+@@ -72,4 +71,6 @@
+ 
+ inline fun CopySourceSpec.from(crossinline filesProvider: () -> Any?): CopySourceSpec = from(Callable { filesProvider() })
+ 
+-fun Project.javaPluginConvention(): JavaPluginConvention = the()
++fun Project.javaPluginConvention(): JavaPluginConvention {return project.getConvention().getPlugin(JavaPluginConvention::class.java)}
++fun getTargetName(project:Project):String? {return project.getConvention().getPlugin(BasePluginConvention::class.java).archivesBaseName.removePrefix("kotlin-") + ".jar"}
++fun customGetBaseConvention(project:Project):BasePluginConvention {return project.getConvention().getPlugin(BasePluginConvention::class.java)}
+--- a/buildSrc/src/main/kotlin/IdeCompatibilityDsl.kt
++++ b/buildSrc/src/main/kotlin/IdeCompatibilityDsl.kt
+@@ -66,7 +66,6 @@
+     }
+ }
+ fun IJ():Boolean{return Ide.IJ()}
+-
+ val Platform.orHigher get() = object : CompatibilityPredicate {
+     override fun matches(ide: Ide) = ide.platform.version >= version
+ }
+@@ -93,7 +92,7 @@
+ 
+ object IdeVersionConfigurator {
+     lateinit var currentIde: Ide
+-
++}
+ fun setCurrentIde(project: Project) {
+     val platformVersion = project.rootProject.extensions.extraProperties["versions.platform"].toString()
+     val ideName = if (platformVersion.startsWith("AS")) platformVersion else "IJ$platformVersion"
+@@ -103,3 +102,9 @@
+ private class IdeKindPredicate(val kind: Ide.Kind) : CompatibilityPredicate {
+     override fun matches(ide: Ide) = ide.kind == kind
+ }
++
++fun getPlatform(version:Int):Platform{return Platform[version]}
++
++fun PlatformOrHigher(version:Int):Boolean{return Platform[version].orHigher()}
++
++fun PlatformOrLower(version:Int):Boolean{return Platform[version].orLower()}
+--- a/buildSrc/src/main/kotlin/SmartJavaExec.kt
++++ b/buildSrc/src/main/kotlin/SmartJavaExec.kt
+@@ -1,14 +1,13 @@
+ import org.gradle.api.Project
+ import org.gradle.api.tasks.JavaExec
+ import org.gradle.jvm.tasks.Jar
+-import org.gradle.kotlin.dsl.task
+ 
+ /*
+  * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+  * that can be found in the license/LICENSE.txt file.
+  */
+ 
+-fun Project.smartJavaExec(configure: JavaExec.() -> Unit) = task<JavaExec> javaExec@{
++/*fun Project.smartJavaExec(configure: JavaExec.() -> Unit) = getTasks().create("sad",JavaExec) javaExec@{
+     configure()
+ 
+     val jarTask = project.task("${name}WriteClassPath", Jar::class) {
+@@ -45,4 +44,4 @@
+         args(copyArgs)
+ 
+     }
+-}
++}*/
+--- a/buildSrc/src/main/kotlin/embeddable.kt
++++ b/buildSrc/src/main/kotlin/embeddable.kt
+@@ -89,6 +89,7 @@
+ 
+ fun Project.embeddableCompilerDummyForDependenciesRewriting(taskName: String = "embeddable", body: Jar.() -> Unit = {}): Jar {
+     val compilerDummyJar = configurations.getOrCreate("compilerDummyJar")
++    dependencies.add(compilerDummyJar.name,
+                      dependencies.project(mapOf<String,String>("path" to ":kotlin-compiler-embeddable", "configuration" to COMPILER_DUMMY_JAR_CONFIGURATION_NAME)))
+ 
+     return getTasks().create(taskName,ShadowJar::class.java) {
+--- a/buildSrc/src/main/kotlin/ideaExtKotlinDsl.kt
++++ /dev/null
+@@ -1,39 +0,0 @@
+-@file:Suppress("PackageDirectoryMismatch")
+-package org.jetbrains.kotlin.ideaExt
+-
+-import org.gradle.api.NamedDomainObjectContainer
+-import org.gradle.api.plugins.ExtensionAware
+-import org.gradle.plugins.ide.idea.model.IdeaProject
+-import org.jetbrains.gradle.ext.*
+-
+-/*
+- * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+- * that can be found in the license/LICENSE.txt file.
+- */
+-
+-fun org.gradle.api.Project.idea(configure: org.gradle.plugins.ide.idea.model.IdeaModel.() -> Unit): Unit =
+-    (this as org.gradle.api.plugins.ExtensionAware).getExtensions().configure("idea", configure)
+-
+-fun IdeaProject.settings(block: ProjectSettings.() -> Unit) =
+-    (this@settings as ExtensionAware).getExtensions().configure(ProjectSettings::class.java,block) // beacuse this is a kotlin dsl function that configures teh extension of type T in parameter T.() -> unit with the given block
+-
+-fun ProjectSettings.compiler(block: IdeaCompilerConfiguration.() -> Unit) =
+-    (this@compiler as ExtensionAware).getExtensions().configure(IdeaCompilerConfiguration::class.java,block)
+-
+-fun ProjectSettings.delegateActions(block: ActionDelegationConfig.() -> Unit) =
+-    (this@delegateActions as ExtensionAware).getExtensions().configure(ActionDelegationConfig::class.java,block)
+-
+-fun ProjectSettings.runConfigurations(block: DefaultRunConfigurationContainer.() -> Unit) =
+-    (this@runConfigurations as ExtensionAware).getExtensions().configure("runConfigurations", block)
+-
+-inline fun <reified T: RunConfiguration> DefaultRunConfigurationContainer.defaults(noinline block: T.() -> Unit) =
+-    defaults(T::class.java, block)
+-
+-fun DefaultRunConfigurationContainer.junit(name: String, block: JUnit.() -> Unit) =
+-    create(name, JUnit::class.java, block)
+-
+-fun DefaultRunConfigurationContainer.application(name: String, block: Application.() -> Unit) =
+-    create(name, Application::class.java, block)
+-
+-fun ProjectSettings.ideArtifacts(block: NamedDomainObjectContainer<org.jetbrains.gradle.ext.TopLevelArtifact>.() -> Unit) =
+-    (this@ideArtifacts as ExtensionAware).extensions.configure("ideArtifacts", block)
+--- a/buildSrc/src/main/kotlin/instrument.kt
++++ b/buildSrc/src/main/kotlin/instrument.kt
+@@ -25,7 +25,6 @@
+ import org.gradle.api.plugins.ExtensionAware
+ import org.gradle.api.tasks.*
+ import org.gradle.api.tasks.compile.AbstractCompile
+-import org.gradle.kotlin.dsl.*
+ import java.io.File
+ 
+ fun Project.configureFormInstrumentation() {
+@@ -46,7 +45,7 @@
+         testCompile?.doFirst {
+             testCompile.classpath = (testCompile.classpath
+                     - mainSourceSet.output.classesDirs
+-                    + files((mainSourceSet as ExtensionAware).extra.get("classesDirsCopy")))
++                    + files((mainSourceSet as ExtensionAware).getExtensions().getExtraProperties().get("classesDirsCopy")))
+         }
+     }
+ 
+@@ -62,7 +61,7 @@
+             val classesDirs = (sourceSetParam.output.classesDirs as ConfigurableFileCollection).from as Collection<Any>
+ 
+             val classesDirsCopy = project.files(classesDirs.toTypedArray()).filter { it.exists() }
+-            (sourceSetParam as ExtensionAware).extra.set("classesDirsCopy", classesDirsCopy)
++            (sourceSetParam as ExtensionAware).getExtensions().getExtraProperties().set("classesDirsCopy", classesDirsCopy)
+ 
+             logger.info("Saving old sources dir for project ${project.name}")
+             val instrumentedClassesDir = File(project.buildDir, "classes/${sourceSetParam.name}-instrumented")
+@@ -192,4 +191,4 @@
+             System.clearProperty("java.awt.headless")
+         }
+     }
+-}
+\ No newline at end of file
++}
+--- a/buildSrc/src/main/kotlin/intellijDependencies.kt
++++ b/buildSrc/src/main/kotlin/intellijDependencies.kt
+@@ -23,10 +23,9 @@
+ import org.gradle.api.artifacts.repositories.IvyArtifactRepository
+ import org.gradle.api.plugins.JavaPluginConvention
+ import org.gradle.api.tasks.JavaExec
+-import org.gradle.kotlin.dsl.*
+ import java.io.File
+ 
+-private fun Project.intellijRepoDir() = File("${project.rootDir.absoluteFile}/buildSrc/prepare-deps/intellij-sdk/build/repo")
++private fun Project.intellijRepoDir() = File("${project.rootDir.absoluteFile}/buildSrc/prepare-deps/intellij-sdk/repo")
+ 
+ fun intellijSdkRepo(repositoryHandler:RepositoryHandler,project: Project): IvyArtifactRepository = repositoryHandler.ivy {
+     val baseDir = project.intellijRepoDir()
+@@ -51,23 +50,23 @@
+     artifactPattern("${baseDir.canonicalPath}/[organisation]/[revision]/[module]/[artifact](-[revision])(-[classifier]).jar")
+     artifactPattern("${baseDir.canonicalPath}/[organisation]/[revision]/sources/[artifact]-[revision]-[classifier].[ext]")
+ 
+-    metadataSources {
++    /*metadataSources {
+         ivyDescriptor()
+-    }
++    }*/
+ }
+ 
+-fun Project.intellijDep(module: String = "intellij") = "kotlin.build.custom.deps:$module:${rootProject.extra["versions.intellijSdk"]}"
++fun Project.intellijDep(module: String = "intellij") = "kotlin.build.custom.deps:$module:${rootProject.getExtensions().getExtraProperties().get("versions.intellijSdk")}"
+ 
+ fun getIntellijDep(project: Project, module: String = "intellij"): String {
+ 	return project.intellijDep(module)
+ }
+ 
+ fun Project.intellijCoreDep() = intellijDep("intellij-core")
+-
+ fun customIntellijCoreDep(project:Project) = project.intellijDep("intellij-core")
+-
+ fun Project.intellijPluginDep(plugin: String) = intellijDep(plugin)
+ 
++fun customIntellijPluginDep(project:Project,plugin: String):String{return project.intellijPluginDep(plugin)}
++
+ fun Project.intellijUltimateDep() = intellijDep("intellij")
+ 
+ fun Project.intellijUltimatePluginDep(plugin: String) = intellijDep(plugin)
+@@ -78,11 +77,11 @@
+         if (baseName == "annotations") {
+             error("Don't use anntations.jar from intellij. Kotlin stdlib already has this annotations.")
+         }
+-        if (rootProject != null && rootProject.extra.has("ignore.jar.$baseName")) {
++        if (rootProject != null && rootProject.getExtensions().getExtraProperties().has("ignore.jar.$baseName")) {
+             return@forEach
+         }
+-        if (rootProject != null && rootProject.extra.has("versions.jar.$baseName")) {
+-            baseName += "-${rootProject.extra["versions.jar.$baseName"]}"
++        if (rootProject != null && rootProject.getExtensions().getExtraProperties().has("versions.jar.$baseName")) {
++            baseName += "-${rootProject.getExtensions().getExtraProperties().get("versions.jar.$baseName")}"
+         }
+         artifact {
+             name = baseName
+@@ -97,7 +96,7 @@
+ // Workaround. Top-level Kotlin function in a default package can't be called from a non-default package
+ object IntellijRootUtils {
+     fun getRepositoryRootDir(project: Project): File = with (project.rootProject) {
+-        return File(intellijRepoDir(), "kotlin.build.custom.deps/${extra["versions.intellijSdk"]}")
++        return File(intellijRepoDir(), "kotlin.build.custom.deps/${getExtensions().getExtraProperties().get("versions.intellijSdk")}")
+     }
+ 
+     fun getIntellijRootDir(project: Project): File = with (project.rootProject) {
+@@ -106,32 +105,37 @@
+ }
+ 
+ fun ModuleDependency.includeIntellijCoreJarDependencies(project: Project) =
+-        includeJars(*(project.rootProject.extra["IntellijCoreDependencies"] as List<String>).toTypedArray(), rootProject = project.rootProject)
++        includeJars(*(project.rootProject.getExtensions().getExtraProperties().get("IntellijCoreDependencies") as List<String>).toTypedArray(), rootProject = project.rootProject)
++
++fun customIncludeIntellijCoreJarDependencies(moduleDependency:ModuleDependency,project:Project){return moduleDependency.includeIntellijCoreJarDependencies(project)}
+ 
+ fun ModuleDependency.includeIntellijCoreJarDependencies(project: Project, jarsFilterPredicate: (String) -> Boolean) =
+-        includeJars(*(project.rootProject.extra["IntellijCoreDependencies"] as List<String>).filter { jarsFilterPredicate(it) }.toTypedArray(), rootProject = project.rootProject)
++        includeJars(*(project.rootProject.getExtensions().getExtraProperties().get("IntellijCoreDependencies") as List<String>).filter { jarsFilterPredicate(it) }.toTypedArray(), rootProject = project.rootProject)
++
++fun customIncludeIntellijCoreJarDependencies(moduleDependency:ModuleDependency,project:Project,jarsFilterPredicate: (String) -> Boolean){return moduleDependency.includeIntellijCoreJarDependencies(project,jarsFilterPredicate)}
+ 
+-fun Project.isIntellijCommunityAvailable() = !(rootProject.extra["intellijUltimateEnabled"] as Boolean) || rootProject.extra["intellijSeparateSdks"] as Boolean
++fun Project.isIntellijCommunityAvailable() = !(rootProject.getExtensions().getExtraProperties().get("intellijUltimateEnabled") as Boolean) || rootProject.getExtensions().getExtraProperties().get("intellijSeparateSdks") as Boolean
+ 
+-fun Project.isIntellijUltimateSdkAvailable() = (rootProject.extra["intellijUltimateEnabled"] as Boolean)
++fun Project.isIntellijUltimateSdkAvailable() = (rootProject.getExtensions().getExtraProperties().get("intellijUltimateEnabled") as Boolean)
+ 
+ fun Project.intellijRootDir() = IntellijRootUtils.getIntellijRootDir(project)
+ 
+ fun Project.intellijUltimateRootDir() =
+         if (isIntellijUltimateSdkAvailable())
+-            File(intellijRepoDir(), "kotlin.build.custom.deps/${rootProject.extra["versions.intellijSdk"]}/intellijUltimate")
++            File(intellijRepoDir(), "kotlin.build.custom.deps/${rootProject.getExtensions().getExtraProperties().get("versions.intellijSdk")}/intellijUltimate")
+         else
+             throw GradleException("intellij ultimate SDK is not available")
+ 
+-fun DependencyHandlerScope.excludeInAndroidStudio(rootProject: Project, block: DependencyHandlerScope.() -> Unit) {
+-    if (!rootProject.extra.has("versions.androidStudioRelease")) {
++/*fun DependencyHandlerScope.excludeInAndroidStudio(rootProject: Project, block: DependencyHandlerScope.() -> Unit) {
++    if (!rootProject.getExtensions().getExtraProperties().has("versions.androidStudioRelease")) {
+         block()
+     }
+-}
++}*/
++
+ 
+ fun Project.runIdeTask(name: String, ideaPluginDir: File, ideaSandboxDir: File, body: JavaExec.() -> Unit): JavaExec {
+ 
+-    return task<JavaExec>(name) {
++    return getTasks().create(name,JavaExec::class.java) {
+         val ideaSandboxConfigDir = File(ideaSandboxDir, "config")
+ 
+         classpath = mainSourceSet.runtimeClasspath
+--- a/buildSrc/src/main/kotlin/jbCacheRedirector.kt
++++ b/buildSrc/src/main/kotlin/jbCacheRedirector.kt
+@@ -54,8 +54,8 @@
+ }
+ 
+ fun cacheRedirectorEnabled(project:Project): Boolean = project.findProperty("cacheRedirectorEnabled")?.toString()?.toBoolean() == true
++
+ fun repositoriesWithRedirector(repositories: RepositoryHandler, project: Project) {
+-    configuration()
+     if (cacheRedirectorEnabled(project)) {
+         redirect(repositories)
+     }
+--- a/buildSrc/src/main/kotlin/pill/kotlinPluginArtifact.kt
++++ b/buildSrc/src/main/kotlin/pill/kotlinPluginArtifact.kt
+@@ -9,7 +9,6 @@
+ import org.gradle.api.plugins.JavaPlugin
+ import org.gradle.api.tasks.Copy
+ import org.gradle.jvm.tasks.Jar
+-import org.gradle.kotlin.dsl.extra
+ import org.jetbrains.kotlin.pill.ArtifactElement.*
+ import org.jetbrains.kotlin.pill.POrderRoot.*
+ import java.io.File
+@@ -104,7 +103,7 @@
+ 
+ fun generateKotlinPluginArtifactFile(rootProject: Project): PFile {
+     val mainIdeaPluginTask = rootProject.tasks.getByName("ideaPlugin")
+-    val gradleArtifactDir = File(rootProject.extra["ideaPluginDir"] as File, "lib")
++    val gradleArtifactDir = File(rootProject.getExtensions().getExtraProperties().get("ideaPluginDir") as File, "lib")
+ 
+     val ideaPluginTasks = mainIdeaPluginTask.taskDependencies
+         .getDependencies(mainIdeaPluginTask)
+@@ -115,7 +114,7 @@
+ 
+     // Copy kotlinc directory
+     root.add(Directory("kotlinc").apply {
+-        val kotlincDirectory = rootProject.extra["distKotlinHomeDir"].toString()
++        val kotlincDirectory = rootProject.getExtensions().getExtraProperties().get("distKotlinHomeDir").toString()
+         add(DirectoryCopy(File(kotlincDirectory)))
+     })
+ 
+@@ -136,7 +135,7 @@
+                     }
+ 
+                     @Suppress("UNCHECKED_CAST")
+-                    for (projectPath in sourcePath.project.extra["projectsToShadow"] as List<String>) {
++                    for (projectPath in sourcePath.project.getExtensions().getExtraProperties().get("projectsToShadow") as List<String>) {
+                         val jpsModuleName = rootProject.findProject(projectPath)!!.name + ".src"
+                         kotlinPluginJar.add(ModuleOutput(jpsModuleName))
+                     }
+--- a/buildSrc/src/main/kotlin/pill/parser.kt
++++ b/buildSrc/src/main/kotlin/pill/parser.kt
+@@ -11,7 +11,6 @@
+ import org.gradle.api.tasks.*
+ import org.gradle.api.plugins.JavaPlugin
+ import org.gradle.api.plugins.JavaPluginConvention
+-import org.gradle.kotlin.dsl.configure
+ import org.gradle.plugins.ide.idea.IdeaPlugin
+ import org.gradle.api.file.SourceDirectorySet
+ import org.gradle.api.internal.HasConvention
+@@ -537,6 +536,6 @@
+ private val Project.sourceSets: SourceSetContainer
+     get() {
+         lateinit var result: SourceSetContainer
+-        project.configure<JavaPluginConvention> { result = sourceSets }
++        result = project.getConvention().getPlugin(JavaPluginConvention::class.java).getSourceSets() // could be wrong translation
+         return result
+     }
+--- a/buildSrc/src/main/kotlin/pill/plugin.kt
++++ b/buildSrc/src/main/kotlin/pill/plugin.kt
+@@ -4,11 +4,10 @@
+ import org.gradle.api.Plugin
+ import org.gradle.api.Project
+ import org.gradle.api.plugins.BasePluginConvention
+-import org.gradle.kotlin.dsl.extra
+-import shadow.org.jdom2.input.SAXBuilder
+-import shadow.org.jdom2.*
+-import shadow.org.jdom2.output.Format
+-import shadow.org.jdom2.output.XMLOutputter
++import org.jdom2.input.SAXBuilder
++import org.jdom2.*
++import org.jdom2.output.Format
++import org.jdom2.output.XMLOutputter
+ import java.io.File
+ 
+ class PillConfigurablePlugin : Plugin<Project> {
+@@ -61,7 +60,7 @@
+         }
+ 
+         fun getProjectLibraries(rootProject: Project): List<PLibrary> {
+-            val distLibDir = File(rootProject.extra["distLibDir"].toString())
++            val distLibDir = File(rootProject.getExtensions().getExtraProperties().get("distLibDir").toString())
+             fun distJar(name: String) = File(rootProject.projectDir, "dist/kotlinc/lib/$name.jar")
+ 
+             val libraries = rootProject.allprojects
+@@ -343,4 +342,4 @@
+         val modules = this.modules.map { it.copy(orderRoots = it.orderRoots.map(::mapLibrary)) }
+         return this.copy(modules = modules)
+     }
+-}
+\ No newline at end of file
++}
+--- a/buildSrc/src/main/kotlin/pill/xml.kt
++++ b/buildSrc/src/main/kotlin/pill/xml.kt
+@@ -1,10 +1,10 @@
+ @file:Suppress("PackageDirectoryMismatch")
+ package org.jetbrains.kotlin.pill
+ 
+-import shadow.org.jdom2.Document
+-import shadow.org.jdom2.Element
+-import shadow.org.jdom2.output.Format
+-import shadow.org.jdom2.output.XMLOutputter
++import org.jdom2.Document
++import org.jdom2.Element
++import org.jdom2.output.Format
++import org.jdom2.output.XMLOutputter
+ 
+ class xml(val name: String, private vararg val args: Pair<String, Any>, block: xml.() -> Unit = {}) {
+     private companion object {
+@@ -58,4 +58,4 @@
+         val output = XMLOutputter().also { it.format = Format.getPrettyFormat() }
+         return output.outputString(document)
+     }
+-}
+\ No newline at end of file
++}
+--- a/buildSrc/src/main/kotlin/plugins/PublishedKotlinModule.kt
++++ b/buildSrc/src/main/kotlin/plugins/PublishedKotlinModule.kt
+@@ -10,7 +10,6 @@
+ import org.gradle.api.plugins.MavenRepositoryHandlerConvention
+ import org.gradle.api.publication.maven.internal.deployer.MavenRemoteRepository
+ import org.gradle.api.tasks.Upload
+-import org.gradle.kotlin.dsl.*
+ import org.gradle.plugins.signing.Sign
+ import org.gradle.plugins.signing.SigningExtension
+ import kotlin.properties.Delegates
+--- a/buildSrc/src/main/kotlin/sourceSets.kt
++++ b/buildSrc/src/main/kotlin/sourceSets.kt
+@@ -3,7 +3,6 @@
+ import org.gradle.api.*
+ import org.gradle.api.plugins.JavaPluginConvention
+ import org.gradle.api.tasks.*
+-import org.gradle.kotlin.dsl.*
+ import org.gradle.language.jvm.tasks.ProcessResources
+ 
+ //import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
+@@ -57,11 +56,15 @@
+     return project(projectPath).sourceSets
+ }
+ 
++fun customGetSourceSetsFrom(project:Project,projectPath: String): SourceSetContainer{return project.getSourceSetsFrom(projectPath)}
++
+ val Project.sourceSets: SourceSetContainer
+     get() = javaPluginConvention().sourceSets
+ 
+ val Project.mainSourceSet: SourceSet
+     get() = sourceSets.getByName("main")
+ 
++fun customMainSourceSet(project:Project): SourceSet {return project.mainSourceSet}
++
+ val Project.testSourceSet: SourceSet
+     get() = sourceSets.getByName("test")
+--- a/buildSrc/src/main/kotlin/stripMetadata.kt
++++ b/buildSrc/src/main/kotlin/stripMetadata.kt
+@@ -1,7 +1,7 @@
+ @file:Suppress("unused") // usages in build scripts are not tracked properly
+ 
+ import org.gradle.api.logging.Logger
+-import org.jetbrains.org.objectweb.asm.*
++import org.objectweb.asm.*
+ import java.io.BufferedOutputStream
+ import java.io.File
+ import java.io.FileOutputStream
+@@ -23,7 +23,7 @@
+ 
+         var changed = false
+         val classWriter = ClassWriter(0)
+-        val classVisitor = object : ClassVisitor(Opcodes.API_VERSION, classWriter) {
++        val classVisitor = object : ClassVisitor(458752, classWriter) {
+             override fun visitAnnotation(desc: String, visible: Boolean): AnnotationVisitor? {
+                 if (Type.getType(desc).internalName == "kotlin/Metadata") {
+                     changed = true
