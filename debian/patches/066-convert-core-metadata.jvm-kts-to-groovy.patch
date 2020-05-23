@@ -1,0 +1,124 @@
+Description: Convert metadata.jvm and descriptors.jvm from kts to groovy
+Author: Saif Abdul Casim
+
+---
+
+
+--- /dev/null
++++ b/core/descriptors.jvm/build.gradle
+@@ -0,0 +1,29 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++jvmTarget = "1.6"
++javaHome = rootProject.ext["JDK_16"] as String
++
++dependencies {
++    compile(project(":kotlin-annotations-jvm"))
++    compile(project(":core:descriptors"))
++    compile(project(":core:deserialization"))
++    compile(project(":core:metadata.jvm"))
++    compile(project(":core:util.runtime"))
++    compile(DependenciesKt.customCommonDep(project,"javax.inject"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
++tasks.withType(JavaCompile) {
++    sourceCompatibility = "1.6"
++    targetCompatibility = "1.6"
++}
+--- a/core/descriptors.jvm/build.gradle.kts
++++ /dev/null
+@@ -1,29 +0,0 @@
+-plugins {
+-    id("org.jetbrains.kotlin.jvm")
+-    id("jps-compatible")
+-}
+-
+-jvmTarget = "1.6"
+-javaHome = rootProject.ext["JDK_16"] as String
+-
+-dependencies {
+-    compile(project(":kotlin-annotations-jvm"))
+-    compile(project(":core:descriptors"))
+-    compile(project(":core:deserialization"))
+-    compile(project(":core:metadata.jvm"))
+-    compile(project(":core:util.runtime"))
+-    compile(DependenciesKt.customCommonDep(project,"javax.inject"))
+-}
+-
+-sourceSets {
+-    "main" {
+-    	java.srcDirs("src")
+-		resources.srcDir("resources")
+-	}
+-    "test" {}
+-}
+-
+-tasks.withType(JavaCompile) {
+-    sourceCompatibility = "1.6"
+-    targetCompatibility = "1.6"
+-}
+--- /dev/null
++++ b/core/metadata.jvm/build.gradle
+@@ -0,0 +1,24 @@
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++jvmTarget = "1.6"
++javaHome = rootProject.ext["JDK_16"] as String
++
++dependencies {
++    compile(project(":core:metadata"))
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
++tasks.withType(JavaCompile) {
++    sourceCompatibility = "1.6"
++    targetCompatibility = "1.6"
++}
+--- a/core/metadata.jvm/build.gradle.kts
++++ /dev/null
+@@ -1,24 +0,0 @@
+-plugins {
+-    id("org.jetbrains.kotlin.jvm")
+-    id("jps-compatible")
+-}
+-
+-jvmTarget = "1.6"
+-javaHome = rootProject.ext["JDK_16"] as String
+-
+-dependencies {
+-    compile(project(":core:metadata"))
+-}
+-
+-sourceSets {
+-    "main" {
+-    	java.srcDirs("src")
+-		resources.srcDir("resources")
+-	}
+-    "test" {}
+-}
+-
+-tasks.withType(JavaCompile) {
+-    sourceCompatibility = "1.6"
+-    targetCompatibility = "1.6"
+-}

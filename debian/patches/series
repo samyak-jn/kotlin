@@ -62,3 +62,4 @@
 063-update-settings.gradle-removes-unwanted-include.patch
 064-removes-metadata-in-kapt3-compiler-txt.patch
 065-renamed-buildSrc-files-not-necessary-dist-build-path.patch
+066-convert-core-metadata.jvm-kts-to-groovy.patch
