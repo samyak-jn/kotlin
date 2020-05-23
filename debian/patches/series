@@ -58,3 +58,4 @@
 059-final-changes-build.gradle.patch
 060-reemove-android-studio.patch
 061-update-gradle.properties-to-use-open8jdk.patch
+062-upgrade-API_version-to-458752-add-methods-and-update-syntax.patch
