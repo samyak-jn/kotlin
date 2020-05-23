@@ -1,0 +1,139 @@
+Description:Convert from kts to groovy and update zip path
+Author: Saif Abdul Casim
+---
+
+--- /dev/null
++++ b/gradle/versions.gradle
+@@ -0,0 +1,70 @@
++import java.util.*
++import java.io.*
++
++/*ext.propertiesFile = rootProject.file("gradle/versions.properties")
++if (!propertiesFile.exists()) {
++    //work-around for buildSrc
++    propertiesFile = rootProject.file("../gradle/versions.properties")
++}
++
++FileReader(propertiesFile).use {
++    val properties = Properties()
++    properties.load(it)
++    properties.each { k, v ->
++        ext[k.toString()] = v
++    }
++}*/
++ext["versions.intellijSdk"]="183.5153.4"
++ext[/versions.androidBuildTools/]="r23.0.1"
++ext[/versions.idea.NodeJS/]="181.3494.12"
++ext[/versions.jar.guava/]="25.1-jre"
++ext[/versions.jar.groovy-all/]="2.4.15"
++ext[/versions.jar.lombok-ast/]="0.2.3"
++ext[/versions.jar.swingx-core/]="1.6.2-2"
++ext[/versions.jar.kxml2/]="2.3.0"
++ext[/versions.jar.streamex/]="0.6.7"
++ext[/versions.jar.gson/]="2.8.5"
++ext[/versions.jar.oro/]="2.0.8"
++ext[/versions.jar.picocontainer/]="1.2"
++ext[/versions.jar.asm-all/]="7.0"
++ext[/ignore.jar.snappy-in-java/]="true"
++ext[/versions.gradle-api/]="4.5.1"
++
++ext.gradleJars = [
++    "gradle-api",
++    "gradle-tooling-api",
++    "gradle-base-services",
++    "gradle-wrapper",
++    "gradle-core",
++    "gradle-base-services-groovy"
++]
++
++ext.androidStudioVersion = null
++if (ext.properties.containsKey("versions.androidStudioRelease")){
++    ext.androidStudioVersion=ext["versions.androidStudioRelease"]?.toString()?.replace(".", "")?.subtring(0, 2)}
++
++ext.intellijVersion = rootProject.ext["versions.intellijSdk"] as String
++ext.intellijVersionDelimiterIndex = intellijVersion.indexOf('.')
++if( intellijVersionDelimiterIndex==-1){ext.intellijVersionDelimiterIndex=intellijVersion.indexOf('-')}
++
++if (intellijVersionDelimiterIndex == -1) {
++    error("Invalid IDEA version $intellijVersion")
++}
++
++ext.platformBaseVersion = intellijVersion.substring(0, intellijVersionDelimiterIndex)
++ext.platform = platformBaseVersion
++if(androidStudioVersion){
++	ext.platform ="AS${androidStudioVersion}"
++}
++println("bEEEE bEEE")
++println(platform)
++rootProject.ext["versions.platform"] = platform
++
++
++for (jar in gradleJars) {
++    ext["versions.jar.$jar"] = ext["versions.gradle-api"]
++}
++
++if (!ext.properties.containsKey("versions.androidStudioRelease")) {
++    ext["ignore.jar.android-base-common"] = "true"
++}
+--- a/gradle/versions.gradle.kts
++++ /dev/null
+@@ -1,50 +0,0 @@
+-import java.util.*
+-import java.io.*
+-
+-var propertiesFile: File = rootProject.file("gradle/versions.properties")
+-if (!propertiesFile.exists()) {
+-    //work-around for buildSrc
+-    propertiesFile = rootProject.file("../gradle/versions.properties")
+-}
+-
+-FileReader(propertiesFile).use {
+-    val properties = Properties()
+-    properties.load(it)
+-    properties.forEach { (k, v) ->
+-        extra[k.toString()] = v
+-    }
+-}
+-
+-val gradleJars = listOf(
+-    "gradle-api",
+-    "gradle-tooling-api",
+-    "gradle-base-services",
+-    "gradle-wrapper",
+-    "gradle-core",
+-    "gradle-base-services-groovy"
+-)
+-
+-val androidStudioVersion = if (extra.has("versions.androidStudioRelease"))
+-    extra["versions.androidStudioRelease"]?.toString()?.replace(".", "")?.substring(0, 2)
+-else
+-    null
+-
+-val intellijVersion = rootProject.extra["versions.intellijSdk"] as String
+-val intellijVersionDelimiterIndex = intellijVersion.indexOfAny(charArrayOf('.', '-'))
+-if (intellijVersionDelimiterIndex == -1) {
+-    error("Invalid IDEA version $intellijVersion")
+-}
+-
+-val platformBaseVersion = intellijVersion.substring(0, intellijVersionDelimiterIndex)
+-val platform = androidStudioVersion?.let { "AS$it" } ?: platformBaseVersion
+-
+-rootProject.extra["versions.platform"] = platform
+-
+-
+-for (jar in gradleJars) {
+-    extra["versions.jar.$jar"] = extra["versions.gradle-api"]
+-}
+-
+-if (!extra.has("versions.androidStudioRelease")) {
+-    extra["ignore.jar.android-base-common"] = true
+-}
+--- a/gradle/wrapper/gradle-wrapper.properties
++++ b/gradle/wrapper/gradle-wrapper.properties
+@@ -1,5 +1,5 @@
+ distributionBase=GRADLE_USER_HOME
+ distributionPath=wrapper/dists
+-distributionUrl=https\://services.gradle.org/distributions/gradle-5.1-bin.zip
++distributionUrl=https\://services.gradle.org/distributions/gradle-4.7-bin.zip
+ zipStoreBase=GRADLE_USER_HOME
+ zipStorePath=wrapper/dists
