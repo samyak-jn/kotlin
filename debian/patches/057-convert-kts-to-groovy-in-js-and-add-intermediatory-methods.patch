@@ -1,0 +1,631 @@
+Description: Update js dir to make compatible to build with gradle
+ This patch adds build.gradle and remove kts file.
+ Added an intermediatory method for protobufFUll() called customProtobufFull().
+Author: Saif Abdul Casim
+---
+
+--- /dev/null
++++ b/js/js.ast/build.gradle
+@@ -0,0 +1,21 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["trove4j"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
+--- a/js/js.ast/build.gradle.kts
++++ /dev/null
+@@ -1,18 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("trove4j") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- a/js/js.ast/src/org/jetbrains/kotlin/js/backend/ast/JsClassModel.kt
++++ b/js/js.ast/src/org/jetbrains/kotlin/js/backend/ast/JsClassModel.kt
+@@ -18,6 +18,6 @@
+ 
+ class JsClassModel(val name: JsName, val superName: JsName?) {
+     val interfaces: MutableSet<JsName> = mutableSetOf()
+-    val preDeclarationBlock = JsGlobalBlock()
++    val preDeclarationBlock = JsGlobalBlock() // TODO only used in IR backend => hide from current backend
+     val postDeclarationBlock = JsGlobalBlock()
+ }
+--- /dev/null
++++ b/js/js.dce/build.gradle
+@@ -0,0 +1,21 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":js:js.ast"))
++    compile(project(":js:js.translator"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
+--- a/js/js.dce/build.gradle.kts
++++ /dev/null
+@@ -1,18 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":js:js.ast"))
+-    compile(project(":js:js.translator"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- /dev/null
++++ b/js/js.frontend/build.gradle
+@@ -0,0 +1,24 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":js:js.ast"))
++    compile(project(":js:js.parser"))
++    compile(project(":js:js.serializer"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["guava"], rootProject) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
+--- a/js/js.frontend/build.gradle.kts
++++ /dev/null
+@@ -1,21 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":js:js.ast"))
+-    compile(project(":js:js.parser"))
+-    compile(project(":js:js.serializer"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("guava", rootProject = rootProject) }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- a/js/js.inliner/src/org/jetbrains/kotlin/js/inline/InliningScope.kt
++++ b/js/js.inliner/src/org/jetbrains/kotlin/js/inline/InliningScope.kt
+@@ -140,6 +140,9 @@
+         get() = JsBlock(
+             JsBlock(fragment.inlinedLocalDeclarations.values.toList()),
+             fragment.declarationBlock,
++            JsBlock(fragment.classes.values.flatMap {
++                listOf(it.preDeclarationBlock, it.postDeclarationBlock)
++            }),
+             fragment.exportBlock,
+             JsExpressionStatement(JsFunction(JsDynamicScope, fragment.initializerBlock, ""))
+         ).also { block ->
+--- /dev/null
++++ b/js/js.parser/build.gradle
+@@ -0,0 +1,20 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":js:js.ast"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
+--- a/js/js.parser/build.gradle.kts
++++ /dev/null
+@@ -1,17 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":js:js.ast"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- /dev/null
++++ b/js/js.serializer/build.gradle
+@@ -0,0 +1,22 @@
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:serialization"))
++    compile(project(":js:js.ast"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++}
++
++sourceSets {
++    "main" {
++    	java.srcDirs("src")
++		resources.srcDir("resources")
++	}
++    "test" {}
++}
++
+--- a/js/js.serializer/build.gradle.kts
++++ /dev/null
+@@ -1,19 +0,0 @@
+-
+-plugins {
+-    kotlin("jvm")
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:serialization"))
+-    compile(project(":js:js.ast"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+--- a/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/BoxJsTestGenerated.java
++++ b/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/BoxJsTestGenerated.java
+@@ -5321,6 +5321,11 @@
+             runTest("js/js.translator/testData/box/multiModule/moduleAndVariableNameClash.kt");
+         }
+ 
++        @TestMetadata("privateInterfaceMethodInheritance.kt")
++        public void testPrivateInterfaceMethodInheritance() throws Exception {
++            runTest("js/js.translator/testData/box/multiModule/privateInterfaceMethodInheritance.kt");
++        }
++
+         @TestMetadata("privateInterfaceNameClash.kt")
+         public void testPrivateInterfaceNameClash() throws Exception {
+             runTest("js/js.translator/testData/box/multiModule/privateInterfaceNameClash.kt");
+--- a/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/InlineSuspendTestsGenerated.java
++++ b/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/InlineSuspendTestsGenerated.java
+@@ -158,6 +158,16 @@
+         runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/multipleSuspensionPoints.kt", "kotlin.coroutines");
+     }
+ 
++    @TestMetadata("nonSuspendCrossinline.kt")
++    public void testNonSuspendCrossinline_1_2() throws Exception {
++        runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/nonSuspendCrossinline.kt", "kotlin.coroutines.experimental");
++    }
++
++    @TestMetadata("nonSuspendCrossinline.kt")
++    public void testNonSuspendCrossinline_1_3() throws Exception {
++        runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/nonSuspendCrossinline.kt", "kotlin.coroutines");
++    }
++
+     @TestMetadata("returnValue.kt")
+     public void testReturnValue_1_2() throws Exception {
+         runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/returnValue.kt", "kotlin.coroutines.experimental");
+@@ -379,6 +389,26 @@
+             KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/boxInline/suspend/stateMachine"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.JS, true);
+         }
+ 
++        @TestMetadata("crossingCoroutineBoundaries.kt")
++        public void testCrossingCoroutineBoundaries_1_2() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/crossingCoroutineBoundaries.kt", "kotlin.coroutines.experimental");
++        }
++
++        @TestMetadata("crossingCoroutineBoundaries.kt")
++        public void testCrossingCoroutineBoundaries_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/crossingCoroutineBoundaries.kt", "kotlin.coroutines");
++        }
++
++        @TestMetadata("independentInline.kt")
++        public void testIndependentInline_1_2() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/independentInline.kt", "kotlin.coroutines.experimental");
++        }
++
++        @TestMetadata("independentInline.kt")
++        public void testIndependentInline_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/independentInline.kt", "kotlin.coroutines");
++        }
++
+         @TestMetadata("innerLambdaInsideLambda.kt")
+         public void testInnerLambdaInsideLambda_1_2() throws Exception {
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerLambdaInsideLambda.kt", "kotlin.coroutines.experimental");
+@@ -439,6 +469,16 @@
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerObjectInsideInnerObject.kt", "kotlin.coroutines");
+         }
+ 
++        @TestMetadata("innerObjectRetransformation.kt")
++        public void testInnerObjectRetransformation_1_2() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerObjectRetransformation.kt", "kotlin.coroutines.experimental");
++        }
++
++        @TestMetadata("innerObjectRetransformation.kt")
++        public void testInnerObjectRetransformation_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerObjectRetransformation.kt", "kotlin.coroutines");
++        }
++
+         @TestMetadata("innerObjectSeveralFunctions.kt")
+         public void testInnerObjectSeveralFunctions_1_2() throws Exception {
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerObjectSeveralFunctions.kt", "kotlin.coroutines.experimental");
+@@ -469,6 +509,16 @@
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerObject.kt", "kotlin.coroutines");
+         }
+ 
++        @TestMetadata("insideObject.kt")
++        public void testInsideObject_1_2() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/insideObject.kt", "kotlin.coroutines.experimental");
++        }
++
++        @TestMetadata("insideObject.kt")
++        public void testInsideObject_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/insideObject.kt", "kotlin.coroutines");
++        }
++
+         @TestMetadata("normalInline.kt")
+         public void testNormalInline_1_2() throws Exception {
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/normalInline.kt", "kotlin.coroutines.experimental");
+@@ -488,5 +538,55 @@
+         public void testNumberOfSuspentions_1_3() throws Exception {
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/numberOfSuspentions.kt", "kotlin.coroutines");
+         }
++
++        @TestMetadata("objectInsideLambdas.kt")
++        public void testObjectInsideLambdas_1_2() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/objectInsideLambdas.kt", "kotlin.coroutines.experimental");
++        }
++
++        @TestMetadata("objectInsideLambdas.kt")
++        public void testObjectInsideLambdas_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/objectInsideLambdas.kt", "kotlin.coroutines");
++        }
++
++        @TestMetadata("oneInlineTwoCaptures.kt")
++        public void testOneInlineTwoCaptures_1_2() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/oneInlineTwoCaptures.kt", "kotlin.coroutines.experimental");
++        }
++
++        @TestMetadata("oneInlineTwoCaptures.kt")
++        public void testOneInlineTwoCaptures_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/oneInlineTwoCaptures.kt", "kotlin.coroutines");
++        }
++
++        @TestMetadata("passLambda.kt")
++        public void testPassLambda_1_2() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/passLambda.kt", "kotlin.coroutines.experimental");
++        }
++
++        @TestMetadata("passLambda.kt")
++        public void testPassLambda_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/passLambda.kt", "kotlin.coroutines");
++        }
++
++        @TestMetadata("passParameterLambda.kt")
++        public void testPassParameterLambda_1_2() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/passParameterLambda.kt", "kotlin.coroutines.experimental");
++        }
++
++        @TestMetadata("passParameterLambda.kt")
++        public void testPassParameterLambda_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/passParameterLambda.kt", "kotlin.coroutines");
++        }
++
++        @TestMetadata("passParameter.kt")
++        public void testPassParameter_1_2() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/passParameter.kt", "kotlin.coroutines.experimental");
++        }
++
++        @TestMetadata("passParameter.kt")
++        public void testPassParameter_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/passParameter.kt", "kotlin.coroutines");
++        }
+     }
+ }
+--- a/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/IrBoxJsTestGenerated.java
++++ b/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/IrBoxJsTestGenerated.java
+@@ -5321,6 +5321,11 @@
+             runTest("js/js.translator/testData/box/multiModule/moduleAndVariableNameClash.kt");
+         }
+ 
++        @TestMetadata("privateInterfaceMethodInheritance.kt")
++        public void testPrivateInterfaceMethodInheritance() throws Exception {
++            runTest("js/js.translator/testData/box/multiModule/privateInterfaceMethodInheritance.kt");
++        }
++
+         @TestMetadata("privateInterfaceNameClash.kt")
+         public void testPrivateInterfaceNameClash() throws Exception {
+             runTest("js/js.translator/testData/box/multiModule/privateInterfaceNameClash.kt");
+--- a/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/IrInlineSuspendTestsGenerated.java
++++ b/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/IrInlineSuspendTestsGenerated.java
+@@ -98,6 +98,11 @@
+         runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/multipleSuspensionPoints.kt", "kotlin.coroutines");
+     }
+ 
++    @TestMetadata("nonSuspendCrossinline.kt")
++    public void testNonSuspendCrossinline_1_3() throws Exception {
++        runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/nonSuspendCrossinline.kt", "kotlin.coroutines");
++    }
++
+     @TestMetadata("returnValue.kt")
+     public void testReturnValue_1_3() throws Exception {
+         runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/returnValue.kt", "kotlin.coroutines");
+@@ -259,6 +264,16 @@
+             KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/boxInline/suspend/stateMachine"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.JS_IR, true);
+         }
+ 
++        @TestMetadata("crossingCoroutineBoundaries.kt")
++        public void testCrossingCoroutineBoundaries_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/crossingCoroutineBoundaries.kt", "kotlin.coroutines");
++        }
++
++        @TestMetadata("independentInline.kt")
++        public void testIndependentInline_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/independentInline.kt", "kotlin.coroutines");
++        }
++
+         @TestMetadata("innerLambdaInsideLambda.kt")
+         public void testInnerLambdaInsideLambda_1_3() throws Exception {
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerLambdaInsideLambda.kt", "kotlin.coroutines");
+@@ -289,6 +304,11 @@
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerObjectInsideInnerObject.kt", "kotlin.coroutines");
+         }
+ 
++        @TestMetadata("innerObjectRetransformation.kt")
++        public void testInnerObjectRetransformation_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerObjectRetransformation.kt", "kotlin.coroutines");
++        }
++
+         @TestMetadata("innerObjectSeveralFunctions.kt")
+         public void testInnerObjectSeveralFunctions_1_3() throws Exception {
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerObjectSeveralFunctions.kt", "kotlin.coroutines");
+@@ -304,6 +324,11 @@
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/innerObject.kt", "kotlin.coroutines");
+         }
+ 
++        @TestMetadata("insideObject.kt")
++        public void testInsideObject_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/insideObject.kt", "kotlin.coroutines");
++        }
++
+         @TestMetadata("normalInline.kt")
+         public void testNormalInline_1_3() throws Exception {
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/normalInline.kt", "kotlin.coroutines");
+@@ -313,5 +338,30 @@
+         public void testNumberOfSuspentions_1_3() throws Exception {
+             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/numberOfSuspentions.kt", "kotlin.coroutines");
+         }
++
++        @TestMetadata("objectInsideLambdas.kt")
++        public void testObjectInsideLambdas_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/objectInsideLambdas.kt", "kotlin.coroutines");
++        }
++
++        @TestMetadata("oneInlineTwoCaptures.kt")
++        public void testOneInlineTwoCaptures_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/oneInlineTwoCaptures.kt", "kotlin.coroutines");
++        }
++
++        @TestMetadata("passLambda.kt")
++        public void testPassLambda_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/passLambda.kt", "kotlin.coroutines");
++        }
++
++        @TestMetadata("passParameterLambda.kt")
++        public void testPassParameterLambda_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/passParameterLambda.kt", "kotlin.coroutines");
++        }
++
++        @TestMetadata("passParameter.kt")
++        public void testPassParameter_1_3() throws Exception {
++            runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/stateMachine/passParameter.kt", "kotlin.coroutines");
++        }
+     }
+ }
+--- a/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/IrJsCodegenBoxTestGenerated.java
++++ b/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/IrJsCodegenBoxTestGenerated.java
+@@ -5628,6 +5628,23 @@
+             }
+         }
+ 
++        @TestMetadata("compiler/testData/codegen/box/coroutines/javaInterop")
++        @TestDataPath("$PROJECT_ROOT")
++        @RunWith(JUnit3RunnerWithInners.class)
++        public static class JavaInterop extends AbstractIrJsCodegenBoxTest {
++            private void runTest(String testDataFilePath) throws Exception {
++                KotlinTestUtils.runTest0(this::doTest, TargetBackend.JS_IR, testDataFilePath);
++            }
++
++            private void runTestWithPackageReplacement(String testDataFilePath, String packageName) throws Exception {
++                KotlinTestUtils.runTest0(filePath -> doTestWithCoroutinesPackageReplacement(filePath, packageName), TargetBackend.JS_IR, testDataFilePath);
++            }
++
++            public void testAllFilesPresentInJavaInterop() throws Exception {
++                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/box/coroutines/javaInterop"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.JS_IR, true);
++            }
++        }
++
+         @TestMetadata("compiler/testData/codegen/box/coroutines/localFunctions")
+         @TestDataPath("$PROJECT_ROOT")
+         @RunWith(JUnit3RunnerWithInners.class)
+--- a/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/JsCodegenBoxTestGenerated.java
++++ b/js/js.tests/test/org/jetbrains/kotlin/js/test/semantics/JsCodegenBoxTestGenerated.java
+@@ -6363,6 +6363,23 @@
+             }
+         }
+ 
++        @TestMetadata("compiler/testData/codegen/box/coroutines/javaInterop")
++        @TestDataPath("$PROJECT_ROOT")
++        @RunWith(JUnit3RunnerWithInners.class)
++        public static class JavaInterop extends AbstractJsCodegenBoxTest {
++            private void runTest(String testDataFilePath) throws Exception {
++                KotlinTestUtils.runTest0(this::doTest, TargetBackend.JS, testDataFilePath);
++            }
++
++            private void runTestWithPackageReplacement(String testDataFilePath, String packageName) throws Exception {
++                KotlinTestUtils.runTest0(filePath -> doTestWithCoroutinesPackageReplacement(filePath, packageName), TargetBackend.JS, testDataFilePath);
++            }
++
++            public void testAllFilesPresentInJavaInterop() throws Exception {
++                KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/box/coroutines/javaInterop"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.JS, true);
++            }
++        }
++
+         @TestMetadata("compiler/testData/codegen/box/coroutines/localFunctions")
+         @TestDataPath("$PROJECT_ROOT")
+         @RunWith(JUnit3RunnerWithInners.class)
+--- a/js/js.translator/build.gradle.kts
++++ b/js/js.translator/build.gradle.kts
+@@ -1,8 +1,8 @@
+ import org.gradle.plugins.ide.idea.model.IdeaModel
+ 
+ plugins {
+-    idea
+-    kotlin("jvm")
++    id("idea")
++    id("org.jetbrains.kotlin.jvm")
+     id("jps-compatible")
+ }
+ 
+@@ -14,20 +14,21 @@
+     compile(project(":js:js.ast"))
+     compile(project(":js:js.frontend"))
+     compile(project(":js:js.parser"))
+-    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+-    compileOnly(intellijDep()) { includeJars("trove4j", "guava", rootProject = rootProject) }
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["trove4j", "guava"], rootProject) }
+ }
+ 
+ sourceSets {
+     "main" {
+-        projectDefault()
++        java.srcDirs("src")
++		resources.srcDir("resources")
+         java.srcDir("../js.inliner/src")
+     }
+     "test" {}
+ }
+ 
+-configure<IdeaModel> {
++idea {
+     module {
+         excludeDirs = excludeDirs + files("testData/out-min")
+     }
+-}
+\ No newline at end of file
++}
+--- /dev/null
++++ b/js/js.translator/testData/box/multiModule/privateInterfaceMethodInheritance.kt
+@@ -0,0 +1,25 @@
++// EXPECTED_REACHABLE_NODES: 1280
++// IGNORE_BACKEND: JS_IR
++// MODULE: lib
++// FILE: lib.kt
++package lib
++
++interface A {
++    private fun foo() = "OK"
++
++    fun bar() = foo()
++}
++
++open class AProxy: A
++
++// MODULE: main(lib)
++// FILE: main.kt
++package main
++
++// KT-31007
++import lib.AProxy
++
++// Important bit: don't inherit A directly
++class B : AProxy()
++
++fun box(): String = B().bar()
+\ No newline at end of file
