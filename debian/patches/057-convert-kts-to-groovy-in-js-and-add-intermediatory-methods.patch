@@ -560,46 +560,42 @@ Author: Saif Abdul Casim
          @TestDataPath("$PROJECT_ROOT")
          @RunWith(JUnit3RunnerWithInners.class)
 --- a/js/js.translator/build.gradle.kts
-+++ b/js/js.translator/build.gradle.kts
-@@ -1,8 +1,8 @@
- import org.gradle.plugins.ide.idea.model.IdeaModel
- 
- plugins {
++++ /dev/null
+@@ -1,33 +0,0 @@
+-import org.gradle.plugins.ide.idea.model.IdeaModel
+-
+-plugins {
 -    idea
 -    kotlin("jvm")
-+    id("idea")
-+    id("org.jetbrains.kotlin.jvm")
-     id("jps-compatible")
- }
- 
-@@ -14,20 +14,21 @@
-     compile(project(":js:js.ast"))
-     compile(project(":js:js.frontend"))
-     compile(project(":js:js.parser"))
+-    id("jps-compatible")
+-}
+-
+-dependencies {
+-    compile(project(":core:descriptors"))
+-    compile(project(":compiler:util"))
+-    compile(project(":compiler:frontend"))
+-    compile(project(":compiler:backend-common"))
+-    compile(project(":js:js.ast"))
+-    compile(project(":js:js.frontend"))
+-    compile(project(":js:js.parser"))
 -    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
 -    compileOnly(intellijDep()) { includeJars("trove4j", "guava", rootProject = rootProject) }
-+    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
-+    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["trove4j", "guava"], rootProject) }
- }
- 
- sourceSets {
-     "main" {
+-}
+-
+-sourceSets {
+-    "main" {
 -        projectDefault()
-+        java.srcDirs("src")
-+		resources.srcDir("resources")
-         java.srcDir("../js.inliner/src")
-     }
-     "test" {}
- }
- 
+-        java.srcDir("../js.inliner/src")
+-    }
+-    "test" {}
+-}
+-
 -configure<IdeaModel> {
-+idea {
-     module {
-         excludeDirs = excludeDirs + files("testData/out-min")
-     }
+-    module {
+-        excludeDirs = excludeDirs + files("testData/out-min")
+-    }
 -}
 \ No newline at end of file
-+}
 --- /dev/null
 +++ b/js/js.translator/testData/box/multiModule/privateInterfaceMethodInheritance.kt
 @@ -0,0 +1,25 @@
@@ -629,3 +625,40 @@ Author: Saif Abdul Casim
 +
 +fun box(): String = B().bar()
 \ No newline at end of file
+--- /dev/null
++++ b/js/js.translator/build.gradle
+@@ -0,0 +1,34 @@
++import org.gradle.plugins.ide.idea.model.IdeaModel
++
++plugins {
++    id("idea")
++    id("org.jetbrains.kotlin.jvm")
++    id("jps-compatible")
++}
++
++dependencies {
++    compile(project(":core:descriptors"))
++    compile(project(":compiler:util"))
++    compile(project(":compiler:frontend"))
++    compile(project(":compiler:backend-common"))
++    compile(project(":js:js.ast"))
++    compile(project(":js:js.frontend"))
++    compile(project(":js:js.parser"))
++    compileOnly(IntellijDependenciesKt.customIntellijCoreDep(project)) { IntellijDependenciesKt.customIncludeJars(it,["intellij-core"],null) }
++    compileOnly(IntellijDependenciesKt.getIntellijDep(project,"intellij")) { IntellijDependenciesKt.customIncludeJars(it,["trove4j", "guava"], rootProject) }
++}
++
++sourceSets {
++    "main" {
++        java.srcDirs("src")
++		resources.srcDir("resources")
++        java.srcDir("../js.inliner/src")
++    }
++    "test" {}
++}
++
++idea {
++    module {
++        excludeDirs = excludeDirs + files("testData/out-min")
++    }
++}
