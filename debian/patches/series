@@ -61,3 +61,4 @@
 062-upgrade-API_version-to-458752-add-methods-and-update-syntax.patch
 063-update-settings.gradle-removes-unwanted-include.patch
 064-removes-metadata-in-kapt3-compiler-txt.patch
+065-renamed-buildSrc-files-not-necessary-dist-build-path.patch

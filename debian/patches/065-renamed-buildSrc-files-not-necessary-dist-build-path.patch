@@ -1,0 +1,2723 @@
+Description: renamed buildSrc files that are unnesscarry for the dist build path
+Author: Saif Abdul Casim
+
+---
+
+--- a/buildSrc/src/main/kotlin/idea/DistCopyDetailsMock.kt
++++ /dev/null
+@@ -1,136 +0,0 @@
+-/*
+- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+- * that can be found in the license/LICENSE.txt file.
+- */
+-
+-package idea
+-
+-import groovy.lang.Closure
+-import org.gradle.api.Action
+-import org.gradle.api.Transformer
+-import org.gradle.api.file.ContentFilterable
+-import org.gradle.api.file.DuplicatesStrategy
+-import org.gradle.api.file.FileCopyDetails
+-import org.gradle.api.file.RelativePath
+-import java.io.File
+-import java.io.FilterReader
+-import java.io.InputStream
+-import java.io.OutputStream
+-
+-class DistCopyDetailsMock(val context: DistModelBuildContext, srcName: String) : FileCopyDetails {
+-    private var relativePath = RelativePath(true, srcName)
+-    lateinit var lastAction: Action<in FileCopyDetails>
+-
+-    class E : Exception() {
+-        // skip stack trace filling
+-        override fun fillInStackTrace(): Throwable = this
+-    }
+-
+-    fun logUnsupported(methodName: String): Nothing {
+-        context.logUnsupported("COPY ACTION FileCopyDetails mock: $methodName", lastAction)
+-        throw E()
+-    }
+-
+-    override fun setDuplicatesStrategy(strategy: DuplicatesStrategy) {
+-        logUnsupported("setDuplicatesStrategy")
+-    }
+-
+-    override fun getSourcePath(): String {
+-        logUnsupported("getSourcePath")
+-    }
+-
+-    override fun getName(): String {
+-        logUnsupported("getName")
+-    }
+-
+-    override fun getSize(): Long {
+-        logUnsupported("getSize")
+-    }
+-
+-    override fun getRelativePath(): RelativePath = relativePath
+-
+-    override fun getRelativeSourcePath(): RelativePath {
+-        logUnsupported("getRelativeSourcePath")
+-    }
+-
+-    override fun expand(properties: MutableMap<String, *>): ContentFilterable {
+-        logUnsupported("expand")
+-    }
+-
+-    override fun getMode(): Int {
+-        logUnsupported("getMode")
+-    }
+-
+-    override fun getSourceName(): String {
+-        logUnsupported("getSourceName")
+-    }
+-
+-    override fun filter(properties: MutableMap<String, *>, filterType: Class<out FilterReader>): ContentFilterable {
+-        logUnsupported("filter")
+-    }
+-
+-    override fun filter(filterType: Class<out FilterReader>): ContentFilterable {
+-        logUnsupported("filter")
+-    }
+-
+-    override fun filter(closure: Closure<*>): ContentFilterable {
+-        logUnsupported("filter")
+-    }
+-
+-    override fun filter(transformer: Transformer<String, String>): ContentFilterable {
+-        logUnsupported("filter")
+-    }
+-
+-    override fun getFile(): File {
+-        logUnsupported("getFile")
+-    }
+-
+-    override fun setMode(mode: Int) {
+-        logUnsupported("setMode")
+-    }
+-
+-    override fun copyTo(output: OutputStream) {
+-        logUnsupported("copyTo")
+-    }
+-
+-    override fun copyTo(target: File): Boolean {
+-        logUnsupported("copyTo")
+-    }
+-
+-    override fun open(): InputStream {
+-        logUnsupported("open")
+-    }
+-
+-    override fun setRelativePath(path: RelativePath) {
+-        relativePath = path
+-    }
+-
+-    override fun getPath(): String {
+-        logUnsupported("getPath")
+-    }
+-
+-    override fun isDirectory(): Boolean {
+-        logUnsupported("isDirectory")
+-    }
+-
+-    override fun getDuplicatesStrategy(): DuplicatesStrategy {
+-        logUnsupported("getDuplicatesStrategy")
+-    }
+-
+-    override fun setName(name: String) {
+-        logUnsupported("setName")
+-    }
+-
+-    override fun getLastModified(): Long {
+-        logUnsupported("getLastModified")
+-    }
+-
+-    override fun setPath(path: String) {
+-        logUnsupported("setPath")
+-    }
+-
+-    override fun exclude() {
+-        logUnsupported("exclude")
+-    }
+-
+-}
+\ No newline at end of file
+--- /dev/null
++++ b/buildSrc/src/main/kotlin/idea/DistCopyDetailsMock_ignore
+@@ -0,0 +1,136 @@
++/*
++ * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package idea
++
++import groovy.lang.Closure
++import org.gradle.api.Action
++import org.gradle.api.Transformer
++import org.gradle.api.file.ContentFilterable
++import org.gradle.api.file.DuplicatesStrategy
++import org.gradle.api.file.FileCopyDetails
++import org.gradle.api.file.RelativePath
++import java.io.File
++import java.io.FilterReader
++import java.io.InputStream
++import java.io.OutputStream
++
++class DistCopyDetailsMock(val context: DistModelBuildContext, srcName: String) : FileCopyDetails {
++    private var relativePath = RelativePath(true, srcName)
++    lateinit var lastAction: Action<in FileCopyDetails>
++
++    class E : Exception() {
++        // skip stack trace filling
++        override fun fillInStackTrace(): Throwable = this
++    }
++
++    fun logUnsupported(methodName: String): Nothing {
++        context.logUnsupported("COPY ACTION FileCopyDetails mock: $methodName", lastAction)
++        throw E()
++    }
++
++    override fun setDuplicatesStrategy(strategy: DuplicatesStrategy) {
++        logUnsupported("setDuplicatesStrategy")
++    }
++
++    override fun getSourcePath(): String {
++        logUnsupported("getSourcePath")
++    }
++
++    override fun getName(): String {
++        logUnsupported("getName")
++    }
++
++    override fun getSize(): Long {
++        logUnsupported("getSize")
++    }
++
++    override fun getRelativePath(): RelativePath = relativePath
++
++    override fun getRelativeSourcePath(): RelativePath {
++        logUnsupported("getRelativeSourcePath")
++    }
++
++    override fun expand(properties: MutableMap<String, *>): ContentFilterable {
++        logUnsupported("expand")
++    }
++
++    override fun getMode(): Int {
++        logUnsupported("getMode")
++    }
++
++    override fun getSourceName(): String {
++        logUnsupported("getSourceName")
++    }
++
++    override fun filter(properties: MutableMap<String, *>, filterType: Class<out FilterReader>): ContentFilterable {
++        logUnsupported("filter")
++    }
++
++    override fun filter(filterType: Class<out FilterReader>): ContentFilterable {
++        logUnsupported("filter")
++    }
++
++    override fun filter(closure: Closure<*>): ContentFilterable {
++        logUnsupported("filter")
++    }
++
++    override fun filter(transformer: Transformer<String, String>): ContentFilterable {
++        logUnsupported("filter")
++    }
++
++    override fun getFile(): File {
++        logUnsupported("getFile")
++    }
++
++    override fun setMode(mode: Int) {
++        logUnsupported("setMode")
++    }
++
++    override fun copyTo(output: OutputStream) {
++        logUnsupported("copyTo")
++    }
++
++    override fun copyTo(target: File): Boolean {
++        logUnsupported("copyTo")
++    }
++
++    override fun open(): InputStream {
++        logUnsupported("open")
++    }
++
++    override fun setRelativePath(path: RelativePath) {
++        relativePath = path
++    }
++
++    override fun getPath(): String {
++        logUnsupported("getPath")
++    }
++
++    override fun isDirectory(): Boolean {
++        logUnsupported("isDirectory")
++    }
++
++    override fun getDuplicatesStrategy(): DuplicatesStrategy {
++        logUnsupported("getDuplicatesStrategy")
++    }
++
++    override fun setName(name: String) {
++        logUnsupported("setName")
++    }
++
++    override fun getLastModified(): Long {
++        logUnsupported("getLastModified")
++    }
++
++    override fun setPath(path: String) {
++        logUnsupported("setPath")
++    }
++
++    override fun exclude() {
++        logUnsupported("exclude")
++    }
++
++}
+\ No newline at end of file
+--- a/buildSrc/src/main/kotlin/idea/DistModelBuildContext.kt
++++ /dev/null
+@@ -1,76 +0,0 @@
+-package idea
+-
+-import org.gradle.api.Action
+-import org.gradle.api.file.FileCopyDetails
+-import org.jetbrains.kotlin.buildUtils.idea.DistVFile
+-import org.jetbrains.kotlin.buildUtils.idea.logger
+-
+-/**
+- * Used for logging and nesting properties
+- */
+-class DistModelBuildContext(
+-        val parent: DistModelBuildContext?,
+-        val kind: String,
+-        val title: String,
+-        val report: Appendable? = parent?.report,
+-        val shade: Boolean = parent?.shade ?: false
+-) {
+-    val logEnabled = false
+-    val allCopyActions = mutableSetOf<Action<in FileCopyDetails>>()
+-
+-    var destination: DistVFile? = parent?.destination // todo: don't nest destination between tasks visiting
+-    val logPrefix: String = if (parent != null) "${parent.logPrefix}-" else ""
+-
+-    init {
+-        report?.appendln(toString())
+-        if (parent != null) {
+-            allCopyActions.addAll(parent.allCopyActions)
+-        }
+-    }
+-
+-    fun log(kind: String, title: String = "", print: Boolean = false) {
+-        if (logEnabled) {
+-            report?.appendln("$logPrefix- $kind $title")
+-            if (print) {
+-                logger.error("$kind $title, while visiting:")
+-                var p = this
+-                while (p.parent != null) {
+-                    logger.error(" - ${p.kind} ${p.title}")
+-                    p = p.parent!!
+-                }
+-            }
+-        }
+-    }
+-
+-    fun logUnsupported(kind: String, obj: Any? = null) {
+-        val objInfo = if (obj != null) {
+-            val javaClass = obj.javaClass
+-            val superclass = javaClass.superclass as Class<*>
+-            "$obj [$javaClass extends $superclass implements ${javaClass.interfaces.map { it.canonicalName }}]"
+-        } else ""
+-
+-        log("UNSUPPORTED $kind", objInfo, true)
+-    }
+-
+-    override fun toString() = "$logPrefix $kind $title"
+-
+-    inline fun child(
+-            kind: String,
+-            title: String = "",
+-            shade: Boolean = false,
+-            body: (DistModelBuildContext) -> Unit = {}
+-    ): DistModelBuildContext {
+-        val result = DistModelBuildContext(this, kind, title, shade = shade)
+-        body(result)
+-        return result
+-    }
+-
+-    fun addCopyActions(allCopyActions: Collection<Action<in FileCopyDetails>>) {
+-        allCopyActions.forEach {
+-            log("COPY ACTION", "$it")
+-        }
+-
+-        this.allCopyActions.addAll(allCopyActions)
+-    }
+-}
+-
+--- /dev/null
++++ b/buildSrc/src/main/kotlin/idea/DistModelBuildContext_ignore
+@@ -0,0 +1,76 @@
++package idea
++
++import org.gradle.api.Action
++import org.gradle.api.file.FileCopyDetails
++import org.jetbrains.kotlin.buildUtils.idea.DistVFile
++import org.jetbrains.kotlin.buildUtils.idea.logger
++
++/**
++ * Used for logging and nesting properties
++ */
++class DistModelBuildContext(
++        val parent: DistModelBuildContext?,
++        val kind: String,
++        val title: String,
++        val report: Appendable? = parent?.report,
++        val shade: Boolean = parent?.shade ?: false
++) {
++    val logEnabled = false
++    val allCopyActions = mutableSetOf<Action<in FileCopyDetails>>()
++
++    var destination: DistVFile? = parent?.destination // todo: don't nest destination between tasks visiting
++    val logPrefix: String = if (parent != null) "${parent.logPrefix}-" else ""
++
++    init {
++        report?.appendln(toString())
++        if (parent != null) {
++            allCopyActions.addAll(parent.allCopyActions)
++        }
++    }
++
++    fun log(kind: String, title: String = "", print: Boolean = false) {
++        if (logEnabled) {
++            report?.appendln("$logPrefix- $kind $title")
++            if (print) {
++                logger.error("$kind $title, while visiting:")
++                var p = this
++                while (p.parent != null) {
++                    logger.error(" - ${p.kind} ${p.title}")
++                    p = p.parent!!
++                }
++            }
++        }
++    }
++
++    fun logUnsupported(kind: String, obj: Any? = null) {
++        val objInfo = if (obj != null) {
++            val javaClass = obj.javaClass
++            val superclass = javaClass.superclass as Class<*>
++            "$obj [$javaClass extends $superclass implements ${javaClass.interfaces.map { it.canonicalName }}]"
++        } else ""
++
++        log("UNSUPPORTED $kind", objInfo, true)
++    }
++
++    override fun toString() = "$logPrefix $kind $title"
++
++    inline fun child(
++            kind: String,
++            title: String = "",
++            shade: Boolean = false,
++            body: (DistModelBuildContext) -> Unit = {}
++    ): DistModelBuildContext {
++        val result = DistModelBuildContext(this, kind, title, shade = shade)
++        body(result)
++        return result
++    }
++
++    fun addCopyActions(allCopyActions: Collection<Action<in FileCopyDetails>>) {
++        allCopyActions.forEach {
++            log("COPY ACTION", "$it")
++        }
++
++        this.allCopyActions.addAll(allCopyActions)
++    }
++}
++
+--- a/buildSrc/src/main/kotlin/idea/DistModelBuilder.kt
++++ /dev/null
+@@ -1,315 +0,0 @@
+-/*
+- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+- * that can be found in the license/LICENSE.txt file.
+- */
+-
+-package org.jetbrains.kotlin.buildUtils.idea
+-
+-import IntelliJInstrumentCodeTask
+-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+-import idea.DistCopyDetailsMock
+-import idea.DistModelBuildContext
+-import org.codehaus.groovy.runtime.GStringImpl
+-import org.gradle.api.Project
+-import org.gradle.api.Task
+-import org.gradle.api.artifacts.Configuration
+-import org.gradle.api.file.FileCollection
+-import org.gradle.api.file.FileVisitDetails
+-import org.gradle.api.file.FileVisitor
+-import org.gradle.api.file.SourceDirectorySet
+-import org.gradle.api.internal.file.*
+-import org.gradle.api.internal.file.archive.ZipFileTree
+-import org.gradle.api.internal.file.collections.*
+-import org.gradle.api.internal.file.copy.CopySpecInternal
+-import org.gradle.api.internal.file.copy.DefaultCopySpec
+-import org.gradle.api.internal.file.copy.DestinationRootCopySpec
+-import org.gradle.api.internal.file.copy.SingleParentCopySpec
+-import org.gradle.api.tasks.AbstractCopyTask
+-import org.gradle.api.tasks.Copy
+-import org.gradle.api.tasks.SourceSetOutput
+-import org.gradle.api.tasks.Sync
+-import org.gradle.api.tasks.bundling.AbstractArchiveTask
+-import org.gradle.api.tasks.compile.AbstractCompile
+-import org.gradle.api.tasks.util.PatternSet
+-import org.gradle.internal.file.PathToFileResolver
+-import org.gradle.jvm.tasks.Jar
+-import java.io.File
+-import java.io.PrintWriter
+-import java.util.concurrent.Callable
+-
+-open class DistModelBuilder(val rootProject: Project, pw: PrintWriter) {
+-    val rootCtx = DistModelBuildContext(null, "ROOT", "dist", pw)
+-    val visited = mutableMapOf<Task, DistModelBuildContext>()
+-    val vfsRoot = DistVFile(null, "<root>", File(""))
+-    val refs = mutableSetOf<DistVFile>()
+-
+-    fun visitInstrumentTask(it: IntelliJInstrumentCodeTask): DistModelBuildContext = visited.getOrPut(it) {
+-        val ctx = rootCtx.child("INSTRUMENT", it.path)
+-        ctx.setDest(it.output!!.path)
+-        processSourcePath(it.originalClassesDirs, ctx)
+-        val dest = ctx.destination
+-        if (dest != null) {
+-            DistModuleOutput(dest, it.project.path)
+-        }
+-
+-        ctx
+-    }
+-
+-    fun visitCompileTask(it: AbstractCompile): DistModelBuildContext = visited.getOrPut(it) {
+-        val ctx = rootCtx.child("COMPILE", it.path)
+-        ctx.setDest(it.destinationDir.path)
+-        val dest = ctx.destination
+-        if (dest != null) DistModuleOutput(dest, it.project.path)
+-        else ctx.logUnsupported("Cannot add contents: destination is unknown", it)
+-
+-        ctx
+-    }
+-
+-    fun visitCopyTask(
+-        copy: AbstractCopyTask,
+-        shade: Boolean = false
+-    ): DistModelBuildContext = visited.getOrPut(copy) {
+-        val context = rootCtx.child("COPY", copy.path, shade)
+-
+-
+-        val rootSpec = copy.rootSpec
+-
+-        when (copy) {
+-            is Copy -> context.setDest(copy.destinationDir.path)
+-            is Sync -> context.setDest(copy.destinationDir.path)
+-            is AbstractArchiveTask -> context.setDest(copy.archivePath.path)
+-        }
+-
+-        when (copy) {
+-            is ShadowJar -> copy.configurations.forEach {
+-                processSourcePath(it, context)
+-            }
+-        }
+-
+-        processCopySpec(rootSpec, context)
+-
+-
+-        context
+-    }
+-
+-    fun processCopySpec(spec: CopySpecInternal, ctx: DistModelBuildContext) {
+-        spec.children.forEach {
+-            when (it) {
+-                is DestinationRootCopySpec -> ctx.child("DESTINATION ROOT COPY SPEC") { newCtx ->
+-                    newCtx.setDest(getRelativePath(it.destinationDir.path))
+-                    processCopySpec(it, newCtx)
+-                }
+-                is DefaultCopySpec -> ctx.child("DEFAULT COPY SPEC") { newCtx ->
+-                    val buildRootResolver = it.buildRootResolver()
+-                    ctx.addCopyActions(buildRootResolver.allCopyActions)
+-                    newCtx.setDest(buildRootResolver.destPath.getFile(ctx.destination!!.file).path)
+-                    processCopySpec(it, newCtx)
+-                    it.includes
+-
+-                    newCtx.child("SINGE PARENT COPY SPEC") { child ->
+-                        it.sourcePaths.forEach {
+-                            processSourcePath(it, child)
+-                        }
+-                    }
+-                }
+-                is SingleParentCopySpec -> ctx.child("OTHER SINGE PARENT COPY SPEC") { child ->
+-                    it.sourcePaths.forEach {
+-                        processSourcePath(it, child)
+-                    }
+-                }
+-                is CopySpecInternal -> processCopySpec(it, ctx)
+-                else -> ctx.logUnsupported("CopySpec", spec)
+-            }
+-        }
+-    }
+-
+-    fun processSourcePath(sourcePath: Any?, ctx: DistModelBuildContext) {
+-        when {
+-            sourcePath == null -> Unit
+-            sourcePath is Jar -> ctx.child("JAR") { child ->
+-                child.addCopyOf(sourcePath.archivePath.path)
+-            }
+-            sourcePath is SourceSetOutput -> ctx.child("COMPILE") { child ->
+-                sourcePath.classesDirs.files.forEach {
+-                    child.addCopyOf(it.path)
+-                }
+-            }
+-            sourcePath is Configuration -> {
+-                ctx.child("CONFIGURATION") { child ->
+-                    sourcePath.resolve().forEach {
+-                        child.addCopyOf(it.path)
+-                    }
+-                }
+-            }
+-            sourcePath is SourceDirectorySet -> {
+-                ctx.child("SOURCES") { child ->
+-                    sourcePath.srcDirs.forEach {
+-                        child.addCopyOf(it.path)
+-                    }
+-                }
+-            }
+-            sourcePath is MinimalFileSet -> ctx.child("MINIMAL FILE SET (${sourcePath.javaClass.simpleName})") { child ->
+-                sourcePath.files.forEach {
+-                    processSourcePath(it, child)
+-                }
+-            }
+-            sourcePath is MinimalFileTree -> ctx.child("MINIMAL FILE TREE (${sourcePath.javaClass.simpleName})") { child ->
+-                sourcePath.visit(object : FileVisitor {
+-                    override fun visitDir(dirDetails: FileVisitDetails) {
+-                        processSourcePath(dirDetails.file, child)
+-                    }
+-
+-                    override fun visitFile(fileDetails: FileVisitDetails) {
+-                        processSourcePath(fileDetails.file, child)
+-                    }
+-                })
+-            }
+-            sourcePath is FileTreeAdapter && sourcePath.tree is GeneratedSingletonFileTree -> ctx.child("FILE TREE ADAPTER OF MAP FILE TREE (${sourcePath.javaClass.simpleName})") { child ->
+-                sourcePath.visitContents(object : FileCollectionResolveContext {
+-                    override fun add(element: Any): FileCollectionResolveContext {
+-                        processSourcePath(element, child)
+-                        return this
+-                    }
+-
+-                    override fun newContext(): ResolvableFileCollectionResolveContext {
+-                        error("not supported")
+-                    }
+-
+-                    override fun push(fileResolver: PathToFileResolver): FileCollectionResolveContext {
+-                        return this
+-                    }
+-                })
+-            }
+-            sourcePath is CompositeFileCollection -> ctx.child("COMPOSITE FILE COLLECTION") { child ->
+-                sourcePath.visitLeafCollections(object : FileCollectionLeafVisitor {
+-                    override fun visitFileTree(file: File, patternSet: PatternSet) {
+-                        child.child("FILE TREE") {
+-                            it.addCopyOf(file.path)
+-                        }
+-                    }
+-
+-                    override fun visitGenericFileTree(fileTree: FileTreeInternal) {
+-                        child.child("TREE") {
+-                            processSourcePath(fileTree, it)
+-                        }
+-                    }
+-
+-                    override fun visitCollection(fileCollection: FileCollectionInternal) {
+-                        processSourcePath(fileCollection, child)
+-                    }
+-                })
+-            }
+-            sourcePath is FileTreeAdapter && sourcePath.tree is ZipFileTree -> ctx.child("ZIP FILE TREE ADAPTER") { child ->
+-                val tree = sourcePath.tree
+-                val field = tree.javaClass.declaredFields.find { it.name == "zipFile" }!!
+-                field.isAccessible = true
+-                val zipFile = field.get(tree) as File
+-
+-                child.addCopyOf(zipFile.path)
+-            }
+-            sourcePath is FileTreeInternal -> ctx.child("FILE TREE INTERNAL") { child ->
+-                // todo: preserve or warn about filtering
+-                sourcePath.visitTreeOrBackingFile(object : FileVisitor {
+-                    override fun visitFile(fileDetails: FileVisitDetails) {
+-                        child.addCopyOf(fileDetails.file.path)
+-                    }
+-
+-                    override fun visitDir(dirDetails: FileVisitDetails) {
+-                        child.addCopyOf(dirDetails.file.path)
+-                    }
+-                })
+-            }
+-            sourcePath is FileCollection -> ctx.child("OTHER FILE COLLECTION (${sourcePath.javaClass})") { child ->
+-                try {
+-                    sourcePath.files.forEach {
+-                        child.addCopyOf(it.path)
+-                    }
+-                } catch (t: Throwable) {
+-                    child.logUnsupported("FILE COLLECTION (${t.message})", sourcePath)
+-                }
+-            }
+-            sourcePath is String || sourcePath is GStringImpl -> ctx.child("STRING") { child ->
+-                child.addCopyOf(sourcePath.toString())
+-            }
+-            sourcePath is Callable<*> -> ctx.child("CALLABLE") { child ->
+-                processSourcePath(sourcePath.call(), child)
+-            }
+-            sourcePath is Collection<*> -> ctx.child("COLLECTION") { child ->
+-                sourcePath.forEach {
+-                    processSourcePath(it, child)
+-                }
+-            }
+-            sourcePath is Copy -> ctx.child("COPY OUTPUT") { child ->
+-                val src = visitCopyTask(sourcePath).destination
+-                if (src != null) child.addCopyOf(src)
+-                // else it is added to `it`, because destination is inhereted by context
+-            }
+-            sourcePath is File -> ctx.child("FILE ${sourcePath.path}") { child ->
+-                child.addCopyOf(sourcePath.path)
+-            }
+-            else -> ctx.logUnsupported("SOURCE PATH", sourcePath)
+-        }
+-    }
+-
+-    inline fun DistModelBuildContext.addCopyOf(
+-        src: String,
+-        body: (src: DistVFile, target: DistVFile) -> Unit = { _, _ -> Unit }
+-    ) {
+-        addCopyOf(requirePath(src), body)
+-    }
+-
+-    fun DistModelBuildContext.transformName(srcName: String): String? {
+-        val detailsMock = DistCopyDetailsMock(this, srcName)
+-        allCopyActions.forEach {
+-            detailsMock.lastAction = it
+-            try {
+-                it.execute(detailsMock)
+-            } catch (t: DistCopyDetailsMock.E) {
+-                // skip
+-            }
+-        }
+-        val name1 = detailsMock.relativePath.lastName
+-        return if (name1.endsWith(".jar")) transformJarName(name1) else name1
+-    }
+-
+-    // todo: investigate why allCopyActions not working
+-    open fun transformJarName(name: String): String = name
+-
+-    inline fun DistModelBuildContext.addCopyOf(
+-        src: DistVFile,
+-        body: (src: DistVFile, target: DistVFile) -> Unit = { _, _ -> Unit }
+-    ) {
+-
+-        val destination = destination
+-        if (destination != null) {
+-            body(src, destination)
+-            val customTargetName = transformName(src.name)
+-            DistCopy(destination, src, customTargetName)
+-            log("+DistCopy", "${getRelativePath(src.file.path)} -> ${getRelativePath(destination.file.path)}/$customTargetName")
+-        } else logUnsupported("Cannot add copy of `$src`: destination is unknown")
+-    }
+-
+-    fun DistModelBuildContext.setDest(path: String) {
+-        destination = vfsRoot.relativePath(path)
+-        log("INTO", getRelativePath(path))
+-    }
+-
+-    fun checkRefs() {
+-        refs.forEach {
+-            if (!it.hasContents && it.contents.isEmpty() && it.file.path.contains("${File.pathSeparator}build${File.pathSeparator}")) {
+-                logger.error("UNRESOLVED ${it.file}")
+-                it.contents.forEach {
+-                    logger.error("+ ${it}")
+-                }
+-            }
+-        }
+-    }
+-
+-    fun getRelativePath(path: String) = path.replace(rootProject.projectDir.path, "$")
+-
+-    fun requirePath(targetPath: String): DistVFile {
+-        val target = vfsRoot.relativePath(targetPath)
+-        if (!File(targetPath).exists()) refs.add(target)
+-        return target
+-    }
+-}
+\ No newline at end of file
+--- /dev/null
++++ b/buildSrc/src/main/kotlin/idea/DistModelBuilder_ignore
+@@ -0,0 +1,315 @@
++/*
++ * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.buildUtils.idea
++
++import IntelliJInstrumentCodeTask
++import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
++import idea.DistCopyDetailsMock
++import idea.DistModelBuildContext
++import org.codehaus.groovy.runtime.GStringImpl
++import org.gradle.api.Project
++import org.gradle.api.Task
++import org.gradle.api.artifacts.Configuration
++import org.gradle.api.file.FileCollection
++import org.gradle.api.file.FileVisitDetails
++import org.gradle.api.file.FileVisitor
++import org.gradle.api.file.SourceDirectorySet
++import org.gradle.api.internal.file.*
++import org.gradle.api.internal.file.archive.ZipFileTree
++import org.gradle.api.internal.file.collections.*
++import org.gradle.api.internal.file.copy.CopySpecInternal
++import org.gradle.api.internal.file.copy.DefaultCopySpec
++import org.gradle.api.internal.file.copy.DestinationRootCopySpec
++import org.gradle.api.internal.file.copy.SingleParentCopySpec
++import org.gradle.api.tasks.AbstractCopyTask
++import org.gradle.api.tasks.Copy
++import org.gradle.api.tasks.SourceSetOutput
++import org.gradle.api.tasks.Sync
++import org.gradle.api.tasks.bundling.AbstractArchiveTask
++import org.gradle.api.tasks.compile.AbstractCompile
++import org.gradle.api.tasks.util.PatternSet
++import org.gradle.internal.file.PathToFileResolver
++import org.gradle.jvm.tasks.Jar
++import java.io.File
++import java.io.PrintWriter
++import java.util.concurrent.Callable
++
++open class DistModelBuilder(val rootProject: Project, pw: PrintWriter) {
++    val rootCtx = DistModelBuildContext(null, "ROOT", "dist", pw)
++    val visited = mutableMapOf<Task, DistModelBuildContext>()
++    val vfsRoot = DistVFile(null, "<root>", File(""))
++    val refs = mutableSetOf<DistVFile>()
++
++    fun visitInstrumentTask(it: IntelliJInstrumentCodeTask): DistModelBuildContext = visited.getOrPut(it) {
++        val ctx = rootCtx.child("INSTRUMENT", it.path)
++        ctx.setDest(it.output!!.path)
++        processSourcePath(it.originalClassesDirs, ctx)
++        val dest = ctx.destination
++        if (dest != null) {
++            DistModuleOutput(dest, it.project.path)
++        }
++
++        ctx
++    }
++
++    fun visitCompileTask(it: AbstractCompile): DistModelBuildContext = visited.getOrPut(it) {
++        val ctx = rootCtx.child("COMPILE", it.path)
++        ctx.setDest(it.destinationDir.path)
++        val dest = ctx.destination
++        if (dest != null) DistModuleOutput(dest, it.project.path)
++        else ctx.logUnsupported("Cannot add contents: destination is unknown", it)
++
++        ctx
++    }
++
++    fun visitCopyTask(
++        copy: AbstractCopyTask,
++        shade: Boolean = false
++    ): DistModelBuildContext = visited.getOrPut(copy) {
++        val context = rootCtx.child("COPY", copy.path, shade)
++
++
++        val rootSpec = copy.rootSpec
++
++        when (copy) {
++            is Copy -> context.setDest(copy.destinationDir.path)
++            is Sync -> context.setDest(copy.destinationDir.path)
++            is AbstractArchiveTask -> context.setDest(copy.archivePath.path)
++        }
++
++        when (copy) {
++            is ShadowJar -> copy.configurations.forEach {
++                processSourcePath(it, context)
++            }
++        }
++
++        processCopySpec(rootSpec, context)
++
++
++        context
++    }
++
++    fun processCopySpec(spec: CopySpecInternal, ctx: DistModelBuildContext) {
++        spec.children.forEach {
++            when (it) {
++                is DestinationRootCopySpec -> ctx.child("DESTINATION ROOT COPY SPEC") { newCtx ->
++                    newCtx.setDest(getRelativePath(it.destinationDir.path))
++                    processCopySpec(it, newCtx)
++                }
++                is DefaultCopySpec -> ctx.child("DEFAULT COPY SPEC") { newCtx ->
++                    val buildRootResolver = it.buildRootResolver()
++                    ctx.addCopyActions(buildRootResolver.allCopyActions)
++                    newCtx.setDest(buildRootResolver.destPath.getFile(ctx.destination!!.file).path)
++                    processCopySpec(it, newCtx)
++                    it.includes
++
++                    newCtx.child("SINGE PARENT COPY SPEC") { child ->
++                        it.sourcePaths.forEach {
++                            processSourcePath(it, child)
++                        }
++                    }
++                }
++                is SingleParentCopySpec -> ctx.child("OTHER SINGE PARENT COPY SPEC") { child ->
++                    it.sourcePaths.forEach {
++                        processSourcePath(it, child)
++                    }
++                }
++                is CopySpecInternal -> processCopySpec(it, ctx)
++                else -> ctx.logUnsupported("CopySpec", spec)
++            }
++        }
++    }
++
++    fun processSourcePath(sourcePath: Any?, ctx: DistModelBuildContext) {
++        when {
++            sourcePath == null -> Unit
++            sourcePath is Jar -> ctx.child("JAR") { child ->
++                child.addCopyOf(sourcePath.archivePath.path)
++            }
++            sourcePath is SourceSetOutput -> ctx.child("COMPILE") { child ->
++                sourcePath.classesDirs.files.forEach {
++                    child.addCopyOf(it.path)
++                }
++            }
++            sourcePath is Configuration -> {
++                ctx.child("CONFIGURATION") { child ->
++                    sourcePath.resolve().forEach {
++                        child.addCopyOf(it.path)
++                    }
++                }
++            }
++            sourcePath is SourceDirectorySet -> {
++                ctx.child("SOURCES") { child ->
++                    sourcePath.srcDirs.forEach {
++                        child.addCopyOf(it.path)
++                    }
++                }
++            }
++            sourcePath is MinimalFileSet -> ctx.child("MINIMAL FILE SET (${sourcePath.javaClass.simpleName})") { child ->
++                sourcePath.files.forEach {
++                    processSourcePath(it, child)
++                }
++            }
++            sourcePath is MinimalFileTree -> ctx.child("MINIMAL FILE TREE (${sourcePath.javaClass.simpleName})") { child ->
++                sourcePath.visit(object : FileVisitor {
++                    override fun visitDir(dirDetails: FileVisitDetails) {
++                        processSourcePath(dirDetails.file, child)
++                    }
++
++                    override fun visitFile(fileDetails: FileVisitDetails) {
++                        processSourcePath(fileDetails.file, child)
++                    }
++                })
++            }
++            sourcePath is FileTreeAdapter && sourcePath.tree is GeneratedSingletonFileTree -> ctx.child("FILE TREE ADAPTER OF MAP FILE TREE (${sourcePath.javaClass.simpleName})") { child ->
++                sourcePath.visitContents(object : FileCollectionResolveContext {
++                    override fun add(element: Any): FileCollectionResolveContext {
++                        processSourcePath(element, child)
++                        return this
++                    }
++
++                    override fun newContext(): ResolvableFileCollectionResolveContext {
++                        error("not supported")
++                    }
++
++                    override fun push(fileResolver: PathToFileResolver): FileCollectionResolveContext {
++                        return this
++                    }
++                })
++            }
++            sourcePath is CompositeFileCollection -> ctx.child("COMPOSITE FILE COLLECTION") { child ->
++                sourcePath.visitLeafCollections(object : FileCollectionLeafVisitor {
++                    override fun visitFileTree(file: File, patternSet: PatternSet) {
++                        child.child("FILE TREE") {
++                            it.addCopyOf(file.path)
++                        }
++                    }
++
++                    override fun visitGenericFileTree(fileTree: FileTreeInternal) {
++                        child.child("TREE") {
++                            processSourcePath(fileTree, it)
++                        }
++                    }
++
++                    override fun visitCollection(fileCollection: FileCollectionInternal) {
++                        processSourcePath(fileCollection, child)
++                    }
++                })
++            }
++            sourcePath is FileTreeAdapter && sourcePath.tree is ZipFileTree -> ctx.child("ZIP FILE TREE ADAPTER") { child ->
++                val tree = sourcePath.tree
++                val field = tree.javaClass.declaredFields.find { it.name == "zipFile" }!!
++                field.isAccessible = true
++                val zipFile = field.get(tree) as File
++
++                child.addCopyOf(zipFile.path)
++            }
++            sourcePath is FileTreeInternal -> ctx.child("FILE TREE INTERNAL") { child ->
++                // todo: preserve or warn about filtering
++                sourcePath.visitTreeOrBackingFile(object : FileVisitor {
++                    override fun visitFile(fileDetails: FileVisitDetails) {
++                        child.addCopyOf(fileDetails.file.path)
++                    }
++
++                    override fun visitDir(dirDetails: FileVisitDetails) {
++                        child.addCopyOf(dirDetails.file.path)
++                    }
++                })
++            }
++            sourcePath is FileCollection -> ctx.child("OTHER FILE COLLECTION (${sourcePath.javaClass})") { child ->
++                try {
++                    sourcePath.files.forEach {
++                        child.addCopyOf(it.path)
++                    }
++                } catch (t: Throwable) {
++                    child.logUnsupported("FILE COLLECTION (${t.message})", sourcePath)
++                }
++            }
++            sourcePath is String || sourcePath is GStringImpl -> ctx.child("STRING") { child ->
++                child.addCopyOf(sourcePath.toString())
++            }
++            sourcePath is Callable<*> -> ctx.child("CALLABLE") { child ->
++                processSourcePath(sourcePath.call(), child)
++            }
++            sourcePath is Collection<*> -> ctx.child("COLLECTION") { child ->
++                sourcePath.forEach {
++                    processSourcePath(it, child)
++                }
++            }
++            sourcePath is Copy -> ctx.child("COPY OUTPUT") { child ->
++                val src = visitCopyTask(sourcePath).destination
++                if (src != null) child.addCopyOf(src)
++                // else it is added to `it`, because destination is inhereted by context
++            }
++            sourcePath is File -> ctx.child("FILE ${sourcePath.path}") { child ->
++                child.addCopyOf(sourcePath.path)
++            }
++            else -> ctx.logUnsupported("SOURCE PATH", sourcePath)
++        }
++    }
++
++    inline fun DistModelBuildContext.addCopyOf(
++        src: String,
++        body: (src: DistVFile, target: DistVFile) -> Unit = { _, _ -> Unit }
++    ) {
++        addCopyOf(requirePath(src), body)
++    }
++
++    fun DistModelBuildContext.transformName(srcName: String): String? {
++        val detailsMock = DistCopyDetailsMock(this, srcName)
++        allCopyActions.forEach {
++            detailsMock.lastAction = it
++            try {
++                it.execute(detailsMock)
++            } catch (t: DistCopyDetailsMock.E) {
++                // skip
++            }
++        }
++        val name1 = detailsMock.relativePath.lastName
++        return if (name1.endsWith(".jar")) transformJarName(name1) else name1
++    }
++
++    // todo: investigate why allCopyActions not working
++    open fun transformJarName(name: String): String = name
++
++    inline fun DistModelBuildContext.addCopyOf(
++        src: DistVFile,
++        body: (src: DistVFile, target: DistVFile) -> Unit = { _, _ -> Unit }
++    ) {
++
++        val destination = destination
++        if (destination != null) {
++            body(src, destination)
++            val customTargetName = transformName(src.name)
++            DistCopy(destination, src, customTargetName)
++            log("+DistCopy", "${getRelativePath(src.file.path)} -> ${getRelativePath(destination.file.path)}/$customTargetName")
++        } else logUnsupported("Cannot add copy of `$src`: destination is unknown")
++    }
++
++    fun DistModelBuildContext.setDest(path: String) {
++        destination = vfsRoot.relativePath(path)
++        log("INTO", getRelativePath(path))
++    }
++
++    fun checkRefs() {
++        refs.forEach {
++            if (!it.hasContents && it.contents.isEmpty() && it.file.path.contains("${File.pathSeparator}build${File.pathSeparator}")) {
++                logger.error("UNRESOLVED ${it.file}")
++                it.contents.forEach {
++                    logger.error("+ ${it}")
++                }
++            }
++        }
++    }
++
++    fun getRelativePath(path: String) = path.replace(rootProject.projectDir.path, "$")
++
++    fun requirePath(targetPath: String): DistVFile {
++        val target = vfsRoot.relativePath(targetPath)
++        if (!File(targetPath).exists()) refs.add(target)
++        return target
++    }
++}
+\ No newline at end of file
+--- a/buildSrc/src/main/kotlin/idea/DistModelIdeaArtifactBuilder.kt
++++ /dev/null
+@@ -1,61 +0,0 @@
+-/*
+- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+- * that can be found in the license/LICENSE.txt file.
+- */
+-
+-package org.jetbrains.kotlin.buildUtils.idea
+-
+-import org.gradle.api.Project
+-import org.gradle.plugins.ide.idea.model.IdeaModel
+-import org.jetbrains.gradle.ext.ArtifactType
+-import org.jetbrains.gradle.ext.RecursiveArtifact
+-
+-class DistModelIdeaArtifactBuilder(val rootProject: Project) {
+-    fun RecursiveArtifact.addFiles(vFile: DistVFile, inJar: Boolean = false) {
+-        val files = mutableSetOf<String>()
+-
+-        vFile.contents.forEach {
+-            when (it) {
+-                is DistCopy -> {
+-                    val file = it.src.file
+-                    when {
+-                        inJar && file.name.endsWith(".jar") -> extractedDirectory(file.path)
+-                        file.isDirectory -> {
+-                            files.add(file.name)
+-                            directoryContent(file.path)
+-                        }
+-                        else -> {
+-                            files.add(file.name)
+-                            file(file.path)
+-                        }
+-                    }
+-                }
+-                is DistModuleOutput -> {
+-                    val name = it.ideaModuleName
+-
+-                    if (name.result != null) moduleOutput(name.result + "_main")
+-                    else logger.warn("Cannot find idea module name for project `${it.projectId}`: ${name.error}")
+-                }
+-            }
+-        }
+-
+-        vFile.child.values.forEach {
+-            if (it.name !in files) {
+-                when {
+-                    it.name.endsWith(".jar") -> archive(it.name).addFiles(it, true)
+-                    else -> directory(it.name).addFiles(it, inJar)
+-                }
+-            }
+-        }
+-    }
+-
+-    class Result<T: Any>(val result: T? = null, val error: String? = null)
+-
+-    val DistModuleOutput.ideaModuleName: Result<String>
+-        get() {
+-            val findProject = rootProject.findProject(projectId) ?: return Result(error = "cannot find gradle project $projectId")
+-            val idea = findProject.extensions?.findByName("idea") as? IdeaModel ?: return Result(error = "cannot find idea model for gradle project $projectId")
+-            val name = idea.module?.name ?: return Result(error = "idea model for project $projectId has no module name")
+-            return Result(name)
+-        }
+-}
+\ No newline at end of file
+--- /dev/null
++++ b/buildSrc/src/main/kotlin/idea/DistModelIdeaArtifactBuilder_ignore
+@@ -0,0 +1,61 @@
++/*
++ * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.buildUtils.idea
++
++import org.gradle.api.Project
++import org.gradle.plugins.ide.idea.model.IdeaModel
++import org.jetbrains.gradle.ext.ArtifactType
++import org.jetbrains.gradle.ext.RecursiveArtifact
++
++class DistModelIdeaArtifactBuilder(val rootProject: Project) {
++    fun RecursiveArtifact.addFiles(vFile: DistVFile, inJar: Boolean = false) {
++        val files = mutableSetOf<String>()
++
++        vFile.contents.forEach {
++            when (it) {
++                is DistCopy -> {
++                    val file = it.src.file
++                    when {
++                        inJar && file.name.endsWith(".jar") -> extractedDirectory(file.path)
++                        file.isDirectory -> {
++                            files.add(file.name)
++                            directoryContent(file.path)
++                        }
++                        else -> {
++                            files.add(file.name)
++                            file(file.path)
++                        }
++                    }
++                }
++                is DistModuleOutput -> {
++                    val name = it.ideaModuleName
++
++                    if (name.result != null) moduleOutput(name.result + "_main")
++                    else logger.warn("Cannot find idea module name for project `${it.projectId}`: ${name.error}")
++                }
++            }
++        }
++
++        vFile.child.values.forEach {
++            if (it.name !in files) {
++                when {
++                    it.name.endsWith(".jar") -> archive(it.name).addFiles(it, true)
++                    else -> directory(it.name).addFiles(it, inJar)
++                }
++            }
++        }
++    }
++
++    class Result<T: Any>(val result: T? = null, val error: String? = null)
++
++    val DistModuleOutput.ideaModuleName: Result<String>
++        get() {
++            val findProject = rootProject.findProject(projectId) ?: return Result(error = "cannot find gradle project $projectId")
++            val idea = findProject.extensions?.findByName("idea") as? IdeaModel ?: return Result(error = "cannot find idea model for gradle project $projectId")
++            val name = idea.module?.name ?: return Result(error = "idea model for project $projectId has no module name")
++            return Result(name)
++        }
++}
+\ No newline at end of file
+--- a/buildSrc/src/main/kotlin/idea/generateIdeArtifacts.kt
++++ /dev/null
+@@ -1,130 +0,0 @@
+-/*
+- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+- * that can be found in the license/LICENSE.txt file.
+- */
+-
+-package org.jetbrains.kotlin.buildUtils.idea
+-
+-import IntelliJInstrumentCodeTask
+-import org.gradle.api.NamedDomainObjectContainer
+-import org.gradle.api.Project
+-import org.gradle.api.tasks.AbstractCopyTask
+-import org.gradle.api.tasks.compile.AbstractCompile
+-import org.jetbrains.gradle.ext.TopLevelArtifact
+-import org.slf4j.LoggerFactory
+-import java.io.File
+-
+-/**
+- * Temporary solution for configuring IDEA artifacts based on Gradle copy tasks configurations.
+- * This should be replaced with DSL that produces both Gradle copy tasks and IDEA artifacts configuration.
+- *
+- * TODO: remove this package when DSL described above will be implemented
+- */
+-fun generateIdeArtifacts(rootProject: Project, artifactsFactory: NamedDomainObjectContainer<TopLevelArtifact>) {
+-    val reportsDir = File(path(rootProject.buildDir.path, "reports", "idea-artifacts-cfg"))
+-    reportsDir.mkdirs()
+-    val projectDir = rootProject.projectDir
+-
+-    File(reportsDir, "01-visitor.report.txt").printWriter().use { visitorReport ->
+-        val modelBuilder = object : DistModelBuilder(rootProject, visitorReport) {
+-            // todo: investigate why allCopyActions not working
+-            override fun transformJarName(name: String): String {
+-                val name1 = name.replace(Regex("-${java.util.regex.Pattern.quote(rootProject.version.toString())}"), "")
+-
+-                val name2 = when (name1) {
+-                    "kotlin-runtime-common.jar" -> "kotlin-runtime.jar"
+-                    "kotlin-compiler-before-proguard.jar" -> "kotlin-compiler.jar"
+-                    "kotlin-main-kts-before-proguard.jar" -> "kotlin-main-kts.jar"
+-                    "kotlin-allopen-compiler-plugin.jar" -> "allopen-compiler-plugin.jar"
+-                    "kotlin-noarg-compiler-plugin.jar" -> "noarg-compiler-plugin.jar"
+-                    "kotlin-sam-with-receiver-compiler-plugin.jar" -> "sam-with-receiver-compiler-plugin.jar"
+-                    "kotlin-android-extensions-runtime.jar" -> "android-extensions-runtime.jar"
+-                    else -> name1
+-                }
+-
+-                val name3 = name2.removePrefix("dist-")
+-
+-                return name3
+-            }
+-        }
+-
+-        fun visitAllTasks(project: Project) {
+-            project.tasks.forEach {
+-                try {
+-                    when {
+-                        it is AbstractCopyTask -> modelBuilder.visitCopyTask(it)
+-                        it is AbstractCompile -> modelBuilder.visitCompileTask(it)
+-                        it is IntelliJInstrumentCodeTask -> modelBuilder.visitInstrumentTask(it)
+-                        it.name == "stripMetadata" -> {
+-                            modelBuilder.rootCtx.log(
+-                                "STRIP METADATA",
+-                                "${it.inputs.files.singleFile} -> ${it.outputs.files.singleFile}"
+-                            )
+-
+-                            DistCopy(
+-                                modelBuilder.requirePath(it.outputs.files.singleFile.path),
+-                                modelBuilder.requirePath(it.inputs.files.singleFile.path)
+-                            )
+-                        }
+-                    }
+-                } catch (t: Throwable) {
+-                    logger.error("Error while visiting `$it`", t)
+-                }
+-            }
+-
+-            project.subprojects.forEach {
+-                visitAllTasks(it)
+-            }
+-        }
+-
+-        visitAllTasks(rootProject)
+-
+-        // proguard
+-        DistCopy(
+-            target = modelBuilder.requirePath(
+-                path(
+-                    projectDir.path,
+-                    "libraries",
+-                    "reflect",
+-                    "build",
+-                    "libs",
+-                    "kotlin-reflect-proguard.jar"
+-                )
+-            ),
+-            src = modelBuilder.requirePath(path(projectDir.path, "libraries", "reflect", "build", "libs", "kotlin-reflect-shadow.jar"))
+-        )
+-
+-        File(reportsDir, "02-vfs.txt").printWriter().use {
+-            modelBuilder.vfsRoot.printTree(it)
+-        }
+-        modelBuilder.checkRefs()
+-
+-        with(DistModelFlattener()) {
+-            with(DistModelIdeaArtifactBuilder(rootProject)) {
+-                File(reportsDir, "03-flattened-vfs.txt").printWriter().use { report ->
+-                    fun getFlattenned(vfsPath: String): DistVFile =
+-                        modelBuilder.vfsRoot.relativePath(path(projectDir.path, vfsPath))
+-                            .flatten()
+-
+-                    val all = getFlattenned("dist")
+-                    all.child["artifacts"]
+-                        ?.removeAll { it != "ideaPlugin" }
+-                    all.child["artifacts"]
+-                        ?.child?.get("ideaPlugin")
+-                        ?.child?.get("Kotlin")
+-                        ?.removeAll { it != "kotlinc" && it != "lib" }
+-                    all.removeAll { it.endsWith(".zip") }
+-                    all.printTree(report)
+-
+-                    val dist = artifactsFactory.create("dist_auto_reference_dont_use")
+-                    dist.addFiles(all)
+-                }
+-            }
+-        }
+-    }
+-}
+-
+-private fun path(vararg components: String) = components.joinToString(File.separator)
+-
+-internal val logger = LoggerFactory.getLogger("ide-artifacts")
+-
+--- /dev/null
++++ b/buildSrc/src/main/kotlin/idea/generateIdeArtifacts_ignore
+@@ -0,0 +1,130 @@
++/*
++ * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++package org.jetbrains.kotlin.buildUtils.idea
++
++import IntelliJInstrumentCodeTask
++import org.gradle.api.NamedDomainObjectContainer
++import org.gradle.api.Project
++import org.gradle.api.tasks.AbstractCopyTask
++import org.gradle.api.tasks.compile.AbstractCompile
++import org.jetbrains.gradle.ext.TopLevelArtifact
++import org.slf4j.LoggerFactory
++import java.io.File
++
++/**
++ * Temporary solution for configuring IDEA artifacts based on Gradle copy tasks configurations.
++ * This should be replaced with DSL that produces both Gradle copy tasks and IDEA artifacts configuration.
++ *
++ * TODO: remove this package when DSL described above will be implemented
++ */
++fun generateIdeArtifacts(rootProject: Project, artifactsFactory: NamedDomainObjectContainer<TopLevelArtifact>) {
++    val reportsDir = File(path(rootProject.buildDir.path, "reports", "idea-artifacts-cfg"))
++    reportsDir.mkdirs()
++    val projectDir = rootProject.projectDir
++
++    File(reportsDir, "01-visitor.report.txt").printWriter().use { visitorReport ->
++        val modelBuilder = object : DistModelBuilder(rootProject, visitorReport) {
++            // todo: investigate why allCopyActions not working
++            override fun transformJarName(name: String): String {
++                val name1 = name.replace(Regex("-${java.util.regex.Pattern.quote(rootProject.version.toString())}"), "")
++
++                val name2 = when (name1) {
++                    "kotlin-runtime-common.jar" -> "kotlin-runtime.jar"
++                    "kotlin-compiler-before-proguard.jar" -> "kotlin-compiler.jar"
++                    "kotlin-main-kts-before-proguard.jar" -> "kotlin-main-kts.jar"
++                    "kotlin-allopen-compiler-plugin.jar" -> "allopen-compiler-plugin.jar"
++                    "kotlin-noarg-compiler-plugin.jar" -> "noarg-compiler-plugin.jar"
++                    "kotlin-sam-with-receiver-compiler-plugin.jar" -> "sam-with-receiver-compiler-plugin.jar"
++                    "kotlin-android-extensions-runtime.jar" -> "android-extensions-runtime.jar"
++                    else -> name1
++                }
++
++                val name3 = name2.removePrefix("dist-")
++
++                return name3
++            }
++        }
++
++        fun visitAllTasks(project: Project) {
++            project.tasks.forEach {
++                try {
++                    when {
++                        it is AbstractCopyTask -> modelBuilder.visitCopyTask(it)
++                        it is AbstractCompile -> modelBuilder.visitCompileTask(it)
++                        it is IntelliJInstrumentCodeTask -> modelBuilder.visitInstrumentTask(it)
++                        it.name == "stripMetadata" -> {
++                            modelBuilder.rootCtx.log(
++                                "STRIP METADATA",
++                                "${it.inputs.files.singleFile} -> ${it.outputs.files.singleFile}"
++                            )
++
++                            DistCopy(
++                                modelBuilder.requirePath(it.outputs.files.singleFile.path),
++                                modelBuilder.requirePath(it.inputs.files.singleFile.path)
++                            )
++                        }
++                    }
++                } catch (t: Throwable) {
++                    logger.error("Error while visiting `$it`", t)
++                }
++            }
++
++            project.subprojects.forEach {
++                visitAllTasks(it)
++            }
++        }
++
++        visitAllTasks(rootProject)
++
++        // proguard
++        DistCopy(
++            target = modelBuilder.requirePath(
++                path(
++                    projectDir.path,
++                    "libraries",
++                    "reflect",
++                    "build",
++                    "libs",
++                    "kotlin-reflect-proguard.jar"
++                )
++            ),
++            src = modelBuilder.requirePath(path(projectDir.path, "libraries", "reflect", "build", "libs", "kotlin-reflect-shadow.jar"))
++        )
++
++        File(reportsDir, "02-vfs.txt").printWriter().use {
++            modelBuilder.vfsRoot.printTree(it)
++        }
++        modelBuilder.checkRefs()
++
++        with(DistModelFlattener()) {
++            with(DistModelIdeaArtifactBuilder(rootProject)) {
++                File(reportsDir, "03-flattened-vfs.txt").printWriter().use { report ->
++                    fun getFlattenned(vfsPath: String): DistVFile =
++                        modelBuilder.vfsRoot.relativePath(path(projectDir.path, vfsPath))
++                            .flatten()
++
++                    val all = getFlattenned("dist")
++                    all.child["artifacts"]
++                        ?.removeAll { it != "ideaPlugin" }
++                    all.child["artifacts"]
++                        ?.child?.get("ideaPlugin")
++                        ?.child?.get("Kotlin")
++                        ?.removeAll { it != "kotlinc" && it != "lib" }
++                    all.removeAll { it.endsWith(".zip") }
++                    all.printTree(report)
++
++                    val dist = artifactsFactory.create("dist_auto_reference_dont_use")
++                    dist.addFiles(all)
++                }
++            }
++        }
++    }
++}
++
++private fun path(vararg components: String) = components.joinToString(File.separator)
++
++internal val logger = LoggerFactory.getLogger("ide-artifacts")
++
+--- a/buildSrc/src/main/kotlin/instrument.kt
++++ /dev/null
+@@ -1,194 +0,0 @@
+-@file:Suppress("unused")
+-
+-/*
+- * Copyright 2010-2017 JetBrains s.r.o.
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- * http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-import org.gradle.api.Project
+-import org.gradle.api.artifacts.Configuration
+-import org.gradle.api.artifacts.ProjectDependency
+-import org.gradle.api.file.ConfigurableFileCollection
+-import org.gradle.api.file.FileCollection
+-import org.gradle.api.internal.ConventionTask
+-import org.gradle.api.plugins.ExtensionAware
+-import org.gradle.api.tasks.*
+-import org.gradle.api.tasks.compile.AbstractCompile
+-import java.io.File
+-
+-fun Project.configureFormInstrumentation() {
+-    plugins.matching { it::class.java.canonicalName.startsWith("org.jetbrains.kotlin.gradle.plugin") }.all {
+-        // When we change the output classes directory, Gradle will automatically configure
+-        // the test compile tasks to use the instrumented classes. Normally this is fine,
+-        // however, it causes problems for Kotlin projects:
+-
+-        // The "internal" modifier can be used to restrict access to the same module.
+-        // To make it possible to use internal methods from the main source set in test classes,
+-        // the Kotlin Gradle plugin adds the original output directory of the Java task
+-        // as "friendly directory" which makes it possible to access internal members
+-        // of the main module. Also this directory should be available on classpath during compilation
+-
+-        // This fails when we change the classes dir. The easiest fix is to prepend the
+-        // classes from the "friendly directory" to the compile classpath.
+-        val testCompile = tasks.findByName("compileTestKotlin") as AbstractCompile?
+-        testCompile?.doFirst {
+-            testCompile.classpath = (testCompile.classpath
+-                    - mainSourceSet.output.classesDirs
+-                    + files((mainSourceSet as ExtensionAware).getExtensions().getExtraProperties().get("classesDirsCopy")))
+-        }
+-    }
+-
+-    val instrumentationClasspathCfg = configurations.create("instrumentationClasspath")
+-
+-    dependencies {
+-        instrumentationClasspathCfg(intellijDep()) { includeJars("javac2", "jdom", "asm-all", rootProject = rootProject) }
+-    }
+-
+-    afterEvaluate {
+-        sourceSets.all { sourceSetParam ->
+-            // This copy will ignore filters, but they are unlikely to be used.
+-            val classesDirs = (sourceSetParam.output.classesDirs as ConfigurableFileCollection).from as Collection<Any>
+-
+-            val classesDirsCopy = project.files(classesDirs.toTypedArray()).filter { it.exists() }
+-            (sourceSetParam as ExtensionAware).getExtensions().getExtraProperties().set("classesDirsCopy", classesDirsCopy)
+-
+-            logger.info("Saving old sources dir for project ${project.name}")
+-            val instrumentedClassesDir = File(project.buildDir, "classes/${sourceSetParam.name}-instrumented")
+-            (sourceSetParam.output.classesDirs as ConfigurableFileCollection).setFrom(instrumentedClassesDir)
+-            val instrumentTask =
+-                project.tasks.create(sourceSetParam.getTaskName("instrument", "classes"), IntelliJInstrumentCodeTask::class.java)
+-            instrumentTask.apply {
+-                dependsOn(sourceSetParam.classesTaskName).onlyIf { !classesDirsCopy.isEmpty }
+-                sourceSet = sourceSetParam
+-                instrumentationClasspath = instrumentationClasspathCfg
+-                originalClassesDirs = classesDirsCopy
+-                output = instrumentedClassesDir
+-            }
+-
+-            instrumentTask.outputs.dir(instrumentedClassesDir)
+-            // Ensure that our task is invoked when the source set is built
+-            sourceSetParam.compiledBy(instrumentTask)
+-            @Suppress("UNUSED_EXPRESSION")
+-            true
+-        }
+-    }
+-}
+-
+-@CacheableTask
+-open class IntelliJInstrumentCodeTask : ConventionTask() {
+-    companion object {
+-        private const val FILTER_ANNOTATION_REGEXP_CLASS = "com.intellij.ant.ClassFilterAnnotationRegexp"
+-        private const val LOADER_REF = "java2.loader"
+-    }
+-
+-    var sourceSet: SourceSet? = null
+-
+-    var instrumentationClasspath: Configuration? = null
+-
+-    @Input
+-    var originalClassesDirs: FileCollection? = null
+-
+-    @get:Input
+-    var instrumentNotNull: Boolean = false
+-
+-    @get:InputFiles
+-    val sourceDirs: FileCollection
+-        get() = project.files(sourceSet!!.allSource.srcDirs.filter { !sourceSet!!.resources.contains(it) && it.exists() })
+-
+-    @get:OutputDirectory
+-    lateinit var output: File
+-
+-    @TaskAction
+-    fun instrumentClasses() {
+-        logger.info(
+-            "input files are: ${originalClassesDirs?.joinToString(
+-                "; ",
+-                transform = { "'${it.name}'${if (it.exists()) "" else " (does not exists)"}" })}"
+-        )
+-        output.deleteRecursively()
+-        copyOriginalClasses()
+-
+-        val classpath = instrumentationClasspath!!
+-
+-        ant.withGroovyBuilder {
+-            "taskdef"(
+-                "name" to "instrumentIdeaExtensions",
+-                "classpath" to classpath.asPath,
+-                "loaderref" to LOADER_REF,
+-                "classname" to "com.intellij.ant.InstrumentIdeaExtensions"
+-            )
+-        }
+-
+-        logger.info("Compiling forms and instrumenting code with nullability preconditions")
+-        if (instrumentNotNull) {
+-            prepareNotNullInstrumenting(classpath.asPath)
+-        }
+-
+-        instrumentCode(sourceDirs, instrumentNotNull)
+-    }
+-
+-    private fun copyOriginalClasses() {
+-        project.copy {
+-            from(originalClassesDirs)
+-            into(output)
+-        }
+-    }
+-
+-    private fun prepareNotNullInstrumenting(classpath: String) {
+-        ant.withGroovyBuilder {
+-            "typedef"(
+-                "name" to "skip",
+-                "classpath" to classpath,
+-                "loaderref" to LOADER_REF,
+-                "classname" to FILTER_ANNOTATION_REGEXP_CLASS
+-            )
+-        }
+-    }
+-
+-    private fun instrumentCode(srcDirs: FileCollection, instrumentNotNull: Boolean) {
+-        val headlessOldValue = System.setProperty("java.awt.headless", "true")
+-
+-        // Instrumentation needs to have access to sources of forms for inclusion
+-        val depSourceDirectorySets = project.configurations["compile"].dependencies.withType(ProjectDependency::class.java)
+-            .map { p -> p.dependencyProject.mainSourceSet.allSource.sourceDirectories }
+-        val instrumentationClasspath =
+-            depSourceDirectorySets.fold(sourceSet!!.compileClasspath) { acc, v -> acc + v }.asPath.also {
+-                logger.info("Using following dependency source dirs: $it")
+-            }
+-
+-        logger.info("Running instrumentIdeaExtensions with srcdir=${srcDirs.asPath}}, destdir=$output and classpath=$instrumentationClasspath")
+-
+-        ant.withGroovyBuilder {
+-            "instrumentIdeaExtensions"(
+-                "srcdir" to srcDirs.asPath,
+-                "destdir" to output,
+-                "classpath" to instrumentationClasspath,
+-                "includeantruntime" to false,
+-                "instrumentNotNull" to instrumentNotNull
+-            ) {
+-                if (instrumentNotNull) {
+-                    ant.withGroovyBuilder {
+-                        "skip"("pattern" to "kotlin/Metadata")
+-                    }
+-                }
+-            }
+-        }
+-
+-        if (headlessOldValue != null) {
+-            System.setProperty("java.awt.headless", headlessOldValue)
+-        } else {
+-            System.clearProperty("java.awt.headless")
+-        }
+-    }
+-}
+--- /dev/null
++++ b/buildSrc/src/main/kotlin/instrument_ignore
+@@ -0,0 +1,194 @@
++@file:Suppress("unused")
++
++/*
++ * Copyright 2010-2017 JetBrains s.r.o.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++import org.gradle.api.Project
++import org.gradle.api.artifacts.Configuration
++import org.gradle.api.artifacts.ProjectDependency
++import org.gradle.api.file.ConfigurableFileCollection
++import org.gradle.api.file.FileCollection
++import org.gradle.api.internal.ConventionTask
++import org.gradle.api.plugins.ExtensionAware
++import org.gradle.api.tasks.*
++import org.gradle.api.tasks.compile.AbstractCompile
++import java.io.File
++
++fun Project.configureFormInstrumentation() {
++    plugins.matching { it::class.java.canonicalName.startsWith("org.jetbrains.kotlin.gradle.plugin") }.all {
++        // When we change the output classes directory, Gradle will automatically configure
++        // the test compile tasks to use the instrumented classes. Normally this is fine,
++        // however, it causes problems for Kotlin projects:
++
++        // The "internal" modifier can be used to restrict access to the same module.
++        // To make it possible to use internal methods from the main source set in test classes,
++        // the Kotlin Gradle plugin adds the original output directory of the Java task
++        // as "friendly directory" which makes it possible to access internal members
++        // of the main module. Also this directory should be available on classpath during compilation
++
++        // This fails when we change the classes dir. The easiest fix is to prepend the
++        // classes from the "friendly directory" to the compile classpath.
++        val testCompile = tasks.findByName("compileTestKotlin") as AbstractCompile?
++        testCompile?.doFirst {
++            testCompile.classpath = (testCompile.classpath
++                    - mainSourceSet.output.classesDirs
++                    + files((mainSourceSet as ExtensionAware).getExtensions().getExtraProperties().get("classesDirsCopy")))
++        }
++    }
++
++    val instrumentationClasspathCfg = configurations.create("instrumentationClasspath")
++
++    dependencies {
++        instrumentationClasspathCfg(intellijDep()) { includeJars("javac2", "jdom", "asm-all", rootProject = rootProject) }
++    }
++
++    afterEvaluate {
++        sourceSets.all { sourceSetParam ->
++            // This copy will ignore filters, but they are unlikely to be used.
++            val classesDirs = (sourceSetParam.output.classesDirs as ConfigurableFileCollection).from as Collection<Any>
++
++            val classesDirsCopy = project.files(classesDirs.toTypedArray()).filter { it.exists() }
++            (sourceSetParam as ExtensionAware).getExtensions().getExtraProperties().set("classesDirsCopy", classesDirsCopy)
++
++            logger.info("Saving old sources dir for project ${project.name}")
++            val instrumentedClassesDir = File(project.buildDir, "classes/${sourceSetParam.name}-instrumented")
++            (sourceSetParam.output.classesDirs as ConfigurableFileCollection).setFrom(instrumentedClassesDir)
++            val instrumentTask =
++                project.tasks.create(sourceSetParam.getTaskName("instrument", "classes"), IntelliJInstrumentCodeTask::class.java)
++            instrumentTask.apply {
++                dependsOn(sourceSetParam.classesTaskName).onlyIf { !classesDirsCopy.isEmpty }
++                sourceSet = sourceSetParam
++                instrumentationClasspath = instrumentationClasspathCfg
++                originalClassesDirs = classesDirsCopy
++                output = instrumentedClassesDir
++            }
++
++            instrumentTask.outputs.dir(instrumentedClassesDir)
++            // Ensure that our task is invoked when the source set is built
++            sourceSetParam.compiledBy(instrumentTask)
++            @Suppress("UNUSED_EXPRESSION")
++            true
++        }
++    }
++}
++
++@CacheableTask
++open class IntelliJInstrumentCodeTask : ConventionTask() {
++    companion object {
++        private const val FILTER_ANNOTATION_REGEXP_CLASS = "com.intellij.ant.ClassFilterAnnotationRegexp"
++        private const val LOADER_REF = "java2.loader"
++    }
++
++    var sourceSet: SourceSet? = null
++
++    var instrumentationClasspath: Configuration? = null
++
++    @Input
++    var originalClassesDirs: FileCollection? = null
++
++    @get:Input
++    var instrumentNotNull: Boolean = false
++
++    @get:InputFiles
++    val sourceDirs: FileCollection
++        get() = project.files(sourceSet!!.allSource.srcDirs.filter { !sourceSet!!.resources.contains(it) && it.exists() })
++
++    @get:OutputDirectory
++    lateinit var output: File
++
++    @TaskAction
++    fun instrumentClasses() {
++        logger.info(
++            "input files are: ${originalClassesDirs?.joinToString(
++                "; ",
++                transform = { "'${it.name}'${if (it.exists()) "" else " (does not exists)"}" })}"
++        )
++        output.deleteRecursively()
++        copyOriginalClasses()
++
++        val classpath = instrumentationClasspath!!
++
++        ant.withGroovyBuilder {
++            "taskdef"(
++                "name" to "instrumentIdeaExtensions",
++                "classpath" to classpath.asPath,
++                "loaderref" to LOADER_REF,
++                "classname" to "com.intellij.ant.InstrumentIdeaExtensions"
++            )
++        }
++
++        logger.info("Compiling forms and instrumenting code with nullability preconditions")
++        if (instrumentNotNull) {
++            prepareNotNullInstrumenting(classpath.asPath)
++        }
++
++        instrumentCode(sourceDirs, instrumentNotNull)
++    }
++
++    private fun copyOriginalClasses() {
++        project.copy {
++            from(originalClassesDirs)
++            into(output)
++        }
++    }
++
++    private fun prepareNotNullInstrumenting(classpath: String) {
++        ant.withGroovyBuilder {
++            "typedef"(
++                "name" to "skip",
++                "classpath" to classpath,
++                "loaderref" to LOADER_REF,
++                "classname" to FILTER_ANNOTATION_REGEXP_CLASS
++            )
++        }
++    }
++
++    private fun instrumentCode(srcDirs: FileCollection, instrumentNotNull: Boolean) {
++        val headlessOldValue = System.setProperty("java.awt.headless", "true")
++
++        // Instrumentation needs to have access to sources of forms for inclusion
++        val depSourceDirectorySets = project.configurations["compile"].dependencies.withType(ProjectDependency::class.java)
++            .map { p -> p.dependencyProject.mainSourceSet.allSource.sourceDirectories }
++        val instrumentationClasspath =
++            depSourceDirectorySets.fold(sourceSet!!.compileClasspath) { acc, v -> acc + v }.asPath.also {
++                logger.info("Using following dependency source dirs: $it")
++            }
++
++        logger.info("Running instrumentIdeaExtensions with srcdir=${srcDirs.asPath}}, destdir=$output and classpath=$instrumentationClasspath")
++
++        ant.withGroovyBuilder {
++            "instrumentIdeaExtensions"(
++                "srcdir" to srcDirs.asPath,
++                "destdir" to output,
++                "classpath" to instrumentationClasspath,
++                "includeantruntime" to false,
++                "instrumentNotNull" to instrumentNotNull
++            ) {
++                if (instrumentNotNull) {
++                    ant.withGroovyBuilder {
++                        "skip"("pattern" to "kotlin/Metadata")
++                    }
++                }
++            }
++        }
++
++        if (headlessOldValue != null) {
++            System.setProperty("java.awt.headless", headlessOldValue)
++        } else {
++            System.clearProperty("java.awt.headless")
++        }
++    }
++}
+--- a/buildSrc/src/main/kotlin/plugins/DexMethodCount.kt
++++ /dev/null
+@@ -1,134 +0,0 @@
+-/*
+- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+- * that can be found in the license/LICENSE.txt file.
+- */
+-
+-import com.jakewharton.dex.*
+-import org.gradle.api.DefaultTask
+-import org.gradle.api.tasks.*
+-import org.gradle.jvm.tasks.Jar
+-import java.io.File
+-
+-open class DexMethodCount : DefaultTask() {
+-
+-    data class Counts(
+-        val total: Int,
+-        val totalOwnPackages: Int?,
+-        val totalOtherPackages: Int?,
+-        val byPackage: Map<String, Int>,
+-        val byClass: Map<String, Int>
+-    )
+-
+-    init {
+-        outputs.upToDateWhen { !shouldPrintTeamCityStatistics } // always execute when teamCityStatistics output is required
+-    }
+-
+-    @InputFile
+-    lateinit var jarFile: File
+-
+-    @Input
+-    @Optional
+-    var ownPackages: List<String>? = null
+-
+-    // ##teamcity[buildStatisticValue key='DexMethodCount_${artifactOrArchiveName}' value='62362']
+-    @Input
+-    @Optional
+-    var teamCityStatistics: Boolean? = null
+-
+-    private val shouldPrintTeamCityStatistics = teamCityStatistics ?: project.hasProperty("teamcity")
+-
+-
+-    @Input
+-    @Optional
+-    var artifactName: String? = null
+-
+-    private val artifactOrArchiveName get() = artifactName ?: project.name
+-
+-    fun from(jar: Jar) {
+-        jarFile = jar.archivePath
+-        artifactName = jar.baseName
+-        dependsOn(jar)
+-    }
+-
+-    @Internal // plain output properties are not supported, mark as internal to suppress warning from validateTaskProperties
+-    lateinit var counts: Counts
+-
+-    @get:OutputFile
+-    val detailOutputFile: File get() = project.buildDir.resolve("$artifactOrArchiveName-method-count.txt")
+-
+-    @TaskAction
+-    fun invoke() {
+-        val methods = dexMethods(jarFile)
+-
+-        val counts = methods.getCounts().also { this.counts = it }
+-
+-        printTotals(counts)
+-        printTCStats(counts)
+-        outputDetails(counts)
+-    }
+-
+-    private fun List<DexMethod>.getCounts(): Counts {
+-        val byPackage = this.groupingBy { it.`package` }.eachCount()
+-        val byClass = this.groupingBy { it.declaringType }.eachCount()
+-
+-        val ownPackages = ownPackages?.map { it + '.' }
+-        val byOwnPackages = if (ownPackages != null) {
+-            this.partition { method -> ownPackages.any { method.declaringType.startsWith(it) } }.let {
+-                it.first.size to it.second.size
+-            }
+-        } else (null to null)
+-
+-        return Counts(
+-            total = this.size,
+-            totalOwnPackages = byOwnPackages.first,
+-            totalOtherPackages = byOwnPackages.second,
+-            byPackage = byPackage,
+-            byClass = byClass
+-        )
+-    }
+-
+-    private fun printTotals(counts: Counts) {
+-        logger.lifecycle("Artifact $artifactOrArchiveName, total methods: ${counts.total}")
+-        ownPackages?.let { packages ->
+-            logger.lifecycle("Artifact $artifactOrArchiveName, total methods from packages ${packages.joinToString { "$it.*" }}: ${counts.totalOwnPackages}")
+-            logger.lifecycle("Artifact $artifactOrArchiveName, total methods from other packages: ${counts.totalOtherPackages}")
+-        }
+-    }
+-
+-    private fun printTCStats(counts: Counts) {
+-        if (shouldPrintTeamCityStatistics) {
+-            println("##teamcity[buildStatisticValue key='DexMethodCount_${artifactOrArchiveName}' value='${counts.total}']")
+-            counts.totalOwnPackages?.let { value ->
+-                println("##teamcity[buildStatisticValue key='DexMethodCount_${artifactOrArchiveName}_OwnPackages' value='$value']")
+-            }
+-            counts.totalOtherPackages?.let { value ->
+-                println("##teamcity[buildStatisticValue key='DexMethodCount_${artifactOrArchiveName}_OtherPackages' value='$value']")
+-            }
+-        }
+-    }
+-
+-    private fun outputDetails(counts: Counts) {
+-        detailOutputFile.printWriter().use { writer ->
+-            writer.println("${counts.total.padRight()}\tTotal methods")
+-            ownPackages?.let { packages ->
+-                writer.println("${counts.totalOwnPackages?.padRight()}\tTotal methods from packages ${packages.joinToString { "$it.*" }}")
+-                writer.println("${counts.totalOtherPackages?.padRight()}\tTotal methods from other packages")
+-            }
+-            writer.println()
+-            writer.println("Method count by package:")
+-            counts.byPackage.forEach { (name, count) ->
+-                writer.println("${count.padRight()}\t$name")
+-            }
+-            writer.println()
+-            writer.println("Method count by class:")
+-            counts.byClass.forEach { (name, count) ->
+-                writer.println("${count.padRight()}\t$name")
+-            }
+-        }
+-    }
+-
+-}
+-
+-
+-private val DexMethod.`package`: String get() = declaringType.substringBeforeLast('.')
+-private fun Int.padRight() = toString().padStart(5, ' ')
+--- /dev/null
++++ b/buildSrc/src/main/kotlin/plugins/DexMethodCount_ignore
+@@ -0,0 +1,134 @@
++/*
++ * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
++ * that can be found in the license/LICENSE.txt file.
++ */
++
++import com.jakewharton.dex.*
++import org.gradle.api.DefaultTask
++import org.gradle.api.tasks.*
++import org.gradle.jvm.tasks.Jar
++import java.io.File
++
++open class DexMethodCount : DefaultTask() {
++
++    data class Counts(
++        val total: Int,
++        val totalOwnPackages: Int?,
++        val totalOtherPackages: Int?,
++        val byPackage: Map<String, Int>,
++        val byClass: Map<String, Int>
++    )
++
++    init {
++        outputs.upToDateWhen { !shouldPrintTeamCityStatistics } // always execute when teamCityStatistics output is required
++    }
++
++    @InputFile
++    lateinit var jarFile: File
++
++    @Input
++    @Optional
++    var ownPackages: List<String>? = null
++
++    // ##teamcity[buildStatisticValue key='DexMethodCount_${artifactOrArchiveName}' value='62362']
++    @Input
++    @Optional
++    var teamCityStatistics: Boolean? = null
++
++    private val shouldPrintTeamCityStatistics = teamCityStatistics ?: project.hasProperty("teamcity")
++
++
++    @Input
++    @Optional
++    var artifactName: String? = null
++
++    private val artifactOrArchiveName get() = artifactName ?: project.name
++
++    fun from(jar: Jar) {
++        jarFile = jar.archivePath
++        artifactName = jar.baseName
++        dependsOn(jar)
++    }
++
++    @Internal // plain output properties are not supported, mark as internal to suppress warning from validateTaskProperties
++    lateinit var counts: Counts
++
++    @get:OutputFile
++    val detailOutputFile: File get() = project.buildDir.resolve("$artifactOrArchiveName-method-count.txt")
++
++    @TaskAction
++    fun invoke() {
++        val methods = dexMethods(jarFile)
++
++        val counts = methods.getCounts().also { this.counts = it }
++
++        printTotals(counts)
++        printTCStats(counts)
++        outputDetails(counts)
++    }
++
++    private fun List<DexMethod>.getCounts(): Counts {
++        val byPackage = this.groupingBy { it.`package` }.eachCount()
++        val byClass = this.groupingBy { it.declaringType }.eachCount()
++
++        val ownPackages = ownPackages?.map { it + '.' }
++        val byOwnPackages = if (ownPackages != null) {
++            this.partition { method -> ownPackages.any { method.declaringType.startsWith(it) } }.let {
++                it.first.size to it.second.size
++            }
++        } else (null to null)
++
++        return Counts(
++            total = this.size,
++            totalOwnPackages = byOwnPackages.first,
++            totalOtherPackages = byOwnPackages.second,
++            byPackage = byPackage,
++            byClass = byClass
++        )
++    }
++
++    private fun printTotals(counts: Counts) {
++        logger.lifecycle("Artifact $artifactOrArchiveName, total methods: ${counts.total}")
++        ownPackages?.let { packages ->
++            logger.lifecycle("Artifact $artifactOrArchiveName, total methods from packages ${packages.joinToString { "$it.*" }}: ${counts.totalOwnPackages}")
++            logger.lifecycle("Artifact $artifactOrArchiveName, total methods from other packages: ${counts.totalOtherPackages}")
++        }
++    }
++
++    private fun printTCStats(counts: Counts) {
++        if (shouldPrintTeamCityStatistics) {
++            println("##teamcity[buildStatisticValue key='DexMethodCount_${artifactOrArchiveName}' value='${counts.total}']")
++            counts.totalOwnPackages?.let { value ->
++                println("##teamcity[buildStatisticValue key='DexMethodCount_${artifactOrArchiveName}_OwnPackages' value='$value']")
++            }
++            counts.totalOtherPackages?.let { value ->
++                println("##teamcity[buildStatisticValue key='DexMethodCount_${artifactOrArchiveName}_OtherPackages' value='$value']")
++            }
++        }
++    }
++
++    private fun outputDetails(counts: Counts) {
++        detailOutputFile.printWriter().use { writer ->
++            writer.println("${counts.total.padRight()}\tTotal methods")
++            ownPackages?.let { packages ->
++                writer.println("${counts.totalOwnPackages?.padRight()}\tTotal methods from packages ${packages.joinToString { "$it.*" }}")
++                writer.println("${counts.totalOtherPackages?.padRight()}\tTotal methods from other packages")
++            }
++            writer.println()
++            writer.println("Method count by package:")
++            counts.byPackage.forEach { (name, count) ->
++                writer.println("${count.padRight()}\t$name")
++            }
++            writer.println()
++            writer.println("Method count by class:")
++            counts.byClass.forEach { (name, count) ->
++                writer.println("${count.padRight()}\t$name")
++            }
++        }
++    }
++
++}
++
++
++private val DexMethod.`package`: String get() = declaringType.substringBeforeLast('.')
++private fun Int.padRight() = toString().padStart(5, ' ')
+--- a/buildSrc/src/main/kotlin/plugins/PublishedKotlinModule.kt
++++ /dev/null
+@@ -1,159 +0,0 @@
+-package plugins
+-
+-import org.codehaus.groovy.runtime.InvokerHelper
+-import org.gradle.api.Plugin
+-import org.gradle.api.Project
+-import org.gradle.api.artifacts.Dependency
+-import org.gradle.api.artifacts.maven.MavenDeployment
+-import org.gradle.api.artifacts.maven.MavenResolver
+-
+-import org.gradle.api.plugins.MavenRepositoryHandlerConvention
+-import org.gradle.api.publication.maven.internal.deployer.MavenRemoteRepository
+-import org.gradle.api.tasks.Upload
+-import org.gradle.plugins.signing.Sign
+-import org.gradle.plugins.signing.SigningExtension
+-import kotlin.properties.Delegates
+-
+-
+-/**
+- * Configures a Kotlin module for publication.
+- *
+- */
+-open class PublishedKotlinModule : Plugin<Project> {
+-
+-    private fun String.toBooleanOrNull() = listOf(true, false).firstOrNull { it.toString().equals(this, ignoreCase = true) }
+-
+-    override fun apply(project: Project) {
+-
+-        project.run {
+-
+-            plugins.apply("maven")
+-
+-            if (!project.hasProperty("prebuiltJar")) {
+-                plugins.apply("signing")
+-
+-                val signingRequired = project.findProperty("signingRequired")?.toString()?.toBooleanOrNull()
+-                                      ?: project.property("isSonatypeRelease") as Boolean
+-
+-                configure<SigningExtension> {
+-                    isRequired = signingRequired
+-                    sign(configurations["archives"])
+-                }
+-
+-                (tasks.getByName("signArchives") as Sign).apply {
+-                    enabled = signingRequired
+-                }
+-            }
+-
+-            fun MavenResolver.configurePom() {
+-                pom.project {
+-                    withGroovyBuilder {
+-                        "licenses" {
+-                            "license" {
+-                                "name"("The Apache Software License, Version 2.0")
+-                                "url"("http://www.apache.org/licenses/LICENSE-2.0.txt")
+-                                "distribution"("repo")
+-                            }
+-                        }
+-                        "name"("${project.group}:${project.name}")
+-                        "packaging"("jar")
+-                        // optionally artifactId can be defined here
+-                        "description"(project.description)
+-                        "url"("https://kotlinlang.org/")
+-                        "licenses" {
+-                            "license" {
+-                                "name"("The Apache License, Version 2.0")
+-                                "url"("http://www.apache.org/licenses/LICENSE-2.0.txt")
+-                            }
+-                        }
+-                        "scm" {
+-                            "url"("https://github.com/JetBrains/kotlin")
+-                            "connection"("scm:git:https://github.com/JetBrains/kotlin.git")
+-                            "developerConnection"("scm:git:https://github.com/JetBrains/kotlin.git")
+-                        }
+-                        "developers" {
+-                            "developer" {
+-                                "name"("Kotlin Team")
+-                                setProperty("organization", "JetBrains")
+-                                "organizationUrl"("https://www.jetbrains.com")
+-                            }
+-                        }
+-                    }
+-                }
+-                pom.whenConfigured {
+-                    dependencies.removeIf {
+-                        InvokerHelper.getMetaClass(it).getProperty(it, "scope") == "test"
+-                    }
+-
+-                    dependencies
+-                        .find {
+-                            InvokerHelper.getMetaClass(it).getProperty(it, "groupId") == "org.jetbrains.kotlin"
+-                                    && InvokerHelper.getMetaClass(it).getProperty(it, "artifactId") == "kotlin-stdlib"
+-                        }
+-                        ?.also {
+-                            InvokerHelper.getMetaClass(it).setProperty(it, "exclusions", emptyList<Any>())
+-                            logger.warn("WARNING! Removed exclusions from kotlin-stdlib dependency of ${this.artifactId} artifact's maven metadata, check kotlin-stdlib dependency of ${project.path} project")
+-                        }
+-                }
+-            }
+-
+-            val preparePublication = project.rootProject.tasks.getByName("preparePublication")
+-
+-            val uploadArchives = (tasks.getByName("uploadArchives") as Upload).apply {
+-
+-                dependsOn(preparePublication)
+-
+-                val username: String? by preparePublication.extra
+-                val password: String? by preparePublication.extra
+-                val repoUrl: String by preparePublication.extra
+-
+-                var repository by Delegates.notNull<MavenRemoteRepository>()
+-
+-                repositories {
+-                    withConvention(MavenRepositoryHandlerConvention::class) {
+-
+-                        mavenDeployer {
+-                            withGroovyBuilder {
+-                                "beforeDeployment" {
+-                                    val signing = project.the<SigningExtension>()
+-                                    if (signing.isRequired)
+-                                        signing.signPom(delegate as MavenDeployment)
+-                                }
+-
+-                                "repository"("url" to repoUrl)!!.also { repository = it as MavenRemoteRepository }.withGroovyBuilder {
+-                                    if (username != null && password != null) {
+-                                        "authentication"("userName" to username, "password" to password)
+-                                    }
+-                                }
+-                            }
+-
+-                            configurePom()
+-                        }
+-                    }
+-                }
+-
+-                doFirst {
+-                    repository.url = repoUrl
+-                }
+-            }
+-
+-            val install = if (tasks.names.contains("install")) tasks.getByName("install") as Upload
+-                          else tasks.create("install", Upload::class.java)
+-            install.apply {
+-                configuration = project.configurations.getByName(Dependency.ARCHIVES_CONFIGURATION)
+-                description = "Installs the 'archives' artifacts into the local Maven repository."
+-                repositories {
+-                    withConvention(MavenRepositoryHandlerConvention::class) {
+-                        mavenInstaller {
+-                            configurePom()
+-                        }
+-                    }
+-                }
+-            }
+-
+-            tasks.create("publish") {
+-                dependsOn(uploadArchives)
+-            }
+-        }
+-    }
+-}
+--- /dev/null
++++ b/buildSrc/src/main/kotlin/plugins/PublishedKotlinModule_ignore
+@@ -0,0 +1,159 @@
++package plugins
++
++import org.codehaus.groovy.runtime.InvokerHelper
++import org.gradle.api.Plugin
++import org.gradle.api.Project
++import org.gradle.api.artifacts.Dependency
++import org.gradle.api.artifacts.maven.MavenDeployment
++import org.gradle.api.artifacts.maven.MavenResolver
++
++import org.gradle.api.plugins.MavenRepositoryHandlerConvention
++import org.gradle.api.publication.maven.internal.deployer.MavenRemoteRepository
++import org.gradle.api.tasks.Upload
++import org.gradle.plugins.signing.Sign
++import org.gradle.plugins.signing.SigningExtension
++import kotlin.properties.Delegates
++
++
++/**
++ * Configures a Kotlin module for publication.
++ *
++ */
++open class PublishedKotlinModule : Plugin<Project> {
++
++    private fun String.toBooleanOrNull() = listOf(true, false).firstOrNull { it.toString().equals(this, ignoreCase = true) }
++
++    override fun apply(project: Project) {
++
++        project.run {
++
++            plugins.apply("maven")
++
++            if (!project.hasProperty("prebuiltJar")) {
++                plugins.apply("signing")
++
++                val signingRequired = project.findProperty("signingRequired")?.toString()?.toBooleanOrNull()
++                                      ?: project.property("isSonatypeRelease") as Boolean
++
++                configure<SigningExtension> {
++                    isRequired = signingRequired
++                    sign(configurations["archives"])
++                }
++
++                (tasks.getByName("signArchives") as Sign).apply {
++                    enabled = signingRequired
++                }
++            }
++
++            fun MavenResolver.configurePom() {
++                pom.project {
++                    withGroovyBuilder {
++                        "licenses" {
++                            "license" {
++                                "name"("The Apache Software License, Version 2.0")
++                                "url"("http://www.apache.org/licenses/LICENSE-2.0.txt")
++                                "distribution"("repo")
++                            }
++                        }
++                        "name"("${project.group}:${project.name}")
++                        "packaging"("jar")
++                        // optionally artifactId can be defined here
++                        "description"(project.description)
++                        "url"("https://kotlinlang.org/")
++                        "licenses" {
++                            "license" {
++                                "name"("The Apache License, Version 2.0")
++                                "url"("http://www.apache.org/licenses/LICENSE-2.0.txt")
++                            }
++                        }
++                        "scm" {
++                            "url"("https://github.com/JetBrains/kotlin")
++                            "connection"("scm:git:https://github.com/JetBrains/kotlin.git")
++                            "developerConnection"("scm:git:https://github.com/JetBrains/kotlin.git")
++                        }
++                        "developers" {
++                            "developer" {
++                                "name"("Kotlin Team")
++                                setProperty("organization", "JetBrains")
++                                "organizationUrl"("https://www.jetbrains.com")
++                            }
++                        }
++                    }
++                }
++                pom.whenConfigured {
++                    dependencies.removeIf {
++                        InvokerHelper.getMetaClass(it).getProperty(it, "scope") == "test"
++                    }
++
++                    dependencies
++                        .find {
++                            InvokerHelper.getMetaClass(it).getProperty(it, "groupId") == "org.jetbrains.kotlin"
++                                    && InvokerHelper.getMetaClass(it).getProperty(it, "artifactId") == "kotlin-stdlib"
++                        }
++                        ?.also {
++                            InvokerHelper.getMetaClass(it).setProperty(it, "exclusions", emptyList<Any>())
++                            logger.warn("WARNING! Removed exclusions from kotlin-stdlib dependency of ${this.artifactId} artifact's maven metadata, check kotlin-stdlib dependency of ${project.path} project")
++                        }
++                }
++            }
++
++            val preparePublication = project.rootProject.tasks.getByName("preparePublication")
++
++            val uploadArchives = (tasks.getByName("uploadArchives") as Upload).apply {
++
++                dependsOn(preparePublication)
++
++                val username: String? by preparePublication.extra
++                val password: String? by preparePublication.extra
++                val repoUrl: String by preparePublication.extra
++
++                var repository by Delegates.notNull<MavenRemoteRepository>()
++
++                repositories {
++                    withConvention(MavenRepositoryHandlerConvention::class) {
++
++                        mavenDeployer {
++                            withGroovyBuilder {
++                                "beforeDeployment" {
++                                    val signing = project.the<SigningExtension>()
++                                    if (signing.isRequired)
++                                        signing.signPom(delegate as MavenDeployment)
++                                }
++
++                                "repository"("url" to repoUrl)!!.also { repository = it as MavenRemoteRepository }.withGroovyBuilder {
++                                    if (username != null && password != null) {
++                                        "authentication"("userName" to username, "password" to password)
++                                    }
++                                }
++                            }
++
++                            configurePom()
++                        }
++                    }
++                }
++
++                doFirst {
++                    repository.url = repoUrl
++                }
++            }
++
++            val install = if (tasks.names.contains("install")) tasks.getByName("install") as Upload
++                          else tasks.create("install", Upload::class.java)
++            install.apply {
++                configuration = project.configurations.getByName(Dependency.ARCHIVES_CONFIGURATION)
++                description = "Installs the 'archives' artifacts into the local Maven repository."
++                repositories {
++                    withConvention(MavenRepositoryHandlerConvention::class) {
++                        mavenInstaller {
++                            configurePom()
++                        }
++                    }
++                }
++            }
++
++            tasks.create("publish") {
++                dependsOn(uploadArchives)
++            }
++        }
++    }
++}
+--- a/buildSrc/prepare-deps/android-dx/build.gradle.kts
++++ /dev/null
+@@ -1,124 +0,0 @@
+-
+-import org.gradle.api.publish.ivy.internal.artifact.FileBasedIvyArtifact
+-import org.gradle.api.publish.ivy.internal.publication.DefaultIvyConfiguration
+-import org.gradle.api.publish.ivy.internal.publication.DefaultIvyPublicationIdentity
+-import org.gradle.api.publish.ivy.internal.publisher.IvyDescriptorFileGenerator
+-import java.io.File
+-import org.gradle.internal.os.OperatingSystem
+-import org.gradle.jvm.tasks.Jar
+-
+-val toolsOs by lazy {
+-    when {
+-        OperatingSystem.current().isWindows -> "windows"
+-        OperatingSystem.current().isMacOsX -> "macosx"
+-        OperatingSystem.current().isLinux -> "linux"
+-        else -> {
+-            logger.error("Unknown operating system for android tools: ${OperatingSystem.current().name}")
+-            ""
+-        }
+-    }
+-}
+-
+-val buildToolsVersion = rootProject.extra["versions.androidBuildTools"] as String
+-val dxSourcesVersion = rootProject.extra["versions.androidDxSources"] as String
+-
+-repositories {
+-    ivy {
+-        artifactPattern("https://dl.google.com/android/repository/[artifact]_[revision](-[classifier]).[ext]")
+-        artifactPattern("https://android.googlesource.com/platform/dalvik/+archive/android-$dxSourcesVersion/[artifact].[ext]")
+-        metadataSources {
+-            artifact()
+-        }
+-    }
+-}
+-
+-val customDepsRepoDir = File(buildDir, "repo")
+-val customDepsOrg: String by rootProject.extra
+-val dxModuleName = "android-dx"
+-val dxRevision = buildToolsVersion
+-val dxRepoModuleDir = File(customDepsRepoDir, "$customDepsOrg/$dxModuleName/$dxRevision")
+-
+-val buildToolsZip by configurations.creating
+-val dxSourcesTar by configurations.creating
+-
+-dependencies {
+-    buildToolsZip("google:build-tools:$buildToolsVersion:$toolsOs@zip")
+-    dxSourcesTar("google:dx:0@tar.gz")
+-}
+-
+-val unzipDxJar by tasks.creating {
+-    dependsOn(buildToolsZip)
+-    inputs.files(buildToolsZip)
+-    outputs.files(File(dxRepoModuleDir, "dx.jar"))
+-    doFirst {
+-        project.copy {
+-            from(zipTree(buildToolsZip.singleFile).files)
+-            include("**/dx.jar")
+-            into(dxRepoModuleDir)
+-        }
+-    }
+-}
+-
+-val dxSourcesTargetDir = File(buildDir, "dx_src")
+-
+-val untarDxSources by tasks.creating {
+-    dependsOn(dxSourcesTar)
+-    inputs.files(dxSourcesTar)
+-    outputs.dir(dxSourcesTargetDir)
+-    doFirst {
+-        project.copy {
+-            from(tarTree(dxSourcesTar.singleFile))
+-            include("src/**")
+-            includeEmptyDirs = false
+-            into(dxSourcesTargetDir)
+-        }
+-    }
+-}
+-
+-val prepareDxSourcesJar by tasks.creating(Jar::class) {
+-    dependsOn(untarDxSources)
+-    from("$dxSourcesTargetDir/src")
+-    destinationDir = dxRepoModuleDir
+-    baseName = "dx"
+-    classifier = "sources"
+-}
+-
+-val prepareIvyXml by tasks.creating {
+-    dependsOn(unzipDxJar, prepareDxSourcesJar)
+-    inputs.files(unzipDxJar, prepareDxSourcesJar)
+-    val ivyFile = File(dxRepoModuleDir, "$dxModuleName.ivy.xml")
+-    outputs.file(ivyFile)
+-    doLast {
+-        with(IvyDescriptorFileGenerator(DefaultIvyPublicationIdentity(customDepsOrg, dxModuleName, dxRevision))) {
+-            addConfiguration(DefaultIvyConfiguration("default"))
+-            addConfiguration(DefaultIvyConfiguration("sources"))
+-            addArtifact(
+-                FileBasedIvyArtifact(
+-                    File(dxRepoModuleDir, "dx.jar"),
+-                    DefaultIvyPublicationIdentity(customDepsOrg, "dx", dxRevision)
+-                ).also {
+-                    it.conf = "default"
+-                })
+-
+-            addArtifact(
+-                FileBasedIvyArtifact(
+-                    File(dxRepoModuleDir, "dx-sources.jar"),
+-                    DefaultIvyPublicationIdentity(customDepsOrg, "dx", dxRevision)
+-                ).also {
+-                    it.conf = "sources"
+-                    it.classifier = "sources"
+-                })
+-
+-            writeTo(ivyFile)
+-        }
+-    }
+-}
+-
+-val build by tasks.creating {
+-    dependsOn(unzipDxJar, prepareDxSourcesJar, prepareIvyXml)
+-}
+-
+-val clean by tasks.creating(Delete::class) {
+-    delete(dxRepoModuleDir)
+-    delete(buildDir)
+-}
+--- /dev/null
++++ b/buildSrc/prepare-deps/android-dx/build.gradlekts_ignore
+@@ -0,0 +1,124 @@
++
++import org.gradle.api.publish.ivy.internal.artifact.FileBasedIvyArtifact
++import org.gradle.api.publish.ivy.internal.publication.DefaultIvyConfiguration
++import org.gradle.api.publish.ivy.internal.publication.DefaultIvyPublicationIdentity
++import org.gradle.api.publish.ivy.internal.publisher.IvyDescriptorFileGenerator
++import java.io.File
++import org.gradle.internal.os.OperatingSystem
++import org.gradle.jvm.tasks.Jar
++
++val toolsOs by lazy {
++    when {
++        OperatingSystem.current().isWindows -> "windows"
++        OperatingSystem.current().isMacOsX -> "macosx"
++        OperatingSystem.current().isLinux -> "linux"
++        else -> {
++            logger.error("Unknown operating system for android tools: ${OperatingSystem.current().name}")
++            ""
++        }
++    }
++}
++
++val buildToolsVersion = rootProject.extra["versions.androidBuildTools"] as String
++val dxSourcesVersion = rootProject.extra["versions.androidDxSources"] as String
++
++repositories {
++    ivy {
++        artifactPattern("https://dl.google.com/android/repository/[artifact]_[revision](-[classifier]).[ext]")
++        artifactPattern("https://android.googlesource.com/platform/dalvik/+archive/android-$dxSourcesVersion/[artifact].[ext]")
++        metadataSources {
++            artifact()
++        }
++    }
++}
++
++val customDepsRepoDir = File(buildDir, "repo")
++val customDepsOrg: String by rootProject.extra
++val dxModuleName = "android-dx"
++val dxRevision = buildToolsVersion
++val dxRepoModuleDir = File(customDepsRepoDir, "$customDepsOrg/$dxModuleName/$dxRevision")
++
++val buildToolsZip by configurations.creating
++val dxSourcesTar by configurations.creating
++
++dependencies {
++    buildToolsZip("google:build-tools:$buildToolsVersion:$toolsOs@zip")
++    dxSourcesTar("google:dx:0@tar.gz")
++}
++
++val unzipDxJar by tasks.creating {
++    dependsOn(buildToolsZip)
++    inputs.files(buildToolsZip)
++    outputs.files(File(dxRepoModuleDir, "dx.jar"))
++    doFirst {
++        project.copy {
++            from(zipTree(buildToolsZip.singleFile).files)
++            include("**/dx.jar")
++            into(dxRepoModuleDir)
++        }
++    }
++}
++
++val dxSourcesTargetDir = File(buildDir, "dx_src")
++
++val untarDxSources by tasks.creating {
++    dependsOn(dxSourcesTar)
++    inputs.files(dxSourcesTar)
++    outputs.dir(dxSourcesTargetDir)
++    doFirst {
++        project.copy {
++            from(tarTree(dxSourcesTar.singleFile))
++            include("src/**")
++            includeEmptyDirs = false
++            into(dxSourcesTargetDir)
++        }
++    }
++}
++
++val prepareDxSourcesJar by tasks.creating(Jar::class) {
++    dependsOn(untarDxSources)
++    from("$dxSourcesTargetDir/src")
++    destinationDir = dxRepoModuleDir
++    baseName = "dx"
++    classifier = "sources"
++}
++
++val prepareIvyXml by tasks.creating {
++    dependsOn(unzipDxJar, prepareDxSourcesJar)
++    inputs.files(unzipDxJar, prepareDxSourcesJar)
++    val ivyFile = File(dxRepoModuleDir, "$dxModuleName.ivy.xml")
++    outputs.file(ivyFile)
++    doLast {
++        with(IvyDescriptorFileGenerator(DefaultIvyPublicationIdentity(customDepsOrg, dxModuleName, dxRevision))) {
++            addConfiguration(DefaultIvyConfiguration("default"))
++            addConfiguration(DefaultIvyConfiguration("sources"))
++            addArtifact(
++                FileBasedIvyArtifact(
++                    File(dxRepoModuleDir, "dx.jar"),
++                    DefaultIvyPublicationIdentity(customDepsOrg, "dx", dxRevision)
++                ).also {
++                    it.conf = "default"
++                })
++
++            addArtifact(
++                FileBasedIvyArtifact(
++                    File(dxRepoModuleDir, "dx-sources.jar"),
++                    DefaultIvyPublicationIdentity(customDepsOrg, "dx", dxRevision)
++                ).also {
++                    it.conf = "sources"
++                    it.classifier = "sources"
++                })
++
++            writeTo(ivyFile)
++        }
++    }
++}
++
++val build by tasks.creating {
++    dependsOn(unzipDxJar, prepareDxSourcesJar, prepareIvyXml)
++}
++
++val clean by tasks.creating(Delete::class) {
++    delete(dxRepoModuleDir)
++    delete(buildDir)
++}
