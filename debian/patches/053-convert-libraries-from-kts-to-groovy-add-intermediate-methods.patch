@@ -705,115 +705,92 @@ Author: Saif Abdul Casim
 \ No newline at end of file
 +}
 --- a/libraries/stdlib/jvm-minimal-for-test/build.gradle.kts
-+++ b/libraries/stdlib/jvm-minimal-for-test/build.gradle.kts
-@@ -1,16 +1,15 @@
- import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
- 
++++ /dev/null
+@@ -1,84 +0,0 @@
+-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+-
 -description = "Kotlin Mock Runtime for Tests"
 -
- plugins {
+-plugins {
 -    kotlin("jvm")
 -    `maven-publish`
-+    id("org.jetbrains.kotlin.jvm")
- }
- 
-+description = "Kotlin Mock Runtime for Tests"
-+
- jvmTarget = "1.6"
+-}
+-
+-jvmTarget = "1.6"
 -javaHome = rootProject.extra["JDK_16"] as String
-+javaHome = rootProject.ext["JDK_16"] as String
- 
+-
 -val builtins by configurations.creating
-+configurations.create("builtins")
- 
- dependencies {
-     compileOnly(project(":kotlin-stdlib"))
-@@ -19,57 +18,60 @@
- 
- sourceSets {
-     "main" {
+-
+-dependencies {
+-    compileOnly(project(":kotlin-stdlib"))
+-    builtins(project(":core:builtins"))
+-}
+-
+-sourceSets {
+-    "main" {
 -        java.apply {
 -            srcDir(File(buildDir, "src"))
-+        java {
-+            srcDir(new File(buildDir, "src"))
-         }
-     }
-     "test" {}
- }
- 
+-        }
+-    }
+-    "test" {}
+-}
+-
 -val copySources by task<Sync> {
 -    val stdlibProjectDir = project(":kotlin-stdlib").projectDir
 -
 -    from(stdlibProjectDir.resolve("runtime"))
-+task("copySources",type:Sync) {
-+    def stdlibProjectDir = project(":kotlin-stdlib").projectDir
-+	println("Look at me woo")
-+	println("$stdlibProjectDir")
-+    from(stdlibProjectDir.toString()+"/runtime")
-         .include("kotlin/TypeAliases.kt",
-                  "kotlin/text/TypeAliases.kt")
+-        .include("kotlin/TypeAliases.kt",
+-                 "kotlin/text/TypeAliases.kt")
 -    from(stdlibProjectDir.resolve("src"))
-+    from(stdlibProjectDir.toString()+"/src")
-         .include("kotlin/collections/TypeAliases.kt")
+-        .include("kotlin/collections/TypeAliases.kt")
 -    from(stdlibProjectDir.resolve("../src"))
-+    from(stdlibProjectDir.toString()+"/../src")
-         .include("kotlin/util/Standard.kt",
-                  "kotlin/internal/Annotations.kt",
-                  "kotlin/contracts/ContractBuilder.kt",
-                  "kotlin/contracts/Effect.kt")
+-        .include("kotlin/util/Standard.kt",
+-                 "kotlin/internal/Annotations.kt",
+-                 "kotlin/contracts/ContractBuilder.kt",
+-                 "kotlin/contracts/Effect.kt")
 -    into(File(buildDir, "src"))
-+    into(new File(buildDir, "src"))
- }
- 
+-}
+-
 -tasks.withType<JavaCompile> {
-+tasks.withType(JavaCompile) {
-     sourceCompatibility = "1.6"
-     targetCompatibility = "1.6"
- }
- 
+-    sourceCompatibility = "1.6"
+-    targetCompatibility = "1.6"
+-}
+-
 -tasks.withType<KotlinCompile> {
-+tasks.withType(KotlinCompile) {
-     dependsOn(copySources)
-     kotlinOptions {
+-    dependsOn(copySources)
+-    kotlinOptions {
 -        freeCompilerArgs += listOf(
-+        freeCompilerArgs += [
-             "-module-name",
-             "kotlin-stdlib",
-             "-Xmulti-platform",
-             "-Xuse-experimental=kotlin.contracts.ExperimentalContracts",
-             "-Xuse-experimental=kotlin.Experimental"
+-            "-module-name",
+-            "kotlin-stdlib",
+-            "-Xmulti-platform",
+-            "-Xuse-experimental=kotlin.contracts.ExperimentalContracts",
+-            "-Xuse-experimental=kotlin.Experimental"
 -        )
-+        ]
-     }
- }
- 
+-    }
+-}
+-
 -val jar = runtimeJar {
 -    dependsOn(builtins)
 -    from(provider { zipTree(builtins.singleFile) }) { include("kotlin/**") }
-+Task jar = ArtifactsKt.customRuntimeJar(project){
-+	println("heeeeeeeeyooooo")
-+	println(project.configurations.builtins.getSingleFile())
-+    it.dependsOn(project.configurations.builtins)
-+    it.from(provider { project.configurations.builtins.getSingleFile() }) { include("kotlin/**") }
- }
- 
--val distDir: String by rootProject.extra
-+ext.distDir= rootProject.ext.distDir
- 
--dist(targetName = "kotlin-stdlib-minimal-for-test.jar", targetDir = File(distDir), fromTask = jar)
-+ArtifactsKt.customDist(project,new File(distDir),"kotlin-stdlib-minimal-for-test.jar",jar){}
- 
--publishing {
-+/*publishing {
-     publications {
-         create<MavenPublication>("internal") {
-             artifactId = "kotlin-stdlib-minimal-for-test"
-@@ -81,4 +83,4 @@
-         maven("${rootProject.buildDir}/internal/repo")
-     }
- }
+-}
 -
-+*/
+-val distDir: String by rootProject.extra
+-
+-dist(targetName = "kotlin-stdlib-minimal-for-test.jar", targetDir = File(distDir), fromTask = jar)
+-
+-publishing {
+-    publications {
+-        create<MavenPublication>("internal") {
+-            artifactId = "kotlin-stdlib-minimal-for-test"
+-            artifact(jar)
+-        }
+-    }
+-
+-    repositories {
+-        maven("${rootProject.buildDir}/internal/repo")
+-    }
+-}
+-
 --- /dev/null
 +++ b/libraries/tools/kotlin-annotations-android/build.gradle
 @@ -0,0 +1,33 @@
@@ -4415,34 +4392,141 @@ Author: Saif Abdul Casim
 -}
 +}*/
 --- a/libraries/tools/mutability-annotations-compat/build.gradle.kts
-+++ b/libraries/tools/mutability-annotations-compat/build.gradle.kts
-@@ -1,20 +1,24 @@
++++ /dev/null
+@@ -1,20 +0,0 @@
 -description = "Compatibility artifact with Mutable and ReadOnly annotations"
- 
- plugins {
+-
+-plugins {
 -    java
+-    id("jps-compatible")
+-}
+-
+-jvmTarget = "1.6"
+-
+-tasks.withType<JavaCompile> {
+-    sourceCompatibility = "1.6"
+-    targetCompatibility = "1.6"
+-}
+-
+-sourceSets {
+-    "main" { projectDefault() }
+-    "test" {}
+-}
+-
+-dist()
+--- /dev/null
++++ b/libraries/stdlib/jvm-minimal-for-test/build.gradle
+@@ -0,0 +1,86 @@
++import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
++
++plugins {
++    id("org.jetbrains.kotlin.jvm")
++}
++
++description = "Kotlin Mock Runtime for Tests"
++
++jvmTarget = "1.6"
++javaHome = rootProject.ext["JDK_16"] as String
++
++configurations.create("builtins")
++
++dependencies {
++    compileOnly(project(":kotlin-stdlib"))
++    builtins(project(":core:builtins"))
++}
++
++sourceSets {
++    "main" {
++        java {
++            srcDir(new File(buildDir, "src"))
++        }
++    }
++    "test" {}
++}
++
++task("copySources",type:Sync) {
++    def stdlibProjectDir = project(":kotlin-stdlib").projectDir
++	println("Look at me woo")
++	println("$stdlibProjectDir")
++    from(stdlibProjectDir.toString()+"/runtime")
++        .include("kotlin/TypeAliases.kt",
++                 "kotlin/text/TypeAliases.kt")
++    from(stdlibProjectDir.toString()+"/src")
++        .include("kotlin/collections/TypeAliases.kt")
++    from(stdlibProjectDir.toString()+"/../src")
++        .include("kotlin/util/Standard.kt",
++                 "kotlin/internal/Annotations.kt",
++                 "kotlin/contracts/ContractBuilder.kt",
++                 "kotlin/contracts/Effect.kt")
++    into(new File(buildDir, "src"))
++}
++
++tasks.withType(JavaCompile) {
++    sourceCompatibility = "1.6"
++    targetCompatibility = "1.6"
++}
++
++tasks.withType(KotlinCompile) {
++    dependsOn(copySources)
++    kotlinOptions {
++        freeCompilerArgs += [
++            "-module-name",
++            "kotlin-stdlib",
++            "-Xmulti-platform",
++            "-Xuse-experimental=kotlin.contracts.ExperimentalContracts",
++            "-Xuse-experimental=kotlin.Experimental"
++        ]
++    }
++}
++
++Task jar = ArtifactsKt.customRuntimeJar(project){
++	println("heeeeeeeeyooooo")
++	println(project.configurations.builtins.getSingleFile())
++    it.dependsOn(project.configurations.builtins)
++    it.from(provider { project.configurations.builtins.getSingleFile() }) { include("kotlin/**") }
++}
++
++ext.distDir= rootProject.ext.distDir
++
++ArtifactsKt.customDist(project,new File(distDir),"kotlin-stdlib-minimal-for-test.jar",jar){}
++
++/*publishing {
++    publications {
++        create<MavenPublication>("internal") {
++            artifactId = "kotlin-stdlib-minimal-for-test"
++            artifact(jar)
++        }
++    }
++
++    repositories {
++        maven("${rootProject.buildDir}/internal/repo")
++    }
++}
++*/
+--- /dev/null
++++ b/libraries/tools/mutability-annotations-compat/build.gradle
+@@ -0,0 +1,24 @@
++
++plugins {
 +    id("java")
-     id("jps-compatible")
- }
- 
++    id("jps-compatible")
++}
++
 +description = "Compatibility artifact with Mutable and ReadOnly annotations"
 +
- jvmTarget = "1.6"
- 
--tasks.withType<JavaCompile> {
++jvmTarget = "1.6"
++
 +tasks.withType(JavaCompile) {
-     sourceCompatibility = "1.6"
-     targetCompatibility = "1.6"
- }
- 
- sourceSets {
--    "main" { projectDefault() }
++    sourceCompatibility = "1.6"
++    targetCompatibility = "1.6"
++}
++
++sourceSets {
 +    "main" {
 +    	java.srcDirs("src")
 +		resources.srcDir("resources")
 +	}
-     "test" {}
- }
- 
--dist()
++    "test" {}
++}
++
 +ArtifactsKt.customDist(project,null,null,null){}
